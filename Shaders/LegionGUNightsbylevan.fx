@@ -1070,7 +1070,9 @@ namespace LegionGUNights
 	// anything where the UI mask reaches UI_SRC_FROM.
 	static const float SRC_AMBIENT = 4.0;
 	static const float SRC_SURROUND = 2.0;
-	static const float SRC_MIN = 0.25;       // in a dark night everything not quite black passed for a light at 0.12
+	static const float SRC_MIN = 0.16;       // 0.12 let everything not quite black pass; 0.25 (1.6.3) lost the dim
+	                                         // indoor lamps the game draws barely lit. The colour doors below carry
+	                                         // the false-light work now, the floor only cuts the noise.
 	static const float SRC_SOFT = 0.5;
 	static const float SRC_RING1 = 2.0;
 	static const float SRC_RING2 = 4.5;
@@ -2070,11 +2072,19 @@ namespace LegionGUNights
 		float across = max(LightTap(bestUV - 2.0 * dy, thr), LightTap(bestUV + 2.0 * dy, thr));
 		keep *= 1.0 - along * (1.0 - across);
 
-		// Only real light counts: very bright, or bright and of a strong colour (a flame, a lit window, a crystal, glowing
-		// eyes). Pale fur or grey armour stands out of a dark night too, and each character got a halo of its own.
+		// Only real light counts, three doors: a nearly clipped white disc (a lamp, the flame core), a bright and
+		// strongly coloured patch (crystals, fel, glowing eyes), or warm light (red clearly over blue: fire, lava,
+		// torches), which after the block average is neither clipped nor very saturated. Pale fur, grey armour and
+		// moonlit white wings pass none of the three.
 		float lmax = max(light.r, max(light.g, light.b));
 		float lsat = (lmax - min(light.r, min(light.g, light.b))) / max(lmax, 1e-5);
-		keep *= saturate(max(smoothstep(LIGHT_WHITE.x, LIGHT_WHITE.y, peak), smoothstep(LIGHT_SAT.x, LIGHT_SAT.y, lsat) * smoothstep(LIGHT_COLOURED.x, LIGHT_COLOURED.y, peak)));
+		float warmL = saturate((light.r - light.b) / max(light.r, 1e-5) * 2.5);
+		keep *= saturate(max(max(smoothstep(LIGHT_WHITE.x, LIGHT_WHITE.y, peak),
+			smoothstep(LIGHT_SAT.x, LIGHT_SAT.y, lsat) * smoothstep(LIGHT_COLOURED.x, LIGHT_COLOURED.y, peak)),
+			warmL * smoothstep(0.2, 0.45, peak)));
+		// Pure red is text, not fire: enemy names over heads are saturated red with almost no green, while a
+		// flame is orange, half green in its red. Red runes and crystals dim with the names; a fair trade.
+		keep *= 1.0 - 0.9 * warmL * (1.0 - smoothstep(0.18, 0.35, light.g / max(light.r, 1e-5)));
 		// A farther light glows less (see LIGHT_FAR): a torch a hundred yards off is a spark, not the lamp at the door.
 		float yards = Yards(u);
 		keep /= 1.0 + (yards / LIGHT_FAR) * (yards / LIGHT_FAR);
@@ -2084,11 +2094,11 @@ namespace LegionGUNights
 		[unroll]
 		for (int k3 = 0; k3 < (LEGIONGU_GLOW_TAPS + 1) * (LEGIONGU_GLOW_TAPS + 1); ++k3)
 			cover += val[k3] > thr ? 1.0 : 0.0;
-		// Only warm light (red clearly over blue: fire, lava, torches, lit windows) and strongly coloured light keep
-		// the full glow wherever they fill the screen. Pale and white light is cut like the cold: white wings, pale
-		// fur and grey armour stood out of a dark night and glowed like lamps (1.6.2 and before cut only the cold).
-		float warmL = saturate((light.r - light.b) / max(light.r, 1e-5) * 2.5);
-		float cold = 1.0 - warmL * saturate(lsat * 3.0);
+		// The self and area cuts hit two kinds: blue-cold light (glowing mounts, 1.6.2 and before) and pale
+		// colourless light (white wings, pale fur, 1.6.3). Warm and strongly coloured light passes whole.
+		float coldBlue = saturate((light.b - light.g) / max(light.b, 1e-5) * 3.0);
+		float pale = (1.0 - warmL) * (1.0 - saturate(lsat * 3.0));
+		float cold = max(coldBlue, pale);
 		// The player's own glowing mount or armour: cold light near the camera in the middle of the frame, where the
 		// character always is. Each flap of a glowing wing was found anew and flashed the land blue like a police car.
 		float2 dc = (bestUV - float2(0.5, 0.55)) * float2(ASPECT, 1.0);

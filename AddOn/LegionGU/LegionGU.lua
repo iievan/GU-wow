@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.6.4-release"
+local VERSION = "1.6.5-release"
 local CELL = 4
 local CELLS = 55
 
@@ -554,8 +554,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.6.4.\n\nПод чатом лёгкая подложка, текст не тонет в мире; выключается на странице «Профили и фото». Рамки и имена напарников читаются ночью. Ночью светятся только настоящие огни. Белые крылья, светлая шерсть и серые доспехи ночью не сияют, как фонари: свечение оставлено огню, лампам и ярко окрашенному свету.\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.6.4.\n\nA light shade sits behind the chat, so the text does not sink into the world; turn it off on the «Profiles and photo» page. Party frames and names stay readable at night. At night only real fires glow. White wings, pale fur and grey armour no longer shine like lamps: the glow belongs to fire, lamps and strongly coloured light.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.6.5.\n\nОгни снова светят, тусклые лампы в домах тоже. Красные имена врагов не считаются огнями. Подложка под чатом держится после входа.\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.6.5.\n\nThe fires glow again, dim indoor lamps too. Red enemy names do not count as fires. The chat shade holds after login.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -1395,8 +1395,14 @@ events:SetScript("OnEvent", function(self, event, arg1)
 	end
 	if event == "PLAYER_ENTERING_WORLD" then
 		-- The chat shade, when it is on: the game keeps the alpha per window, this only reasserts the choice.
+		-- A moment later too: the chat settings cache can land after this event and overwrite the alpha.
 		if DB.chatBack then
 			ChatBack()
+			After(3, function()
+				if DB.chatBack then
+					ChatBack()
+				end
+			end)
 		end
 	end
 	if event == "PLAYER_ENTERING_WORLD" and DB.newsSeen ~= VERSION then

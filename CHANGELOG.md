@@ -1,5 +1,21 @@
 # GU-WOW: история версий / Version history
 
+## 1.6.5-release «Лунная тропа» / "Moonlit Path"
+
+### Русский
+
+**Исправлено**
+- Костры, факелы и лампы светят снова, тусклые лампы в помещениях тоже. Фильтр 1.6.3 против ложных огней задел настоящие: усреднение делает пламя не совсем белым и не совсем цветным, и оно резалось вместе с крыльями. Теперь у тёплого света (огонь, лава, окна) своя дверь в фильтре, а планка яркости опущена до тусклых ламп.
+- Красные имена врагов над головами не считаются огнями. Чистый красный без зелени это текст; пламя оранжевое. Красные надписи не светят и не пересвечиваются.
+- Подложка под чатом держится: настройки чата подгружаются после входа в мир и затирали её, теперь она подтверждается ещё раз через мгновение.
+
+### English
+
+**Fixed**
+- Bonfires, torches and lamps glow again, dim indoor lamps too. The 1.6.3 filter against false lights caught the real ones: the block average makes a flame neither clipped white nor strongly coloured, and it was cut with the wings. Warm light (fire, lava, windows) has its own door in the filter now, and the brightness bar is down to the dim lamps.
+- Red enemy names over heads do not count as fires. Pure red with no green is text; a flame is orange. Red names no longer glow.
+- The chat shade holds: the chat settings load after entering the world and overwrote it; it is reasserted a moment later.
+
 ## 1.6.4-release «Лунная тропа» / "Moonlit Path"
 
 ### Русский
