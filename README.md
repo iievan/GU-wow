@@ -5,13 +5,13 @@
 Графическое улучшение World of Warcraft. Основные работы проводятся на версии Legion 7.3.5. 
 Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
-Текущая сборка: **1.5.6-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **1.5.8-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.5.6-release
+## Что входит в сборку 1.5.8-release
 
 Всё настраивается в игре: Интерфейс > Модификации > GU-WOW, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -23,7 +23,7 @@
 | Атмосфера | Погодное настроение | В пасмурную погоду и в дождь дымка гуще, цвет холоднее, контраст мягче. Работает, только когда включён туман | 1.3 |
 | Атмосфера | Тени в щелях | Мягкие тени под камнями, травой и у стен, предметы садятся на землю | 1.4 |
 | Атмосфера | Мокрая земля | В дождь и в пасмурную погоду земля темнеет, блестит и отражает небо | 1.4 |
-| Атмосфера | Марево | В пустынях и огненных землях дальняя земля дрожит от жара. Персонажи и небо не искажаются. Включается на странице «Профили и фото» | 1.5.4 |
+| Атмосфера | Марево | В пустынях и огненных землях дальняя земля дрожит от жара. Персонажи и небо не искажаются. Ползунок силы на главной странице меню, 0 выключает | 1.5.4 |
 | Атмосфера | Атмосфера по зонам | В болотах и лесах гуще низовой туман, в пустынях воздух прозрачнее, в снегах больше дымки. В выжженных землях и в городах низового тумана меньше. Ползунки игрока остаются главными | 1.5 |
 | Ночь | Ночь по игровым часам | Темнеет с 21:00 до 5:00 с плавным переходом. Ползунки «Темнота ночи» и «Глубина ночи» | 1.3 |
 | Ночь | Свет огней | Огонь, окна и лава светят тёплым светом. Ползунок «Свет огней» | до 1.3 |
@@ -32,8 +32,8 @@
 | Ночь | Лунный свет | Ночью луна даёт мягкие холодные лучи | 1.5 |
 | Картинка | Резкость, цвет по времени суток, виньетка, привыкание глаз | Чёткость без мыла, золотистые вечер и утро, прохладные тени ночью, мягкое затемнение краёв, глаза привыкают к темноте и свету | 1.3 |
 | Картинка | Цветовые стили | «Тёплый», «Холодный», «Плёнка», «Сочный», а с 1.5.4 ещё «Закат», «Сказка» и «Нуар». Меняют характер цвета, как фильтр фотоаппарата | 1.5 |
-| Картинка | Кино-HDR | Тени глубже, яркое не выгорает в белое, цвет чуть плотнее, как на киноплёнке. Переключатель | 1.5.4 |
-| Картинка | Плёночное зерно | Лёгкое зерно плёнки, ползунок | 1.5.4 |
+| Картинка | Кино-HDR | Тени глубже, яркое не выгорает в белое, цвет чуть плотнее, как на киноплёнке. Ползунок силы на главной странице меню | 1.5.4 |
+| Картинка | Плёночное зерно | Лёгкое зерно плёнки, ползунок на главной странице меню | 1.5.4 |
 | Фото | Фоторежим | Интерфейс прячется, персонаж в фокусе, фон размыт. Не работает в бою | 1.4 |
 | Фото | Сила размытия и боке | Ползунок силы размытия фона. По умолчанию размытие втрое мягче, чем в 1.5.3. Боке превращает огни на размытом фоне в мягкие кружки | 1.5.4 |
 | Фото | Облёт, имена, кинорамка | В фоторежиме: медленный облёт камеры вокруг персонажа, скрытие имён над головами, кинорамка. На экранах 21:9 кинорамки почти не видно | 1.5 |
@@ -41,9 +41,9 @@
 | Удобство | Меню в игре | Все переключатели и ползунки, изменения видны сразу | 1.3 |
 | Удобство | Настройки автора | Кнопка возвращает настройки автора после вопроса. Пресеты остаются | 1.5.4 |
 | Удобство | Что нового | После обновления игра один раз показывает, что появилось | 1.5.4 |
-| Удобство | Мои пресеты | До 10 своих настроек с названиями в основном разделе меню. Их можно сохранить, загрузить и удалить. Перед загрузкой, удалением и перезаписью меню спрашивает подтверждение | 1.5.1 |
-| Удобство | Предпросмотр | Стили, готовые профили и чужие коды сначала только показываются на экране. Ваши настройки меняются, только если нажать «Применить» | 1.5.1 |
-| Удобство | Готовые профили | «Кино», «Ясный день», «Мрачно», «Больше FPS» | 1.4 |
+| Удобство | Мои пресеты | До 10 своих настроек с названиями на странице «Профили и фото». Их можно сохранить, загрузить и удалить. Перед загрузкой, удалением и перезаписью меню спрашивает подтверждение | 1.5.1 |
+| Удобство | Предпросмотр | Готовые пресеты, стили и чужие коды сначала только показываются на экране. Ваши настройки меняются, только если нажать «Применить» | 1.5.1 |
+| Удобство | Готовые пресеты | На главной странице меню: Default (настройки автора), Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir, More FPS. Стрелки показывают пресет сразу, «Применить» оставляет его, ползунки подстраивают его до применения. «+» сохраняет свои настройки как «Пользовательские #1» и дальше по номерам, до 10, «-» удаляет показанный | 1.5.8 |
 | Удобство | Коды настройки | Кнопка «Мой код» даёт строку с вашими настройками. Друг вставляет её и нажимает «Попробовать код» | 1.5 |
 | Удобство | Кнопка у миникарты | Щелчок левой кнопкой мыши открывает меню, правой включает и выключает мод. Shift с левой кнопкой или средняя кнопка запускают фоторежим. Кнопку можно перетащить по кругу миникарты | 1.5 |
 | Удобство | Автокачество | По умолчанию выключено, включается на странице «Профили и фото». Если кадров меньше, чем задано ползунком «Держать кадров не ниже» (по умолчанию 45), тени в щелях, низовой туман, резкость, мокрая земля и привыкание глаз временно отключаются | 1.5 |
@@ -117,13 +117,13 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 A graphical enhancement for World of Warcraft. The main development work is being carried out for Legion 7.3.5.
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
-Current build: **1.5.6-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **1.5.8-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.5.6-release
+## What is in build 1.5.8-release
 
 Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -135,7 +135,7 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 | Atmosphere | Weather mood | In overcast weather and rain the haze gets thicker, the colours cooler and the contrast softer. Works only with the fog on | 1.3 |
 | Atmosphere | Contact shadows | Soft shadows under stones, grass and near walls, objects sit on the ground | 1.4 |
 | Atmosphere | Wet ground | In rain and overcast weather the ground darkens, shines and reflects the sky | 1.4 |
-| Atmosphere | Heat haze | In deserts and fire lands the far ground wavers in the heat. Characters and the sky stay still. Turned on on the "Profiles and photo" page | 1.5.4 |
+| Atmosphere | Heat haze | In deserts and fire lands the far ground wavers in the heat. Characters and the sky stay still. A strength slider on the main menu page, 0 turns it off | 1.5.4 |
 | Atmosphere | Atmosphere by zone | Thicker ground mist in swamps and forests, clearer air in deserts, more haze in the snow. Less ground mist in scorched lands and cities. Your sliders stay in charge | 1.5 |
 | Night | Night by the game clock | It gets dark from 21:00 to 5:00 with a smooth fade. Sliders "Night darkness" and "Night depth" | 1.3 |
 | Night | Light glow | Fire, windows and lava glow with warm light. Slider "Light glow" | before 1.3 |
@@ -144,8 +144,8 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 | Night | Moonlight | At night the moon casts soft cold rays | 1.5 |
 | Picture | Sharpness, time of day colour, vignette, eye adaptation | Crisp picture without blur, golden evenings and mornings, cool shadows at night, soft dark edges, eyes that adapt to dark and light | 1.3 |
 | Picture | Colour styles | Warm, Cold, Film, Vivid, and since 1.5.4 Sunset, Fairy tale and Noir. They change the mood of the colours, like a camera filter | 1.5 |
-| Picture | Cinema HDR | Deeper shadows, bright areas no longer burn to white, a little denser colour, like film. A switch | 1.5.4 |
-| Picture | Film grain | A light film grain, a slider | 1.5.4 |
+| Picture | Cinema HDR | Deeper shadows, bright areas no longer burn to white, a little denser colour, like film. A strength slider on the main menu page | 1.5.4 |
+| Picture | Film grain | A light film grain, a slider on the main menu page | 1.5.4 |
 | Photo | Photo mode | The interface hides, your character stays in focus, the background is blurred. Not available in combat | 1.4 |
 | Photo | Blur strength and bokeh | A slider for the background blur. By default the blur is three times softer than in 1.5.3. Bokeh turns lights in the blur into soft discs | 1.5.4 |
 | Photo | Orbit, names, cinema bars | In photo mode: a slow camera orbit around your character, names above heads hidden, cinema bars. On 21:9 screens the bars barely show | 1.5 |
@@ -153,9 +153,9 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 | Convenience | In-game menu | All switches and sliders, changes show at once | 1.3 |
 | Convenience | Author's settings | A button restores the author's settings after a question. Presets stay | 1.5.4 |
 | Convenience | What is new | After an update the game shows once what has appeared | 1.5.4 |
-| Convenience | My presets | Up to 10 named sets of your own settings in the main menu page. You can save, load and delete them. Before loading, deleting or overwriting, the menu asks you to confirm | 1.5.1 |
-| Convenience | Preview | Styles, ready profiles and friends' codes are first only shown on screen. Your settings change only when you press "Apply" | 1.5.1 |
-| Convenience | Ready profiles | Cinema, Clear day, Gloomy, More FPS | 1.4 |
+| Convenience | My presets | Up to 10 named sets of your own settings on the "Profiles and photo" page. You can save, load and delete them. Before loading, deleting or overwriting, the menu asks you to confirm | 1.5.1 |
+| Convenience | Preview | Ready presets, styles and friends' codes are first only shown on screen. Your settings change only when you press "Apply" | 1.5.1 |
+| Convenience | Ready presets | On the main menu page: Default (the author's settings), Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir, More FPS. The arrows show a preset at once, «Apply» keeps it, the sliders tune it before that. «+» saves your settings as «Custom #1» and up by number, 10 at most, «-» deletes the shown one | 1.5.8 |
 | Convenience | Settings codes | The "My code" button gives a line with your settings. A friend pastes it and presses "Try the code" | 1.5 |
 | Convenience | Minimap button | Left click opens the menu, right click turns the mod on or off. Shift and left click, or middle click, start photo mode. The button can be dragged around the minimap | 1.5 |
 | Convenience | Auto quality | Off by default, turn it on on the "Profiles and photo" page. When the frame rate drops below the "Keep FPS at least" slider (45 by default), contact shadows, ground mist, sharpening, wet ground and eye adaptation pause | 1.5 |

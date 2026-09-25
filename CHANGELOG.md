@@ -1,5 +1,37 @@
 # GU-WOW: история версий / Version history
 
+## 1.5.8-release «Лунная тропа» / "Moonlit Path"
+
+### Русский
+
+**Новое**
+- Готовые пресеты на главной странице меню: Default, Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir и More FPS. Default повторяет настройки автора, остальные собраны от него. Стрелки сразу показывают пресет на экране, кнопка «Применить» оставляет его.
+- Пока идёт предпросмотр, ползунки подстраивают показанный пресет. «Применить» сохраняет его с правками, «Отменить» возвращает прежние настройки.
+- Рядом со стрелками видно имя пресета, который сейчас на экране. После любой правки там написано «Свои настройки».
+- Кнопка «+» рядом со стрелками сохраняет настройки с экрана как пресет «Пользовательские #1» и дальше по номерам, до 10. Кнопка «-» удаляет показанный пользовательский пресет после вопроса. Стрелки листают готовые и пользовательские вместе.
+
+**Изменено**
+- Настройки автора обновлены до вида, собранного в игре 25.09. Кнопка «Настройки автора» возвращает пресет Default.
+- Марево, кино-HDR и плёночное зерно находятся на главной странице меню рядом с остальными эффектами игры. Они работают всё время, поэтому им место среди настроек игры.
+- У марева и кино-HDR есть ползунок силы от 0 до 100. Ноль выключает эффект, 50 даёт вид версии 1.5.4, 100 усиливает вдвое. Кто включал их в 1.5.4, получит 50.
+- Страница «Профили и фото» собирает то, что нужно только для снимков и подбора вида: стили, коды, свои пресеты, фоторежим, боке и размытие фона.
+- Коды настройки из прошлых версий читаются.
+
+### English
+
+**New**
+- Ready presets on the main menu page: Default, Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir and More FPS. Default is the author's settings, the others are built from it. The arrows show a preset on screen at once, the «Apply» button keeps it.
+- While a preview is on, the sliders tune the preset on screen. «Apply» saves it with your changes, «Cancel» brings back your settings.
+- Next to the arrows you see the name of the preset on screen. After any change it says «Custom».
+- The «+» button next to the arrows saves the on-screen settings as the preset «Custom #1» and up by number, 10 at most. The «-» button deletes the shown user preset after a question. The arrows walk through the ready and the user presets together.
+
+**Changed**
+- The author's settings are updated to the look tuned in game on 25.09. The «Author's settings» button brings back the Default preset.
+- Heat haze, cinema HDR and film grain sit on the main menu page with the other in-game effects. They work all the time, so they belong with the game settings.
+- Heat haze and cinema HDR have a strength slider from 0 to 100. Zero turns the effect off, 50 gives the look of 1.5.4, 100 doubles it. If you had them on in 1.5.4, you get 50.
+- The "Profiles and photo" page holds what is needed only for shots and choosing a look: styles, codes, your presets, photo mode, bokeh and background blur.
+- Settings codes from earlier versions still load.
+
 ## 1.5.6-release «Лунная тропа» / "Moonlit Path"
 
 ### Русский

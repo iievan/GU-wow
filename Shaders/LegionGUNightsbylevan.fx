@@ -155,8 +155,10 @@
 #define LEGIONGU_CTL_GRAIN 18    // film grain
 #define LEGIONGU_CTL_PHOTO_BLUR 19 // the photo mode blur
 #define LEGIONGU_CTL_EXTRA 20    // 1 heat haze, 2 a hot zone (desert, fire), 4 cinema HDR, 8 bokeh in photo mode
+#define LEGIONGU_CTL_HAZE 21     // heat haze strength, 50 the look of 1.5.4
+#define LEGIONGU_CTL_HDR 22      // cinema HDR strength, 50 the look of 1.5.4
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 45    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 49    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -165,7 +167,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 21; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 23; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
@@ -3226,7 +3228,7 @@ namespace LegionGUNights
 			{
 				float ht = GUTimer * 0.001;
 				float2 wob = float2(sin(uv.y * 700.0 + ht * 5.0 + sin(uv.x * 37.0 + ht * 1.7) * 2.0), 0.5 * sin(uv.y * 530.0 - ht * 4.1 + uv.x * 23.0));
-				float2 off = wob * hz * HAZE_PX * (float(BUFFER_HEIGHT) / 1080.0) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+				float2 off = wob * hz * HAZE_PX * LegionGUValue(LEGIONGU_CTL_HAZE, 50.0) * 0.02 * (float(BUFFER_HEIGHT) / 1080.0) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 				c = tex2Dlod(ColorLinear, float4(uv + off, 0.0, 0.0)).rgb;
 			}
 		}
@@ -3336,7 +3338,9 @@ namespace LegionGUNights
 			float hl = max(dot(c, LUMA601), 1e-4);
 			float tl = hl < 0.25 ? hl * lerp(0.8, 1.0, hl / 0.25) : hl;
 			tl = tl > 0.65 ? 0.65 + (tl - 0.65) * (1.0 - 0.25 * (tl - 0.65) / 0.35) : tl;
-			c = saturate(lerp(float3(tl, tl, tl), c * (tl / hl), 1.08));
+			// The strength slider: 50 is the look of 1.5.4, 100 twice as much.
+			float3 hdr = saturate(lerp(float3(tl, tl, tl), c * (tl / hl), 1.08));
+			c = saturate(lerp(c, hdr, LegionGUValue(LEGIONGU_CTL_HDR, 50.0) * 0.02));
 		}
 
 		// A light vignette: the corners a little darker, the middle as it is.

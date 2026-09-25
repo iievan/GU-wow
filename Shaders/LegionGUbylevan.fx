@@ -172,8 +172,10 @@
 #define LEGIONGU_CTL_GRAIN 18    // film grain
 #define LEGIONGU_CTL_PHOTO_BLUR 19 // the photo mode blur
 #define LEGIONGU_CTL_EXTRA 20    // 1 heat haze, 2 a hot zone (desert, fire), 4 cinema HDR, 8 bokeh in photo mode
+#define LEGIONGU_CTL_HAZE 21     // heat haze strength, 50 the look of 1.5.4
+#define LEGIONGU_CTL_HDR 22      // cinema HDR strength, 50 the look of 1.5.4
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 45    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 49    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -182,7 +184,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 21; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 23; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
@@ -2587,7 +2589,7 @@ namespace LegionGU
 	static const float BRIDGE_GAP = 0.3;    // smallest step between black and white in each channel
 	static const float BRIDGE_HOLD = 2.0;   // seconds the last values stay after the strip is gone
 
-	texture2D BridgePrevTex { Width = 21; Height = 1; Format = RGBA32F; };
+	texture2D BridgePrevTex { Width = 23; Height = 1; Format = RGBA32F; };
 	sampler2D BridgePrev { Texture = BridgePrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 	float3 BridgeCell(int i)
@@ -2636,7 +2638,7 @@ namespace LegionGU
 			bool live = seen || (prev0.x > 0.5 && since <= BRIDGE_HOLD);
 			return float4(live ? 1.0 : 0.0, since, seen ? 1.0 : 0.0, 1.0);
 		}
-		if (seen && texel <= 20)
+		if (seen && texel <= 22)
 			return float4(BridgeValue(1 + 2 * texel, th) / 63.0, 0.0, 0.0, 1.0);
 		return tex2Dfetch(BridgePrev, int2(texel, 0));
 	}

@@ -1,13 +1,13 @@
 -- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
--- The settings travel to the shader as a strip of 39 cells, 4 by 4 pixels, in the top left corner of the screen.
+-- The settings travel to the shader as a strip of 49 cells, 4 by 4 pixels, in the top left corner of the screen.
 -- The effect LegionGUBridge (LegionGUbylevan.fx) reads the strip after the interface is drawn and covers it
 -- again, so it is not seen. Each colour channel is black or white, one bit. Cell 0 is black, cell 1 white, cell 2
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.5.6-release"
+local VERSION = "1.5.8-release"
 local CELL = 4
-local CELLS = 45
+local CELLS = 49
 
 -- Russian on a Russian client, English elsewhere.
 local RU = GetLocale() == "ruRU"
@@ -15,15 +15,15 @@ local function T(ru, en)
 	return RU and ru or en
 end
 
--- The author's own settings, tuned in game on 2026-09-24 and 25.
+-- The author's own settings, the preset «Default», tuned in game on 2026-09-25.
 local DEFAULTS = {
 	master = true, fog = true, weather = true, wet = true, rays = true, night = true, eye = true,
-	zones = true, autoQuality = false, targetFps = 45, orbit = false, hideNames = true, cinema = false, style = 0,
-	fogThickness = 50, fogDistance = 97, mist = 100, mistDensity = 50, raysStrength = 95,
-	nightDarkness = 80, nightDepth = 0, lightGlow = 70, caveDarkness = 50,
-	sharpness = 10, grade = 90, vignette = 19, ao = 35,
-	-- 1.5.4: all off by default, so the author's picture stays as it is; the photo blur is a third of 1.5.3's.
-	heatHaze = false, cinemaHdr = false, grain = 0, bokeh = false, photoBlur = 35,
+	zones = true, autoQuality = false, targetFps = 45, orbit = false, hideNames = true, cinema = true, style = 0,
+	fogThickness = 20, fogDistance = 100, mist = 58, mistDensity = 70, raysStrength = 100,
+	nightDarkness = 95, nightDepth = 70, lightGlow = 95, caveDarkness = 75,
+	sharpness = 40, grade = 95, vignette = 55, ao = 50,
+	-- Heat haze and cinema HDR: 0 off, 50 the look of 1.5.4.
+	hazeStrength = 50, hdrStrength = 50, grain = 55, bokeh = false, photoBlur = 50,
 }
 -- The order of the values in the strip, the same as LEGIONGU_CTL_* in the shaders (after the flags).
 local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDarkness", "lightGlow",
@@ -32,17 +32,54 @@ local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDa
 local CODE_KEYS = { "fogThickness", "fogDistance", "mist", "mistDensity", "raysStrength", "nightDarkness", "nightDepth",
 	"lightGlow", "caveDarkness", "sharpness", "grade", "vignette", "ao", "style" }
 local CODE_FLAGS = { "fog", "rays", "night", "weather", "wet", "eye", "zones", "cinema" }
--- Since 1.5.4 a code (GUW2) carries these too; a GUW1 code leaves them as they are.
+-- Since 1.5.4 a code (GUW2) carries these too; a GUW1 code leaves them as they are. GUW2 had heat haze and cinema
+-- HDR as switches, GUW3 (1.5.8) carries their strengths; the two first bits of the switches stay unused.
 local CODE_KEYS2 = { "grain", "photoBlur" }
+local CODE_KEYS3 = { "grain", "photoBlur", "hazeStrength", "hdrStrength" }
 local CODE_FLAGS2 = { "heatHaze", "cinemaHdr", "bokeh" }
 -- The look: what a style, a ready profile or a friend's code may change. The zones and the cinema bars are the
 -- player's habits, not the look, so a preview leaves them alone.
 local LOOK = { fog = true, rays = true, night = true, weather = true, wet = true, eye = true,
-	heatHaze = true, cinemaHdr = true, grain = true }
+	hazeStrength = true, hdrStrength = true, grain = true }
 for _, k in ipairs(CODE_KEYS) do
 	LOOK[k] = true
 end
 local MAX_PRESETS = 10
+
+-- The ready presets of the main page: «Default» with a few values changed. English names on every client, as the
+-- author named them. Styles: 1 warm, 2 cold, 3 film, 5 sunset, 6 fairy tale, 7 noir.
+local BASE_PRESETS = {
+	{ "Default", {} },
+	-- Clear air and little mist keep the sky open; the night is dark, not black, the colour cold.
+	{ "Starry Night", { fogThickness = 10, mist = 35, mistDensity = 50, nightDarkness = 85, nightDepth = 45, lightGlow = 100,
+		grade = 100, vignette = 45, hdrStrength = 60, grain = 35, style = 2 } },
+	{ "Peaceful Morning", { fogThickness = 30, fogDistance = 90, mist = 85, mistDensity = 50, grade = 100, sharpness = 30,
+		vignette = 30, ao = 45, hazeStrength = 25, hdrStrength = 35, grain = 25, style = 1 } },
+	{ "Cinema", { fogThickness = 40, fogDistance = 75, mist = 70, ao = 55, sharpness = 30, vignette = 65, hdrStrength = 70,
+		grain = 65, style = 3 } },
+	{ "Clear Day", { fogThickness = 5, mist = 25, mistDensity = 40, raysStrength = 85, nightDarkness = 75, nightDepth = 30,
+		sharpness = 50, grade = 70, vignette = 20, hdrStrength = 30, grain = 0 } },
+	{ "Golden Sunset", { fogThickness = 30, fogDistance = 90, mist = 60, grade = 100, vignette = 45, hazeStrength = 70,
+		hdrStrength = 60, grain = 40, style = 5 } },
+	{ "Fairy Forest", { fogThickness = 35, fogDistance = 85, mist = 100, mistDensity = 60, lightGlow = 100, nightDepth = 40,
+		sharpness = 35, vignette = 40, hdrStrength = 40, grain = 20, style = 6 } },
+	{ "Grim Storm", { fogThickness = 75, fogDistance = 45, mist = 100, mistDensity = 85, raysStrength = 60, nightDarkness = 100,
+		nightDepth = 90, caveDarkness = 90, sharpness = 30, vignette = 65, hdrStrength = 60, grain = 60, style = 2 } },
+	{ "Noir", { fogThickness = 30, mist = 60, nightDepth = 80, sharpness = 45, vignette = 70, hdrStrength = 80, grain = 75,
+		style = 7 } },
+	-- The heavy parts off: the same that auto quality lightens, and the rays.
+	{ "More FPS", { wet = false, eye = false, rays = false, mist = 0, ao = 0, sharpness = 0, hazeStrength = 0, grain = 0 } },
+}
+for _, p in ipairs(BASE_PRESETS) do
+	local full = {}
+	for k in pairs(LOOK) do
+		full[k] = DEFAULTS[k]
+	end
+	for k, v in pairs(p[2]) do
+		full[k] = v
+	end
+	p[2] = full
+end
 
 local DB
 -- A look tried on the page «Profiles and photo»: on screen until «Apply» or «Cancel», never saved by itself, so
@@ -284,9 +321,10 @@ local function Paint()
 	local state, time = GameState()
 	lastState, lastTime = state, time
 	local hot = zoneKind == "desert" or zoneKind == "fire"
-	local switches = (V("heatHaze") and 1 or 0) + (hot and 2 or 0) + (V("cinemaHdr") and 4 or 0) + (DB.bokeh and 8 or 0)
+	local haze, hdr = V("hazeStrength") or 0, V("hdrStrength") or 0
+	local switches = (haze > 0 and 1 or 0) + (hot and 2 or 0) + (hdr > 0 and 4 or 0) + (DB.bokeh and 8 or 0)
 	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + (DB.cinema and 8 or 0),
-		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches }
+		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches, Code(haze), Code(hdr) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v
@@ -438,22 +476,16 @@ local function MakeCode()
 		end
 	end
 	parts[#parts + 1] = tostring(f)
-	for _, k in ipairs(CODE_KEYS2) do
+	for _, k in ipairs(CODE_KEYS3) do
 		parts[#parts + 1] = tostring(math.floor((DB[k] or 0) + 0.5))
 	end
-	local f2 = 0
-	for i, k in ipairs(CODE_FLAGS2) do
-		if DB[k] then
-			f2 = f2 + 2 ^ (i - 1)
-		end
-	end
-	parts[#parts + 1] = tostring(f2)
-	return "GUW2:" .. table.concat(parts, ".")
+	parts[#parts + 1] = tostring(DB.bokeh and 4 or 0)
+	return "GUW3:" .. table.concat(parts, ".")
 end
 
 -- The values a code carries, or nil when the line is not a GU-WOW code.
 local function ParseCode(code)
-	local ver, body = string.match(code or "", "GUW([12]):([%d%.]+)")
+	local ver, body = string.match(code or "", "GUW([123]):([%d%.]+)")
 	if not body then
 		return nil
 	end
@@ -462,7 +494,8 @@ local function ParseCode(code)
 		nums[#nums + 1] = tonumber(n)
 	end
 	local n1 = #CODE_KEYS + 1
-	if #nums ~= (ver == "2" and n1 + #CODE_KEYS2 + 1 or n1) then
+	local keys2 = ver == "3" and CODE_KEYS3 or CODE_KEYS2
+	if #nums ~= (ver == "1" and n1 or n1 + #keys2 + 1) then
 		return nil
 	end
 	local t = {}
@@ -473,14 +506,20 @@ local function ParseCode(code)
 	for i, k in ipairs(CODE_FLAGS) do
 		t[k] = math.floor(f / 2 ^ (i - 1)) % 2 == 1
 	end
-	if ver == "2" then
-		for i, k in ipairs(CODE_KEYS2) do
+	if ver ~= "1" then
+		for i, k in ipairs(keys2) do
 			t[k] = math.min(nums[n1 + i], 100)
 		end
 		local f2 = nums[#nums]
 		for i, k in ipairs(CODE_FLAGS2) do
 			t[k] = math.floor(f2 / 2 ^ (i - 1)) % 2 == 1
 		end
+		-- A GUW2 switch becomes the strength of 1.5.4.
+		if ver == "2" then
+			t.hazeStrength = t.heatHaze and 50 or 0
+			t.hdrStrength = t.cinemaHdr and 50 or 0
+		end
+		t.heatHaze, t.cinemaHdr = nil, nil
 	end
 	return t
 end
@@ -489,10 +528,14 @@ end
 -- The panels: Interface > AddOns > GU-WOW, and its page «Profiles and photo»
 -- ---------------------------------------------------------------------------------------------------------------
 
+-- The widgets show what is on screen, a preview too. Setting a slider there is not a change by the player.
+local refreshing = false
 local function Refresh()
+	refreshing = true
 	for _, w in pairs(widgets) do
 		w:Refresh()
 	end
+	refreshing = false
 end
 
 local function Say(text)
@@ -502,8 +545,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.5.6.\n\nНовое: марево в пустынях, стили «Закат», «Сказка» и «Нуар», кино-HDR, плёночное зерно, сила размытия и боке в фоторежиме, кнопка «Настройки автора». Всё новое выключено, включается на странице «Профили и фото».\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.5.6.\n\nNew: heat haze in deserts, the Sunset, Fairy tale and Noir styles, cinema HDR, film grain, blur strength and bokeh in photo mode, the Author's settings button. All new things are off; turn them on on the «Profiles and photo» page.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.5.8.\n\nНа главной странице меню появились пресеты: Default, Starry Night, Peaceful Morning и ещё семь. Стрелки показывают пресет сразу, «Применить» оставляет его, «+» сохраняет свои настройки под номером, «-» удаляет.\n\nМарево, кино-HDR и плёночное зерно тоже на главной странице, у каждого свой ползунок силы. Свои пресеты на странице «Профили и фото».\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.5.8.\n\nThe main page of the menu has presets now: Default, Starry Night, Peaceful Morning and seven more. The arrows show a preset at once, «Apply» keeps it, «+» saves your settings under a number, «-» deletes.\n\nHeat haze, cinema HDR and film grain are on the main page too, each with its own strength slider. Your own presets are on the «Profiles and photo» page.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -532,8 +575,21 @@ local function Confirm(text, onYes)
 	end
 end
 
--- Changing the player's own look in the main panel ends a preview: from then on the screen shows their settings.
+-- A change in the panel during a preview tunes the preview: «Apply» saves it with the change, «Cancel» brings back
+-- the player's own settings untouched.
 local CancelPreview
+
+-- Where a change goes: into the preview while one is on, into the player's settings otherwise.
+local function Set(key, v)
+	if preview and LOOK[key] then
+		preview[key] = v
+	else
+		DB[key] = v
+	end
+	if widgets.base then
+		widgets.base:Refresh()
+	end
+end
 
 local function Header(parent, text, x, y)
 	local h = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -550,17 +606,14 @@ local function Check(parent, key, label, x, y, onClick)
 	c:SetPoint("TOPLEFT", x, y)
 	_G[name .. "Text"]:SetText(label)
 	c:SetScript("OnClick", function(self)
-		DB[key] = self:GetChecked() and true or false
-		if preview and LOOK[key] then
-			CancelPreview()
-		end
+		Set(key, self:GetChecked() and true or false)
 		if onClick then
 			onClick()
 		end
 		Paint()
 	end)
 	c.Refresh = function(self)
-		self:SetChecked(DB[key])
+		self:SetChecked(V(key))
 	end
 	widgets[name] = c
 	return c
@@ -585,17 +638,16 @@ local function Slider(parent, key, label, x, y, lo, hi)
 	s:SetScript("OnValueChanged", function(self, v)
 		v = math.floor(v + 0.5)
 		text:SetText(label .. ": " .. v)
-		if DB and DB[key] ~= v then
-			DB[key] = v
-			if preview and LOOK[key] then
-				CancelPreview()
-			end
-			Paint()
+		if refreshing or not DB or V(key) == v then
+			return
 		end
+		Set(key, v)
+		Paint()
 	end)
 	s.Refresh = function(self)
-		self:SetValue(DB[key])
-		text:SetText(label .. ": " .. DB[key])
+		local v = V(key)
+		self:SetValue(v)
+		text:SetText(label .. ": " .. v)
 	end
 	widgets[name] = s
 	return s
@@ -706,11 +758,140 @@ title:SetPoint("TOPLEFT", 16, -16)
 title:SetText("GU-WOW " .. VERSION)
 local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-sub:SetText(T("Туман, лучи солнца, ночь и картинка. Всё меняется сразу. Весь мод на клавише F11.",
-	"Fog, sun rays, night and picture. Changes apply at once. The whole mod toggles with F11."))
+sub:SetText(T("Всё, что видно в игре. Меняется сразу. Весь мод на клавише F11. Стили, свои пресеты и фото: «Профили и фото».",
+	"Everything seen in the game. Changes apply at once. The whole mod toggles with F11. Styles, own presets, photo: «Profiles and photo»."))
 
 local L, R = 16, 330
 Check(panel, "master", T("Включить GU-WOW", "Enable GU-WOW"), L, -60)
+
+-- The presets: the arrows walk through the ready ones and the player's own and show each at once as a preview.
+-- «Apply» on the bar at the top of the screen makes it the player's own, the sliders tune it before that. The name
+-- shows while the settings are exactly a preset, «Свои настройки» after any change. «+» saves those as a numbered
+-- user preset, «-» deletes the shown user preset; the ready ones stay.
+local baseIndex = 1
+local function FindPreset(name)
+	for i, p in ipairs(DB.presets) do
+		if p.name == name then
+			return i
+		end
+	end
+end
+-- The preset the on-screen look is exactly equal to: its place among the ready ones and then the player's own,
+-- and its name. Nothing when the look is the player's own mix.
+local function MatchingPreset()
+	for i, p in ipairs(BASE_PRESETS) do
+		local same = true
+		for k, v in pairs(p[2]) do
+			if V(k) ~= v then
+				same = false
+				break
+			end
+		end
+		if same then
+			return i, p[1]
+		end
+	end
+	for j, p in ipairs(DB and DB.presets or {}) do
+		local t = ParseCode(p.code)
+		if t then
+			local same = true
+			for k in pairs(LOOK) do
+				if t[k] == nil or V(k) ~= t[k] then
+					same = false
+					break
+				end
+			end
+			if same then
+				return #BASE_PRESETS + j, p.name
+			end
+		end
+	end
+end
+Header(panel, T("Пресет", "Preset"), R, -66)
+local baseLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+baseLabel:SetPoint("TOPLEFT", R + 78, -66)
+baseLabel:SetWidth(122)
+baseLabel:SetHeight(12)
+local function ShowBase(d)
+	local total = #BASE_PRESETS + #(DB.presets or {})
+	baseIndex = (baseIndex - 1 + d) % total + 1
+	if baseIndex <= #BASE_PRESETS then
+		Preview(BASE_PRESETS[baseIndex][2], BASE_PRESETS[baseIndex][1])
+		return
+	end
+	local p = DB.presets[baseIndex - #BASE_PRESETS]
+	local t = ParseCode(p.code)
+	if t then
+		Preview(t, p.name)
+	else
+		Say(T("пресет «", "the preset «") .. p.name .. T("» повреждён.", "» is damaged."))
+	end
+end
+local function SaveShown()
+	local _, name = MatchingPreset()
+	if name then
+		Say(T("это уже сохранённый пресет «", "this is already the preset «") .. name .. "».")
+		return
+	end
+	if #DB.presets >= MAX_PRESETS then
+		Say(T("пресетов уже 10. Удалите ненужный кнопкой «-» или на странице «Профили и фото».",
+			"there are 10 presets already. Delete one with «-» or on the «Profiles and photo» page."))
+		return
+	end
+	if preview then
+		ApplyPreview()
+	end
+	local n = 1
+	while FindPreset(T("Пользовательские #", "Custom #") .. n) do
+		n = n + 1
+	end
+	local newName = T("Пользовательские #", "Custom #") .. n
+	table.insert(DB.presets, { name = newName, code = MakeCode() })
+	Refresh()
+	Say(T("сохранено как пресет «", "saved as the preset «") .. newName .. "».")
+end
+local function DeleteShown()
+	local i, name = MatchingPreset()
+	if not i or i <= #BASE_PRESETS then
+		Say(T("показан готовый пресет, удалить можно только пользовательский.",
+			"a ready preset is shown; only a user preset can be deleted."))
+		return
+	end
+	Confirm(T("Удалить пресет «", "Delete the preset «") .. name .. "»?", function()
+		table.remove(DB.presets, i - #BASE_PRESETS)
+		if preview then
+			CancelPreview()
+		else
+			Refresh()
+		end
+		Say(T("пресет «", "preset «") .. name .. T("» удалён.", "» deleted."))
+	end)
+end
+local function Tip(b, text)
+	b:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(text, nil, nil, nil, nil, true)
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+end
+Tip(Button(panel, "<", R + 50, -61, 24, function() ShowBase(-1) end), T("Предыдущий пресет", "Previous preset"))
+Tip(Button(panel, ">", R + 204, -61, 24, function() ShowBase(1) end), T("Следующий пресет", "Next preset"))
+Tip(Button(panel, "+", R + 232, -61, 24, SaveShown),
+	T("Сохранить настройки с экрана как пресет «Пользовательские #1» и дальше по номерам, всего до 10",
+		"Save the on-screen settings as the preset «Custom #1» and up by number, 10 at most"))
+Tip(Button(panel, "-", R + 260, -61, 24, DeleteShown),
+	T("Удалить показанный пользовательский пресет. Готовые не удаляются",
+		"Delete the shown user preset. The ready ones stay"))
+widgets.base = { Refresh = function()
+	local i, name = MatchingPreset()
+	if i then
+		baseIndex = i
+	end
+	baseLabel:SetText(name or T("Свои настройки", "Custom"))
+end }
 
 Header(panel, T("Атмосфера", "Atmosphere"), L, -94)
 Check(panel, "fog", T("Туман", "Fog"), L, -110)
@@ -723,6 +904,10 @@ Check(panel, "wet", T("Мокрая земля в дождь", "Wet ground in ra
 Check(panel, "rays", T("Лучи солнца", "Sun rays"), L, -352)
 Slider(panel, "raysStrength", T("Сила лучей", "Ray strength"), L + 6, -392)
 Slider(panel, "ao", T("Тени в щелях", "Contact shadows"), L + 6, -434)
+Slider(panel, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), L + 6, -476)
+Check(panel, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), L, -500, function()
+	UpdateZone()
+end)
 
 Header(panel, T("Ночь", "Night"), R, -94)
 Check(panel, "night", T("Ночь и огни", "Night and lights"), R, -110)
@@ -731,18 +916,107 @@ Slider(panel, "nightDepth", T("Глубина ночи", "Night depth"), R + 6, 
 Slider(panel, "lightGlow", T("Свет огней", "Light glow"), R + 6, -234)
 Slider(panel, "caveDarkness", T("Темнота подземелий", "Dungeon darkness"), R + 6, -276)
 
-Header(panel, T("Картинка", "Picture"), R, -310)
-Slider(panel, "sharpness", T("Резкость", "Sharpness"), R + 6, -348)
-Slider(panel, "grade", T("Цвет по времени суток", "Time of day colour"), R + 6, -390)
-Slider(panel, "vignette", T("Виньетка", "Vignette"), R + 6, -432)
-Check(panel, "eye", T("Привыкание глаз", "Eye adaptation"), R, -456)
+Header(panel, T("Картинка", "Picture"), R, -306)
+Check(panel, "eye", T("Привыкание глаз", "Eye adaptation"), R, -322)
+Slider(panel, "sharpness", T("Резкость", "Sharpness"), R + 6, -360)
+Slider(panel, "grade", T("Цвет по времени суток", "Time of day colour"), R + 6, -400)
+Slider(panel, "vignette", T("Виньетка", "Vignette"), R + 6, -440)
+Slider(panel, "hdrStrength", T("Кино-HDR: глубже тени, мягче блики", "Cinema HDR: deeper shadows, softer highlights"), R + 6, -480)
+Slider(panel, "grain", T("Плёночное зерно", "Film grain"), R + 6, -520)
+
+panel:SetScript("OnShow", Refresh)
+panel.okay = function() end
+panel.cancel = function() end
+panel.default = function()
+	preview, previewBase, previewStyle = nil, nil, nil
+	bar:Hide()
+	for k, v in pairs(DEFAULTS) do
+		DB[k] = v
+	end
+	Refresh()
+	Paint()
+end
+panel.refresh = Refresh
+
+-- The author's settings in one click, after a question. Blizzard's «Defaults» at the bottom of the window can also
+-- reset the whole game interface, this button only GU-WOW.
+local authorButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+authorButton:SetWidth(160)
+authorButton:SetHeight(22)
+authorButton:SetPoint("TOPRIGHT", -16, -16)
+authorButton:SetText(T("Настройки автора", "Author's settings"))
+authorButton:SetScript("OnClick", function()
+	Confirm(T("Вернуть настройки автора? Ваши нынешние заменятся. Пресеты останутся.", "Restore the author's settings? Your current ones are replaced. Presets stay."), function()
+		panel.default()
+		Say(T("настройки автора вернулись.", "the author's settings are back."))
+	end)
+end)
+
+-- The second page.
+local page = CreateFrame("Frame", "LegionGUPanel2", UIParent)
+page.name = T("Профили и фото", "Profiles and photo")
+page.parent = panel.name
+page:Hide()
+local title2 = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+title2:SetPoint("TOPLEFT", 16, -16)
+title2:SetText("GU-WOW: " .. page.name)
+
+local sub2 = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+sub2:SetPoint("TOPLEFT", title2, "BOTTOMLEFT", 0, -6)
+sub2:SetWidth(590)
+sub2:SetJustifyH("LEFT")
+sub2:SetText(T("Стили и коды сначала только показываются. Сохраняет их кнопка «Применить». Готовые пресеты на главной странице.",
+	"Styles and codes are only shown at first. «Apply» saves them. The ready presets are on the main page."))
+
+Header(page, T("Цветовой стиль", "Colour style"), 16, -62)
+local STYLE_NAMES = { T("Нет", "None"), T("Тёплый", "Warm"), T("Холодный", "Cold"), T("Плёнка", "Film"), T("Сочный", "Vivid"),
+	T("Закат", "Sunset"), T("Сказка", "Fairy tale"), T("Нуар", "Noir") }
+local styleButtons = {}
+for i, n in ipairs(STYLE_NAMES) do
+	styleButtons[i] = Button(page, n, 16 + (i - 1) * 73, -80, 70, function()
+		Preview({ style = i - 1 }, nil, n)
+	end)
+end
+widgets.styles = { Refresh = function()
+	for i, b in ipairs(styleButtons) do
+		if (V("style") or 0) == i - 1 then
+			b:LockHighlight()
+		else
+			b:UnlockHighlight()
+		end
+	end
+end }
+
+Header(page, T("Код настройки: поделиться или вставить чужой", "Settings code: share yours or paste another"), 16, -116)
+local codeBox = CreateFrame("EditBox", "LegionGUCodeBox", page, "InputBoxTemplate")
+codeBox:SetPoint("TOPLEFT", 22, -136)
+codeBox:SetWidth(460)
+codeBox:SetHeight(20)
+codeBox:SetAutoFocus(false)
+codeBox:SetMaxLetters(200)
+codeBox:SetScript("OnEnterPressed", codeBox.ClearFocus)
+codeBox:SetScript("OnEscapePressed", codeBox.ClearFocus)
+codeBox:SetScript("OnHide", codeBox.ClearFocus)
+Button(page, T("Мой код", "My code"), 16, -162, 140, function()
+	codeBox:SetText(MakeCode())
+	codeBox:HighlightText()
+	codeBox:SetFocus()
+end)
+Button(page, T("Попробовать код", "Try the code"), 162, -162, 140, function()
+	local t = ParseCode(codeBox:GetText())
+	if t then
+		Preview(t, T("код настройки", "settings code"))
+	else
+		Say(T("это не код GU-WOW.", "this is not a GU-WOW code."))
+	end
+end)
 
 -- My presets: up to ten named sets of the player's own settings. The arrows walk through them, the box holds the
 -- name to save under, load or delete. Loading, deleting and overwriting ask first.
-local presetHeader = Header(panel, "", L, -490)
+local presetHeader = Header(page, "", L, -198)
 local presetIndex = 0
-local nameBox = CreateFrame("EditBox", "LegionGUPresetName", panel, "InputBoxTemplate")
-nameBox:SetPoint("TOPLEFT", L + 40, -508)
+local nameBox = CreateFrame("EditBox", "LegionGUPresetName", page, "InputBoxTemplate")
+nameBox:SetPoint("TOPLEFT", L + 40, -216)
 nameBox:SetWidth(146)
 nameBox:SetHeight(22)
 nameBox:SetAutoFocus(false)
@@ -772,24 +1046,16 @@ local function PresetName()
 	return (string.gsub(string.gsub(nameBox:GetText() or "", "|", ""), "^%s*(.-)%s*$", "%1"))
 end
 
-local function FindPreset(name)
-	for i, p in ipairs(DB.presets) do
-		if p.name == name then
-			return i
-		end
-	end
-end
-
 local function Step(d)
 	local n = #DB.presets
 	if n > 0 then
 		ShowPreset((presetIndex - 1 + d) % n + 1)
 	end
 end
-Button(panel, "<", L, -508, 30, function() nameBox:ClearFocus() Step(-1) end)
-Button(panel, ">", L + 192, -508, 30, function() nameBox:ClearFocus() Step(1) end)
+Button(page, "<", L, -216, 30, function() nameBox:ClearFocus() Step(-1) end)
+Button(page, ">", L + 192, -216, 30, function() nameBox:ClearFocus() Step(1) end)
 
-Button(panel, T("Сохранить", "Save"), L + 228, -508, 110, function()
+Button(page, T("Сохранить", "Save"), L + 228, -216, 110, function()
 	nameBox:ClearFocus()
 	-- A preset keeps the player's own settings; during a preview the screen shows something else.
 	if preview then
@@ -821,7 +1087,7 @@ Button(panel, T("Сохранить", "Save"), L + 228, -508, 110, function()
 	end
 end)
 
-Button(panel, T("Загрузить", "Load"), L + 344, -508, 110, function()
+Button(page, T("Загрузить", "Load"), L + 344, -216, 110, function()
 	nameBox:ClearFocus()
 	local name = PresetName()
 	local i = FindPreset(name)
@@ -848,7 +1114,7 @@ Button(panel, T("Загрузить", "Load"), L + 344, -508, 110, function()
 	end)
 end)
 
-Button(panel, T("Удалить", "Delete"), L + 460, -508, 110, function()
+Button(page, T("Удалить", "Delete"), L + 460, -216, 110, function()
 	nameBox:ClearFocus()
 	local name = PresetName()
 	local i = FindPreset(name)
@@ -863,112 +1129,7 @@ Button(panel, T("Удалить", "Delete"), L + 460, -508, 110, function()
 	end)
 end)
 
-local note = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-note:SetPoint("BOTTOMLEFT", 16, 16)
-note:SetWidth(430)
-note:SetJustifyH("LEFT")
-note:SetText(T("Стили, профили, фото и новые эффекты: страница «Профили и фото».", "Styles, profiles, photo and new effects: the «Profiles and photo» page."))
-
-panel:SetScript("OnShow", Refresh)
-panel.okay = function() end
-panel.cancel = function() end
-panel.default = function()
-	preview, previewBase, previewStyle = nil, nil, nil
-	bar:Hide()
-	for k, v in pairs(DEFAULTS) do
-		DB[k] = v
-	end
-	Refresh()
-	Paint()
-end
-panel.refresh = Refresh
-
--- The author's settings in one click, after a question. Blizzard's «Defaults» at the bottom of the window can also
--- reset the whole game interface, this button only GU-WOW.
-local authorButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-authorButton:SetWidth(160)
-authorButton:SetHeight(22)
-authorButton:SetPoint("BOTTOMRIGHT", -16, 12)
-authorButton:SetText(T("Настройки автора", "Author's settings"))
-authorButton:SetScript("OnClick", function()
-	Confirm(T("Вернуть настройки автора? Ваши нынешние заменятся. Пресеты останутся.", "Restore the author's settings? Your current ones are replaced. Presets stay."), function()
-		panel.default()
-		Say(T("настройки автора вернулись.", "the author's settings are back."))
-	end)
-end)
-
--- The second page.
-local page = CreateFrame("Frame", "LegionGUPanel2", UIParent)
-page.name = T("Профили и фото", "Profiles and photo")
-page.parent = panel.name
-page:Hide()
-local title2 = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-title2:SetPoint("TOPLEFT", 16, -16)
-title2:SetText("GU-WOW: " .. page.name)
-
-local sub2 = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-sub2:SetPoint("TOPLEFT", title2, "BOTTOMLEFT", 0, -6)
-sub2:SetWidth(590)
-sub2:SetJustifyH("LEFT")
-sub2:SetText(T("Стили, профили и коды сначала только показываются. Сохраняет их кнопка «Применить».",
-	"Styles, profiles and codes are only shown at first. «Apply» saves them."))
-
-Header(page, T("Цветовой стиль", "Colour style"), 16, -62)
-local STYLE_NAMES = { T("Нет", "None"), T("Тёплый", "Warm"), T("Холодный", "Cold"), T("Плёнка", "Film"), T("Сочный", "Vivid"),
-	T("Закат", "Sunset"), T("Сказка", "Fairy tale"), T("Нуар", "Noir") }
-local styleButtons = {}
-for i, n in ipairs(STYLE_NAMES) do
-	styleButtons[i] = Button(page, n, 16 + (i - 1) * 73, -80, 70, function()
-		Preview({ style = i - 1 }, nil, n)
-	end)
-end
-widgets.styles = { Refresh = function()
-	for i, b in ipairs(styleButtons) do
-		if (V("style") or 0) == i - 1 then
-			b:LockHighlight()
-		else
-			b:UnlockHighlight()
-		end
-	end
-end }
-
-Header(page, T("Готовые профили", "Ready profiles"), 16, -116)
-local PROFILES = {
-	{ T("Кино", "Cinema"), { fog = true, rays = true, night = true, weather = true, eye = true, fogThickness = 70, fogDistance = 60, mist = 80, mistDensity = 55, raysStrength = 100, nightDarkness = 85, nightDepth = 30, lightGlow = 75, caveDarkness = 55, sharpness = 15, grade = 90, vignette = 40, ao = 50, style = 3 } },
-	{ T("Ясный день", "Clear day"), { fog = true, rays = true, night = true, fogThickness = 35, fogDistance = 90, mist = 40, mistDensity = 35, raysStrength = 90, nightDarkness = 60, nightDepth = 0, lightGlow = 60, caveDarkness = 30, sharpness = 25, grade = 50, vignette = 15, ao = 35, style = 0 } },
-	{ T("Мрачно", "Gloomy"), { fog = true, rays = true, night = true, weather = true, fogThickness = 85, fogDistance = 40, mist = 100, mistDensity = 70, raysStrength = 70, nightDarkness = 95, nightDepth = 70, lightGlow = 70, caveDarkness = 75, sharpness = 10, grade = 80, vignette = 55, ao = 60, style = 2 } },
-	{ T("Больше FPS", "More FPS"), { rays = false, eye = false, wet = false, mist = 0, ao = 0, sharpness = 0 } },
-}
-for i, p in ipairs(PROFILES) do
-	Button(page, p[1], 16 + (i - 1) * 145, -134, 140, function()
-		Preview(p[2], p[1])
-	end)
-end
-
-Header(page, T("Код настройки: поделиться или вставить чужой", "Settings code: share yours or paste another"), 16, -170)
-local codeBox = CreateFrame("EditBox", "LegionGUCodeBox", page, "InputBoxTemplate")
-codeBox:SetPoint("TOPLEFT", 22, -190)
-codeBox:SetWidth(460)
-codeBox:SetHeight(20)
-codeBox:SetAutoFocus(false)
-codeBox:SetMaxLetters(200)
-codeBox:SetScript("OnEnterPressed", codeBox.ClearFocus)
-codeBox:SetScript("OnEscapePressed", codeBox.ClearFocus)
-codeBox:SetScript("OnHide", codeBox.ClearFocus)
-Button(page, T("Мой код", "My code"), 16, -216, 140, function()
-	codeBox:SetText(MakeCode())
-	codeBox:HighlightText()
-	codeBox:SetFocus()
-end)
-Button(page, T("Попробовать код", "Try the code"), 162, -216, 140, function()
-	local t = ParseCode(codeBox:GetText())
-	if t then
-		Preview(t, T("код настройки", "settings code"))
-	else
-		Say(T("это не код GU-WOW.", "this is not a GU-WOW code."))
-	end
-end)
-
+-- Photo: only what works in photo mode and on the clean screenshot.
 Header(page, T("Фото", "Photo"), 16, -252)
 Check(page, "orbit", T("Медленный облёт камеры", "Slow camera orbit"), 16, -270)
 Check(page, "hideNames", T("Прятать имена над головами", "Hide names above heads"), 16, -296)
@@ -978,17 +1139,9 @@ Slider(page, "photoBlur", T("Сила размытия", "Blur strength"), 336, 
 Button(page, T("Фоторежим", "Photo mode"), 330, -274, 150, GUWOW_TogglePhoto)
 Button(page, T("Чистый снимок", "Clean screenshot"), 330, -302, 150, GUWOW_Screenshot)
 
-Header(page, T("Прочее", "Other"), 16, -384)
-Check(page, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), 16, -402, function()
-	UpdateZone()
-end)
-Check(page, "autoQuality", T("Автокачество: упрощать тяжёлое при низких кадрах", "Auto quality: lighten heavy effects at low FPS"), 16, -428)
+Header(page, T("Производительность", "Performance"), 16, -386)
+Check(page, "autoQuality", T("Автокачество: упрощать тяжёлое при низких кадрах", "Auto quality: lighten heavy effects at low FPS"), 16, -404)
 Slider(page, "targetFps", T("Держать кадров не ниже", "Keep FPS at least"), 330, -408, 20, 120)
-
-Header(page, T("Новые эффекты", "New effects"), 16, -464)
-Check(page, "heatHaze", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), 16, -482)
-Check(page, "cinemaHdr", T("Кино-HDR: глубже тени, мягче блики", "Cinema HDR: deeper shadows, softer highlights"), 16, -508)
-Slider(page, "grain", T("Плёночное зерно", "Film grain"), 336, -494)
 
 page:SetScript("OnShow", Refresh)
 page.refresh = Refresh
@@ -1150,6 +1303,14 @@ events:SetScript("OnEvent", function(self, event, arg1)
 		end
 		LegionGUDB = LegionGUDB or {}
 		DB = LegionGUDB
+		-- The switches of 1.5.4 to 1.5.6 become strengths: on is the look of 1.5.4.
+		if DB.hazeStrength == nil and DB.heatHaze ~= nil then
+			DB.hazeStrength = DB.heatHaze and 50 or 0
+		end
+		if DB.hdrStrength == nil and DB.cinemaHdr ~= nil then
+			DB.hdrStrength = DB.cinemaHdr and 50 or 0
+		end
+		DB.heatHaze, DB.cinemaHdr = nil, nil
 		for k, v in pairs(DEFAULTS) do
 			if DB[k] == nil then
 				DB[k] = v
