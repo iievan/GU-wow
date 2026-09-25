@@ -2,7 +2,7 @@
 
 **Русский** · [English](#english)
 
-Графическое улучшение World of Warcraft, созданное в знак солидарности сообществу Brothers of Turtle. Основные работы проводятся на версии Legion 7.3.5. 
+Графическое улучшение World of Warcraft. Основные работы проводятся на версии Legion 7.3.5. 
 Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
 Текущая сборка: **1.5.1-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
@@ -107,7 +107,7 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 
 ## English
 
-A graphical enhancement for World of Warcraft created as a sign of solidarity with the Brothers of Turtle community. The main development work is being carried out for Legion 7.3.5.
+A graphical enhancement for World of Warcraft. The main development work is being carried out for Legion 7.3.5.
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
 Current build: **1.5.1-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
@@ -210,6 +210,8 @@ The build is free and provided "as is", without any warranty. You use it at your
 
 ## P.S.
 
-Героизму первопроходства самого сплоченного сообщества Turtle WoW. Честь и слава Черепашке!
+Чести Turtle WoW. Слава Черепашке!
+Создано в знак солидарности сообществу Brothers of Turtle.
 
-To the pioneering heroism of the most united Turtle WoW community. Honor and glory to the Turtle!
+Honor to Turtle WoW. Glory to the Turtle!
+Created as a sign of solidarity with the Brothers of Turtle community.
