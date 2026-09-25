@@ -5,13 +5,13 @@
 Графическое улучшение World of Warcraft. Основные работы проводятся на версии Legion 7.3.5. 
 Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
-Текущая сборка: **1.5.1-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **1.5.2-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.5.1-release
+## Что входит в сборку 1.5.2-release
 
 Всё настраивается в игре: Интерфейс > Модификации > GU-WOW, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -45,6 +45,7 @@
 | Удобство | Чистый экран | Эффекты не трогают интерфейс, стартовый экран, экраны загрузки и открытую карту мира | 1.3 |
 | Установщик | Установка в одну кнопку | Ставит и удаляет сборку. ReShade скачивается с официального сайта и проверяется | 1.3 |
 | Установщик | Новые версии | Сообщает о выходе новой сборки и открывает страницу загрузки | 1.5 |
+| Установщик | Скромная надпись ReShade | Надпись ReShade при запуске игры вдвое меньше и видна около 5 секунд, даже после очистки диска | 1.5.2 |
 
 Подробно о каждой сборке: [CHANGELOG.md](CHANGELOG.md).
 
@@ -110,13 +111,13 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 A graphical enhancement for World of Warcraft. The main development work is being carried out for Legion 7.3.5.
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
-Current build: **1.5.1-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **1.5.2-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.5.1-release
+## What is in build 1.5.2-release
 
 Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -150,6 +151,7 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 | Convenience | Clean screen | The effects leave the interface, the login screen, loading screens and the open world map alone | 1.3 |
 | Installer | One-click install | Installs and removes the build. ReShade is downloaded from the official site and checked | 1.3 |
 | Installer | New versions | Tells you when a new build is out and opens its download page | 1.5 |
+| Installer | A quiet ReShade banner | The ReShade banner at the game start is half as big and shows for about 5 seconds, even after a disk cleanup | 1.5.2 |
 
 Details of every build: [CHANGELOG.md](CHANGELOG.md).
 

@@ -2,6 +2,6 @@
 ## Title: GU-WOW
 ## Notes: Настройки тумана, лучей солнца, ночи и картинки GU-WOW прямо в игре. Открыть: Интерфейс > Модификации > GU-WOW или /gu.
 ## Author: levan
-## Version: 1.5.1-release
+## Version: 1.5.2-release
 ## SavedVariables: LegionGUDB
 LegionGU.lua

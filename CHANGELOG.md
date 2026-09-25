@@ -1,5 +1,23 @@
 # GU-WOW: история версий / Version history
 
+## 1.5.2-release «Лунная тропа» / "Moonlit Path"
+
+> Модификация создана в честь неоспоримого наследия Turtle WoW, а также для жизни и процветания коммьюнити Brothers of Turtle. Лок'Тар!
+>
+> This mod is made in honour of the undeniable legacy of Turtle WoW, and for the life and prosperity of the Brothers of Turtle community. Lok'tar!
+
+### Русский
+
+**Исправлено**
+- Надпись ReShade при запуске игры вдвое меньше. Раньше на мониторах от 1440 пикселей в высоту ReShade сам увеличивал её в полтора раза, а на 4K в два.
+- Надпись видна около 5 секунд. Собранные эффекты теперь хранятся в папке игры, и очистка диска их больше не стирает. Раньше после неё эффекты собирались заново от 10 до 20 секунд.
+
+### English
+
+**Fixed**
+- The ReShade banner at the game start is half as big. Before, ReShade itself made it 1.5 times bigger on screens of 1440 lines and more, and twice as big on 4K.
+- The banner shows for about 5 seconds. The compiled effects are now kept in the game folder, so a disk cleanup no longer makes them compile again for 10 to 20 seconds.
+
 ## 1.5.1-release «Лунная тропа» / "Moonlit Path"
 
 > Модификация создана в честь неоспоримого наследия Turtle WoW, а также для жизни и процветания коммьюнити Brothers of Turtle. Лок'Тар!

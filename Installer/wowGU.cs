@@ -24,7 +24,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.5.1-release";
+	const string Version = "1.5.2-release";
 	// Releases of GU-WOW: the window says when a newer one is out and opens its page; it never downloads by itself.
 	const string ReleasesApi = "https://api.github.com/repos/iievan/GU-wow/releases/latest";
 	const string ReShadeUrl = "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe";
@@ -234,6 +234,8 @@ static class WowGU
 			Say("Закройте игру и нажмите «Установить» ещё раз.");
 			return;
 		}
+		// An update over an earlier GU-WOW: the player's own choices in ReShade.ini stay.
+		bool updating = File.Exists(G(Marker));
 		var marker = ReadMarker();
 		string dll = current.Api + ".dll";
 
@@ -305,10 +307,33 @@ static class WowGU
 		IniSet(rs, "GENERAL", "EffectSearchPaths", @".\reshade-shaders\Shaders\**", true);
 		IniSet(rs, "GENERAL", "TextureSearchPaths", @".\reshade-shaders\Textures\**", true);
 		IniSet(rs, "GENERAL", "PresetPath", @".\" + Preset, true);
-		IniSet(rs, "INPUT", "KeyOverlay", "145,0,0,0", false);
-		IniSet(rs, "INPUT", "KeyEffects", "122,0,0,0", false);
+		// The keys only on the first install. ReShade leaves them unset (0,0,0,0) there; on an update the same value
+		// means the player cleared the key on purpose.
+		if (!updating)
+		{
+			IniSet(rs, "INPUT", "KeyOverlay", "145,0,0,0", false);
+			IniSet(rs, "INPUT", "KeyEffects", "122,0,0,0", false);
+		}
 		IniSet(rs, "OVERLAY", "TutorialProgress", "4", true);
 		if (IniGet(rs, "INPUT", "KeyOverlay") == "36,0,0,0") IniSet(rs, "INPUT", "KeyOverlay", "145,0,0,0", true);
+		// The ReShade banner at the game start. ReShade shows it while the effects compile and 5 s after, always opaque.
+		// With the default font size 13 it scales the font by the screen height, 1.5 at 1440 lines and 2 at 4K:
+		// a 10 px font at scale 1 makes it about half as big. The compiled effects kept in the game folder, not in Temp
+		// that disk cleaners wipe, keep the compile to a second, so the banner stays about 5 s. A size or a cache
+		// folder the player chose stays as it is.
+		var fontSize = IniGet(rs, "STYLE", "FontSize");
+		if (string.IsNullOrEmpty(fontSize) || fontSize.StartsWith("13"))
+		{
+			IniSet(rs, "STYLE", "FontSize", "10.000000", true);
+			IniSet(rs, "STYLE", "FontScale", "1.000000", true);
+		}
+		const string cache = @".\reshade-shaders\Cache";
+		var cachePath = IniGet(rs, "GENERAL", "IntermediateCachePath");
+		if (string.IsNullOrEmpty(cachePath) || cachePath.IndexOf(@"\Temp\", StringComparison.OrdinalIgnoreCase) >= 0)
+			IniSet(rs, "GENERAL", "IntermediateCachePath", cache, true);
+		if (IniGet(rs, "GENERAL", "IntermediateCachePath") == cache)
+			Directory.CreateDirectory(G(@"reshade-shaders\Cache"));
+		Say("Надпись ReShade при запуске игры стала мельче, собранные эффекты хранятся в папке игры.");
 		// Without the addon there is no signal from the game world: the effects must not wait for it.
 		if (current.Major < 3)
 		{
@@ -345,6 +370,8 @@ static class WowGU
 		foreach (var f in new[] { @"reshade-shaders\Shaders\LegionGUbylevan.fx", @"reshade-shaders\Shaders\LegionGUNightsbylevan.fx", @"reshade-shaders\Textures\LegionGUMask.png", Preset })
 			if (File.Exists(G(f))) File.Delete(G(f));
 		if (Directory.Exists(G(@"Interface\AddOns\LegionGU"))) Directory.Delete(G(@"Interface\AddOns\LegionGU"), true);
+		// The effect cache is always GU-WOW's; a ReShade that stays falls back to Temp without it.
+		if (Directory.Exists(G(@"reshade-shaders\Cache"))) Directory.Delete(G(@"reshade-shaders\Cache"), true);
 		if (marker.ContainsKey("rest"))
 			foreach (var f in new[] { "ReshadeEffectShaderToggler.addon64", "ReshadeEffectShaderToggler.ini" })
 				if (File.Exists(G(f))) File.Delete(G(f));
