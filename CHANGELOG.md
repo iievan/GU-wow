@@ -1,5 +1,19 @@
 # GU-WOW: история версий / Version history
 
+## 1.6.3-release «Лунная тропа» / "Moonlit Path"
+
+### Русский
+
+**Исправлено**
+- Рамки напарников читаются ночью. Игра делает рамки дальних членов группы полупрозрачными, и над затемнённой ночью они пропадали целиком; порог, отделяющий интерфейс от мира, опущен, и тусклые рамки с именами остаются видны.
+- Ночью светятся только настоящие огни. Белое и бледное ночью сияло, как фонарь: крылья летучих мышей, светлая шерсть, серые доспехи получали ореол и подсвечивали воздух. Теперь свечение оставлено огню, лампам и ярко окрашенному свету, а бесцветное должно быть почти белым по яркости, как сам огонь, чтобы считаться источником. Это же убирает лишние пересветы ночью.
+
+### English
+
+**Fixed**
+- Party frames stay readable at night. The game fades the frames of far party members to half transparency, and over the darkened night they vanished; the gate that tells the interface from the world is lowered, and the dim frames with names stay visible.
+- At night only real fires glow. White and pale things shone like lamps: bat wings, pale fur and grey armour got a halo and lit the air. The glow now belongs to fire, lamps and strongly coloured light, and a colourless patch must be nearly clipped bright, like a flame itself, to count as a source. This also removes the stray overexposure at night.
+
 ## 1.6.2-release «Лунная тропа» / "Moonlit Path"
 
 ### Русский

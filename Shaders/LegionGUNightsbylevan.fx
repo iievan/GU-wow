@@ -1043,7 +1043,8 @@ namespace LegionGUNights
 	static const float NIGHT_FAR_FROM = 150.0;  // yards: from here far land goes over to the night curve of the sky
 	static const float NIGHT_FAR_SKY = 450.0;   // and from here it is fully on it
 	static const float LIGHT_FAR = 60.0;        // yards: a light this far glows half as much, at twice the distance a fifth
-	static const float2 LIGHT_WHITE = float2(0.75, 0.9);    // peak at which any colour counts as a light
+	static const float2 LIGHT_WHITE = float2(0.9, 0.97);    // peak at which any colour counts as a light: only a nearly
+	                                                        // clipped disc (a flame, a lamp); moonlit white wings stay below
 	static const float2 LIGHT_SAT = float2(0.3, 0.5);       // saturation at which a less bright source counts
 	static const float2 LIGHT_COLOURED = float2(0.3, 0.45); // and the peak it needs then
 	static const float LIGHT_SELF_CUT = 0.9;    // glow taken from cold light on the player's own model (see LightFindPS)
@@ -1081,8 +1082,11 @@ namespace LegionGUNights
 	// UI_KEEP_FULL) keeps its brightness and gets no light from the lights: the icons, the text and the bars. The
 	// night land under the mask is darker than that and is darkened like the land around it, so the painted areas of
 	// the mask, larger than the UI, leave no lighter patches on the night ground and sky.
-	static const float UI_KEEP_FROM = 2.5;
-	static const float UI_KEEP_FULL = 5.0;
+	// 1.6.3: from 2.5 and 5.0. The game fades the frames of far party members to about half transparency, and
+	// over the darkened night they fell below the old gate and vanished; the gate now keeps them readable, and
+	// the mask over land is mostly weaker than over the frames, so the ground stays night.
+	static const float UI_KEEP_FROM = 1.2;
+	static const float UI_KEEP_FULL = 2.4;
 	// The light field: the sources blurred at three widths, LIGHT_SIG0 (L0), LIGHT_SIG1 (L1) and LIGHT_SIG2 (L2)
 	// screen heights (see L0PS and DownBlur). Each field keeps the light-weighted log2 yards of its lights
 	// in alpha, so a pixel knows how far the lights around it are. A light lights about LIGHT_R yards around it in
@@ -2080,9 +2084,11 @@ namespace LegionGUNights
 		[unroll]
 		for (int k3 = 0; k3 < (LEGIONGU_GLOW_TAPS + 1) * (LEGIONGU_GLOW_TAPS + 1); ++k3)
 			cover += val[k3] > thr ? 1.0 : 0.0;
-		// Only cold light, blue, violet and pink (blue over green), is cut: fire, lava, fel, torches and lamps keep
-		// their glow however much of the screen they fill.
-		float cold = saturate((light.b - light.g) / max(light.b, 1e-5) * 3.0);
+		// Only warm light (red clearly over blue: fire, lava, torches, lit windows) and strongly coloured light keep
+		// the full glow wherever they fill the screen. Pale and white light is cut like the cold: white wings, pale
+		// fur and grey armour stood out of a dark night and glowed like lamps (1.6.2 and before cut only the cold).
+		float warmL = saturate((light.r - light.b) / max(light.r, 1e-5) * 2.5);
+		float cold = 1.0 - warmL * saturate(lsat * 3.0);
 		// The player's own glowing mount or armour: cold light near the camera in the middle of the frame, where the
 		// character always is. Each flap of a glowing wing was found anew and flashed the land blue like a police car.
 		float2 dc = (bestUV - float2(0.5, 0.55)) * float2(ASPECT, 1.0);
