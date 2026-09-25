@@ -208,7 +208,7 @@ The project is not affiliated with the operators of the game servers mentioned h
 
 The build is free and provided "as is", without any warranty. You use it at your own risk. The author is not liable for the consequences of its use, including decisions by the game's rights holder or by server operators.
 
-## 
+## P.S.
 
 Героизму первопроходства самого сплоченного сообщества Turtle WoW. Честь и слава Черепашке!
 
