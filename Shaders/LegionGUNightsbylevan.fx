@@ -2221,7 +2221,10 @@ namespace LegionGUNights
 		float fogL = t > 0.0 ? FogAtYards(zAir, t, haze0) * depthState.x : 0.0;
 		air.rgb *= GLOW_AIR_GAIN * nt.z * (GLOW_AIR_BASE + GLOW_AIR_FOG * fogL);
 		float al = dot(air.rgb, LUMA601);
-		air.rgb *= GLOW_AIR_MAX * (1.0 - exp(-exp2(GLOW_AIR_POW * log2(max(al, 1e-12) / GLOW_AIR_KNEE)))) / max(al, 1e-12);
+		// The cap follows «Свет огней» too: the eased curve saturates at the cap, and with a fixed one the slider
+		// changed almost nothing once a fire was bright (the owner: the slider did not work).
+		float glowS = LegionGUValue(LEGIONGU_CTL_GLOW, LightGlow) * 0.01;
+		air.rgb *= GLOW_AIR_MAX * (0.4 + 1.2 * glowS) * (1.0 - exp(-exp2(GLOW_AIR_POW * log2(max(al, 1e-12) / GLOW_AIR_KNEE)))) / max(al, 1e-12);
 		lit.a = dot(lit.rgb, LUMA601) * zLit;
 		air.a = dot(air.rgb, LUMA601) * zAir;
 	}
@@ -2324,7 +2327,9 @@ namespace LegionGUNights
 		// on the ground and on the character read cold next to a campfire.
 		// Only as much as the night (or a dark cave) darkens here: in a lit tavern the game's own torches and candles need
 		// nothing, and the tint of a room full of lights drowned it in red.
-		float poolFx = pool * saturate(s * 3.0);
+		// The pool follows «Свет огней»: its lift was a constant, and the firelight on the ground and on the
+		// character stayed dim at night whatever the slider said.
+		float poolFx = pool * saturate(s * 3.0) * (0.4 + 1.2 * LegionGUValue(LEGIONGU_CTL_GLOW, LightGlow) * 0.01);
 		if (poolFx > 0.0)
 		{
 			// Fire reads orange: a warm light (red over blue) leans its tint toward FIRE_COLOUR, since the flame itself is

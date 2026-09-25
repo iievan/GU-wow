@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.6.0-release"
+local VERSION = "1.6.1-release"
 local CELL = 4
 local CELLS = 55
 
@@ -294,7 +294,9 @@ local function GameState()
 	if V("wet") and not lowQuality then
 		s = s + 16
 	end
-	if WorldMapFrame and WorldMapFrame:IsShown() then
+	-- Only the fullscreen map: part of it is drawn before the effects start, and the night darkened it. The
+	-- windowed map covers a piece of the screen, and the world around it keeps the effects.
+	if WorldMapFrame and WorldMapFrame:IsShown() and not (WorldMapFrame_InWindowedMode and WorldMapFrame_InWindowedMode()) then
 		s = s + 32
 	end
 	local h, m = GetGameTime()
@@ -551,8 +553,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.6.0.\n\nТуман, лучи и огни спокойны при поворотах камеры: эффекты следят за движением кадра. Новый ползунок «Туман с высоты»: стелющийся туман виден с гор и в полёте. Новый ползунок «Чёткость лучей»: от мягкого свечения до отдельных снопов. Марево стоит в мире, рябь едет вместе с землёй.\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.6.0.\n\nFog, rays and lights stay calm as the camera turns: the effects follow the motion of the frame. A new slider, mist from a height: the ground mist shows from hills and in flight. A new slider, ray definition: from a soft glow to separate shafts. The heat haze stands in the world, the ripples ride with the land.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.6.1.\n\nПолзунок «Свет огней» управляет яркостью огней ночью по-настоящему: костры и фонари отвечают на него всей силой. Карта в окне не выключает эффекты, ночь остаётся вокруг окна карты.\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.6.1.\n\nThe light glow slider truly drives the fires at night: bonfires and lamps answer it with their full strength. The windowed map does not switch the effects off, the night stays around the map window.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,

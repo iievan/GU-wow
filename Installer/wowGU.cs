@@ -24,7 +24,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.6.0-release";
+	const string Version = "1.6.1-release";
 	// Ctrl + Scroll Lock opens the ReShade window: key, Ctrl, Shift, Alt.
 	const string OverlayKey = "145,1,0,0";
 	// Releases of GU-WOW: the window says when a newer one is out and opens its page; it never downloads by itself.
@@ -119,7 +119,7 @@ static class WowGU
 		Application.Run(form);
 	}
 
-	// A newer release on GitHub: the tag of the latest release, like "v1.6.0-release", against Version.
+	// A newer release on GitHub: the tag of the latest release, like "v1.6.1-release", against Version.
 	// Only the numbers are compared; the whole name is what the window shows.
 	static void CheckUpdate(LinkLabel link)
 	{

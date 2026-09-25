@@ -1,5 +1,19 @@
 # GU-WOW: история версий / Version history
 
+## 1.6.1-release «Лунная тропа» / "Moonlit Path"
+
+### Русский
+
+**Исправлено**
+- Ползунок «Свет огней» управляет яркостью огней ночью по-настоящему. Ореол в воздухе упирался в фиксированный потолок, а свет костра на земле и на персонаже был константой: у ярких огней ползунок почти ничего не менял. Теперь и ореол, и свет на земле отвечают на него всей шкалой.
+- Карта в окне не выключает эффекты. Выключение нужно только полноэкранной карте, где ночь затемняла недорисованную карту; оконная карта закрывает часть экрана, и мир вокруг неё держит эффекты.
+
+### English
+
+**Fixed**
+- The light glow slider truly drives the fires at night. The halo in the air ran into a fixed cap and the firelight on the ground and the character was a constant: for bright fires the slider changed almost nothing. Now the halo and the light on the ground answer it over the whole range.
+- The windowed map does not switch the effects off. The switch is only needed for the fullscreen map, where the night darkened the half-drawn map; the windowed map covers part of the screen, and the world around it keeps the effects.
+
 ## 1.6.0-release «Лунная тропа» / "Moonlit Path"
 
 ### Русский
