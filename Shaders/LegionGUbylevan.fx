@@ -1,6 +1,6 @@
 /*
  * LegionGUbylevan.fx for ReShade 6.8 (Direct3D 11)
- * LegionGU by levan, based on comfyatmosphere by aloofbit, GPL-3.0, modified in 2026. ReShade is not included.
+ * GU-WOW by levan, based on comfyatmosphere by aloofbit, GPL-3.0 with additional terms under section 7 (NOTICE.txt), modified in 2026. ReShade is not included.
  * Made for the Tauri World of Warcraft client: Legion 7.3.5, build 26972, Wow-64.exe.
  *
  * Two techniques in one self-contained file (no #include, no shader pack needed):

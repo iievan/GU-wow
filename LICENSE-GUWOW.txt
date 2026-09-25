@@ -1,0 +1,73 @@
+ЛИЦЕНЗИЯ АВТОРА GU-WOW
+© 2026 levan, https://github.com/iievan. Все права защищены, кроме прямо предоставленных ниже.
+English text below. If the two texts differ, the Russian text applies.
+
+1. Что покрывает эта лицензия
+Эта лицензия действует на части сборки, которые целиком созданы автором:
+- меню в игре: папка AddOn;
+- установщик: Installer/wowGU.cs, Installer/build.sh, настройка дополнения Installer/payload/ReshadeEffectShaderToggler.ini и собранный из них GU-WOW.exe, кроме сторонних частей внутри него;
+- готовая настройка LegionGUbylevan.ini;
+- тексты README.md, CHANGELOG.md и папки docs.
+Эффекты из папок Shaders и Textures распространяются по GNU GPL v3.0 с дополнительными условиями, см. LICENSE и NOTICE.txt.
+Дополнение ReshadeEffectShaderToggler (файл ReshadeEffectShaderToggler.addon64) распространяется по лицензии MIT, см. REST-LICENSE.txt.
+На эти две части лицензия автора не действует.
+
+2. Что разрешено без спроса
+- Бесплатно пользоваться сборкой.
+- Копировать и раздавать сборку без изменений и бесплатно, сохраняя этот файл и указание автора.
+- Менять настройки в меню игры и делиться кодами настройки.
+- Менять файлы для себя, если изменённые файлы никому не передаются.
+- Делать форк репозитория на GitHub кнопкой Fork: это разрешают правила GitHub. Раздавать изменённые версии из такого форка всё равно нельзя.
+
+3. Что запрещено без письменного согласия автора
+- Раздавать или публиковать изменённые версии частей под этой лицензией.
+- Создавать клоны, переделки и другие сборки на основе этих частей, в том числе переносить их код в другие проекты.
+- Продавать части сборки под этой лицензией и брать плату за доступ к ним.
+- Удалять или менять указание автора, выдавать части сборки под этой лицензией за свои, распространять их под другим названием.
+- Использовать название GU-WOW и имя автора в названиях других проектов.
+
+4. Как получить согласие
+Создать обращение (Issue) в репозитории: https://github.com/iievan/GU-wow/issues. Согласие действует, только если оно дано письменно.
+
+5. Без гарантий
+Сборка предоставляется «как есть», без каких-либо гарантий. Автор не отвечает за вред и последствия её использования.
+
+6. Прекращение прав
+Нарушение этих условий автоматически прекращает право пользоваться частями сборки под этой лицензией. Права на эффекты по GPL-3.0 прекращаются только по правилам раздела 8 GPL-3.0.
+
+
+GU-WOW AUTHOR'S LICENCE
+© 2026 levan, https://github.com/iievan. All rights reserved except as expressly granted below.
+
+1. What this licence covers
+This licence applies to the parts of the build made entirely by the author:
+- the in-game menu: the AddOn folder;
+- the installer: Installer/wowGU.cs, Installer/build.sh, the add-on settings Installer/payload/ReshadeEffectShaderToggler.ini and the GU-WOW.exe built from them, except the third-party parts inside it;
+- the ready settings file LegionGUbylevan.ini;
+- the texts of README.md, CHANGELOG.md and the docs folder.
+The effects in the Shaders and Textures folders are licensed under the GNU GPL v3.0 with additional terms, see LICENSE and NOTICE.txt.
+The ReshadeEffectShaderToggler add-on (the file ReshadeEffectShaderToggler.addon64) is licensed under the MIT licence, see REST-LICENSE.txt.
+This licence does not apply to those two parts.
+
+2. What you may do without asking
+- Use the build free of charge.
+- Copy and share the build unchanged and free of charge, keeping this file and the author's credit.
+- Change the settings in the in-game menu and share settings codes.
+- Change the files for yourself, as long as the changed files are not passed on to anyone.
+- Fork the repository on GitHub with the Fork button, as GitHub's terms allow. Sharing changed versions from such a fork is still not allowed.
+
+3. What needs the author's written consent
+- Sharing or publishing changed versions of the parts under this licence.
+- Making clones, remakes or other builds based on these parts, including moving their code into other projects.
+- Selling the parts under this licence, or charging for access to them.
+- Removing or changing the author's credit, passing the parts under this licence off as your own, or sharing them under another name.
+- Using the name GU-WOW or the author's name in the names of other projects.
+
+4. How to get consent
+Open an issue in the repository: https://github.com/iievan/GU-wow/issues. Consent counts only when it is given in writing.
+
+5. No warranty
+The build is provided "as is", without any warranty. The author is not liable for any harm or consequences of its use.
+
+6. Termination
+Breaking these terms automatically ends the right to use the parts under this licence. Rights to the GPL-3.0 effects end only under section 8 of GPL-3.0.

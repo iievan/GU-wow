@@ -24,7 +24,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.5";
+	const string Version = "1.5.1-release";
 	// Releases of GU-WOW: the window says when a newer one is out and opens its page; it never downloads by itself.
 	const string ReleasesApi = "https://api.github.com/repos/iievan/GU-wow/releases/latest";
 	const string ReShadeUrl = "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe";
@@ -62,11 +62,13 @@ static class WowGU
 		var head = new Label
 		{
 			Text = "Графическое улучшение World of Warcraft, созданное специально для сообщества Brothers of Turtle.\n\n" +
-			       "Добавляет в игру солнечные лучи, туман и дымку, настоящую ночь, свет и освещение. " +
+			       "Добавляет в игру лучи солнца, туман и дымку, ночь по игровым часам и тёплый свет огней. " +
 			       "Сразу после установки работает с настройками по умолчанию. Изменить их можно в меню игры: " +
 			       "Интерфейс > Модификации > GU-WOW.\n\n" +
-			       "Создано на основе ReShade. © 2026 levan. Распространяется по лицензии GPL-3.0. " +
-			       "Проект не связан с компанией Blizzard Entertainment.",
+			       "Создано на основе ReShade. © 2026 levan. Эффекты распространяются по лицензии GPL-3.0. " +
+			       "Меню в игре, установщик и готовая настройка распространяются по лицензии автора: изменённые версии и клоны только с его согласия.\n\n" +
+			       "Неофициальный любительский проект. Не связан с Blizzard Entertainment и не претендует на её " +
+			       "интеллектуальную собственность. World of Warcraft является товарным знаком Blizzard Entertainment, Inc.",
 			Location = new Point(16, 44), AutoSize = true, MaximumSize = new Size(630, 0), Font = new Font("Segoe UI", 10f)
 		};
 		// Everything below the text follows its real height, which depends on the screen scale.
@@ -80,7 +82,7 @@ static class WowGU
 		log = new TextBox { Location = new Point(16, y + 144), Size = new Size(628, 230), Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.White };
 		form.Controls.AddRange(new Control[] { title, head, hint, pathBox, browse, found, install, remove, log });
 		form.ClientSize = new Size(660, y + 390);
-		var update = new LinkLabel { Location = new Point(390, y + 100), Size = new Size(254, 40), Visible = false };
+		var update = new LinkLabel { Location = new Point(390, y + 92), Size = new Size(254, 50), Visible = false };
 		form.Controls.Add(update);
 		new Thread(() => CheckUpdate(update)) { IsBackground = true }.Start();
 
@@ -115,7 +117,8 @@ static class WowGU
 		Application.Run(form);
 	}
 
-	// A newer release on GitHub: the tag of the latest release, "v1.6" or "1.6", against Version.
+	// A newer release on GitHub: the tag of the latest release, like "v1.6.0-release", against Version.
+	// Only the numbers are compared; the whole name is what the window shows.
 	static void CheckUpdate(LinkLabel link)
 	{
 		try
@@ -128,14 +131,16 @@ static class WowGU
 				w.Encoding = Encoding.UTF8;
 				json = w.DownloadString(ReleasesApi);
 			}
-			var tag = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"v?([0-9.]+)\"").Groups[1].Value;
+			var m = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"v?(([0-9]+(?:\\.[0-9]+)*)[^\"]*)\"");
+			var name = m.Groups[1].Value;
+			var tag = m.Groups[2].Value;
 			var page = Regex.Match(json, "\"html_url\"\\s*:\\s*\"([^\"]+/releases/tag/[^\"]+)\"").Groups[1].Value;
 			Version have, got;
-			if (!System.Version.TryParse(Version, out have) || !System.Version.TryParse(tag, out got) || got <= have || page.Length == 0)
+			if (!System.Version.TryParse(Regex.Match(Version, "^[0-9]+(?:\\.[0-9]+)*").Value, out have) || !System.Version.TryParse(tag, out got) || got <= have || page.Length == 0)
 				return;
 			form.BeginInvoke((Action)(() =>
 			{
-				link.Text = "Вышла версия " + tag + ". Открыть страницу загрузки\nVersion " + tag + " is out. Open the download page";
+				link.Text = "Новая сборка " + name + "\nNew build " + name;
 				link.LinkClicked += delegate { Process.Start(page); };
 				link.Visible = true;
 			}));

@@ -1,11 +1,11 @@
--- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects.
+-- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
 -- The settings travel to the shader as a strip of 39 cells, 4 by 4 pixels, in the top left corner of the screen.
 -- The effect LegionGUBridge (LegionGUbylevan.fx) reads the strip after the interface is drawn and covers it
 -- again, so it is not seen. Each colour channel is black or white, one bit. Cell 0 is black, cell 1 white, cell 2
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.5"
+local VERSION = "1.5.1-release"
 local CELL = 4
 local CELLS = 39
 
@@ -30,8 +30,18 @@ local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDa
 local CODE_KEYS = { "fogThickness", "fogDistance", "mist", "mistDensity", "raysStrength", "nightDarkness", "nightDepth",
 	"lightGlow", "caveDarkness", "sharpness", "grade", "vignette", "ao", "style" }
 local CODE_FLAGS = { "fog", "rays", "night", "weather", "wet", "eye", "zones", "cinema" }
+-- The look: what a style, a ready profile or a friend's code may change. The zones and the cinema bars are the
+-- player's habits, not the look, so a preview leaves them alone.
+local LOOK = { fog = true, rays = true, night = true, weather = true, wet = true, eye = true }
+for _, k in ipairs(CODE_KEYS) do
+	LOOK[k] = true
+end
+local MAX_PRESETS = 10
 
 local DB
+-- A look tried on the page «Profiles and photo»: on screen until «Apply» or «Cancel», never saved by itself, so
+-- experiments do not touch the player's own settings. Gone after /reload.
+local preview, previewBase, previewStyle
 local photo = false
 local lowQuality = false
 local zoneKind
@@ -197,8 +207,17 @@ end
 
 -- A value as the shader gets it: the player's, nudged by the zone, and off for the heavy parts in low quality.
 local QUALITY_OFF = { ao = true, mist = true, sharpness = true }
+
+-- A value on screen: the preview's while one is on, the player's own otherwise.
+local function V(key)
+	if preview and preview[key] ~= nil then
+		return preview[key]
+	end
+	return DB[key]
+end
+
 local function Effective(key)
-	local v = DB[key]
+	local v = V(key)
 	if DB.zones and zoneKind and KIND_MODS[zoneKind][key] then
 		v = v * KIND_MODS[zoneKind][key]
 	end
@@ -226,7 +245,7 @@ local function GameState()
 	if photo then
 		s = s + 8
 	end
-	if DB.wet and not lowQuality then
+	if V("wet") and not lowQuality then
 		s = s + 16
 	end
 	if WorldMapFrame and WorldMapFrame:IsShown() then
@@ -247,8 +266,8 @@ local function Paint()
 	Colour(0, 0, 0, 0)
 	Colour(1, 1, 1, 1)
 	Colour(2, 1, 0, 1)
-	local flags = (DB.master and 1 or 0) + (DB.fog and 2 or 0) + (DB.rays and 4 or 0)
-		+ (DB.night and 8 or 0) + (DB.weather and 16 or 0) + ((DB.eye and not lowQuality) and 32 or 0)
+	local flags = (DB.master and 1 or 0) + (V("fog") and 2 or 0) + (V("rays") and 4 or 0)
+		+ (V("night") and 8 or 0) + (V("weather") and 16 or 0) + ((V("eye") and not lowQuality) and 32 or 0)
 	Cell(3, flags)
 	local sum = flags
 	for i, key in ipairs(VALUES) do
@@ -258,7 +277,7 @@ local function Paint()
 	end
 	local state, time = GameState()
 	lastState, lastTime = state, time
-	local extra = { state, time, Code(DB.nightDepth), Code(Effective("ao")), (DB.style or 0) + (DB.cinema and 8 or 0) }
+	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + (DB.cinema and 8 or 0) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v
@@ -294,6 +313,14 @@ local function Names(show)
 	end
 end
 
+-- The options window opened from the Esc menu goes back to that menu when it hides, and hiding the interface hides
+-- it: the Esc menu would open over the settings page and close the bags. Forgetting the way back keeps the page.
+local function ForgetMenuReturn()
+	if InterfaceOptionsFrame then
+		InterfaceOptionsFrame.lastFrame = nil
+	end
+end
+
 local function Photo(on)
 	if on == photo then
 		return
@@ -304,6 +331,7 @@ local function Photo(on)
 	end
 	photo = on
 	if on then
+		ForgetMenuReturn()
 		UIParent:Hide()
 		if DB.hideNames then
 			Names(false)
@@ -334,13 +362,17 @@ function GUWOW_Screenshot()
 	end
 	local wasPhoto = photo
 	if not wasPhoto then
+		ForgetMenuReturn()
 		UIParent:Hide()
 	end
+	-- The first-draw square goes too: with the strip gone nothing covers it, and it would stay on the shot.
 	strip:Hide()
+	first:Hide()
 	After(0.15, function()
 		Screenshot()
 		After(0.3, function()
 			strip:Show()
+			first:Show()
 			if not wasPhoto then
 				UIParent:Show()
 			end
@@ -383,26 +415,28 @@ local function MakeCode()
 	return "GUW1:" .. table.concat(parts, ".")
 end
 
-local function ApplyCode(code)
+-- The values a code carries, or nil when the line is not a GU-WOW code.
+local function ParseCode(code)
 	local body = code and string.match(code, "GUW1:([%d%.]+)")
 	if not body then
-		return false
+		return nil
 	end
 	local nums = {}
 	for n in string.gmatch(body, "%d+") do
 		nums[#nums + 1] = tonumber(n)
 	end
 	if #nums ~= #CODE_KEYS + 1 then
-		return false
+		return nil
 	end
+	local t = {}
 	for i, k in ipairs(CODE_KEYS) do
-		DB[k] = k == "style" and math.min(nums[i], 4) or math.min(nums[i], 100)
+		t[k] = k == "style" and math.min(nums[i], 4) or math.min(nums[i], 100)
 	end
 	local f = nums[#nums]
 	for i, k in ipairs(CODE_FLAGS) do
-		DB[k] = math.floor(f / 2 ^ (i - 1)) % 2 == 1
+		t[k] = math.floor(f / 2 ^ (i - 1)) % 2 == 1
 	end
-	return true
+	return t
 end
 
 -- ---------------------------------------------------------------------------------------------------------------
@@ -414,6 +448,35 @@ local function Refresh()
 		w:Refresh()
 	end
 end
+
+local function Say(text)
+	print("|cffffd200GU-WOW:|r " .. text)
+end
+
+-- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
+StaticPopupDialogs["GUWOW_CONFIRM"] = {
+	text = "%s",
+	button1 = ACCEPT or "OK",
+	button2 = CANCEL or "Cancel",
+	OnAccept = function(self, data)
+		if data then
+			data()
+		end
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+	preferredIndex = 3,
+}
+local function Confirm(text, onYes)
+	local d = StaticPopup_Show("GUWOW_CONFIRM", text)
+	if d then
+		d.data = onYes
+	end
+end
+
+-- Changing the player's own look in the main panel ends a preview: from then on the screen shows their settings.
+local CancelPreview
 
 local function Header(parent, text, x, y)
 	local h = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -431,6 +494,9 @@ local function Check(parent, key, label, x, y, onClick)
 	_G[name .. "Text"]:SetText(label)
 	c:SetScript("OnClick", function(self)
 		DB[key] = self:GetChecked() and true or false
+		if preview and LOOK[key] then
+			CancelPreview()
+		end
 		if onClick then
 			onClick()
 		end
@@ -462,8 +528,11 @@ local function Slider(parent, key, label, x, y, lo, hi)
 	s:SetScript("OnValueChanged", function(self, v)
 		v = math.floor(v + 0.5)
 		text:SetText(label .. ": " .. v)
-		if DB then
+		if DB and DB[key] ~= v then
 			DB[key] = v
+			if preview and LOOK[key] then
+				CancelPreview()
+			end
 			Paint()
 		end
 	end)
@@ -484,6 +553,92 @@ local function Button(parent, text, x, y, w, onClick)
 	b:SetScript("OnClick", onClick)
 	return b
 end
+
+-- The preview bar at the top of the screen: what is being tried, «Apply» and «Cancel». It is part of the interface,
+-- so photo mode and the clean screenshot hide it with the rest.
+local bar = CreateFrame("Frame", "GUWOWPreviewBar", UIParent)
+bar:SetFrameStrata("DIALOG")
+-- Narrow and at the very top, between the target frame and the buffs at the default interface scale.
+bar:SetWidth(400)
+bar:SetHeight(34)
+bar:SetPoint("TOP", UIParent, "TOP", 0, -4)
+bar:Hide()
+local barBack = bar:CreateTexture(nil, "BACKGROUND")
+barBack:SetAllPoints(bar)
+if barBack.SetColorTexture then
+	barBack:SetColorTexture(0, 0, 0, 0.8)
+else
+	barBack:SetTexture(0, 0, 0, 0.8)
+end
+local barText = bar:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+barText:SetPoint("LEFT", 10, 0)
+barText:SetWidth(214)
+barText:SetJustifyH("LEFT")
+
+local function ShowBar()
+	local what
+	if previewBase and previewStyle then
+		what = "«" .. previewBase .. "» + «" .. previewStyle .. "»"
+	elseif previewBase then
+		what = "«" .. previewBase .. "»"
+	else
+		what = "«" .. (previewStyle or "") .. "»"
+	end
+	barText:SetText(T("Предпросмотр: ", "Preview: ") .. what)
+	bar:Show()
+end
+
+-- A ready profile or a code starts from the player's own settings; a style goes on top of what is on screen.
+local function Preview(changes, base, styleName)
+	if base or not preview then
+		preview = {}
+		for k in pairs(LOOK) do
+			preview[k] = DB[k]
+		end
+		previewBase, previewStyle = base, nil
+	end
+	for k, v in pairs(changes) do
+		if LOOK[k] then
+			preview[k] = v
+		end
+	end
+	if styleName then
+		previewStyle = styleName
+	end
+	ShowBar()
+	Refresh()
+	Paint()
+end
+
+local function ApplyPreview()
+	if not preview then
+		return
+	end
+	for k in pairs(LOOK) do
+		DB[k] = preview[k]
+	end
+	preview, previewBase, previewStyle = nil, nil, nil
+	bar:Hide()
+	Refresh()
+	Paint()
+	Say(T("новые настройки применены и сохранены.", "the new settings are applied and saved."))
+end
+
+CancelPreview = function()
+	if not preview then
+		return
+	end
+	preview, previewBase, previewStyle = nil, nil, nil
+	bar:Hide()
+	Refresh()
+	Paint()
+end
+
+Button(bar, T("Применить", "Apply"), 230, -6, 84, ApplyPreview)
+Button(bar, T("Отменить", "Cancel"), 318, -6, 76, function()
+	CancelPreview()
+	Say(T("предпросмотр отменён. На экране снова ваши настройки.", "preview cancelled. Your own settings are back on screen."))
+end)
 
 local panel = CreateFrame("Frame", "LegionGUPanel", UIParent)
 panel.name = "GU-WOW"
@@ -525,6 +680,127 @@ Slider(panel, "grade", T("Цвет по времени суток", "Time of day
 Slider(panel, "vignette", T("Виньетка", "Vignette"), R + 6, -432)
 Check(panel, "eye", T("Привыкание глаз", "Eye adaptation"), R, -456)
 
+-- My presets: up to ten named sets of the player's own settings. The arrows walk through them, the box holds the
+-- name to save under, load or delete. Loading, deleting and overwriting ask first.
+local presetHeader = Header(panel, "", L, -490)
+local presetIndex = 0
+local nameBox = CreateFrame("EditBox", "LegionGUPresetName", panel, "InputBoxTemplate")
+nameBox:SetPoint("TOPLEFT", L + 40, -508)
+nameBox:SetWidth(146)
+nameBox:SetHeight(22)
+nameBox:SetAutoFocus(false)
+nameBox:SetMaxLetters(24)
+nameBox:SetScript("OnEnterPressed", nameBox.ClearFocus)
+nameBox:SetScript("OnEscapePressed", nameBox.ClearFocus)
+
+local function ShowPreset(i)
+	presetIndex = i
+	local p = DB.presets[i]
+	nameBox:SetText(p and p.name or "")
+	presetHeader:SetText(T("Мои пресеты", "My presets") .. " (" .. #DB.presets .. T(" из ", " of ") .. MAX_PRESETS .. ")")
+end
+-- A refresh keeps a name the player has typed; only the arrows, saving and deleting put a preset's name in the box.
+widgets.presets = { Refresh = function()
+	local typed = nameBox:GetText() or ""
+	ShowPreset(math.min(math.max(presetIndex, #DB.presets > 0 and 1 or 0), #DB.presets))
+	if typed ~= "" then
+		nameBox:SetText(typed)
+	end
+end }
+
+-- The name in the box without the characters that would break the chat line or the colour codes.
+local function PresetName()
+	return (string.gsub(string.gsub(nameBox:GetText() or "", "|", ""), "^%s*(.-)%s*$", "%1"))
+end
+
+local function FindPreset(name)
+	for i, p in ipairs(DB.presets) do
+		if p.name == name then
+			return i
+		end
+	end
+end
+
+local function Step(d)
+	local n = #DB.presets
+	if n > 0 then
+		ShowPreset((presetIndex - 1 + d) % n + 1)
+	end
+end
+Button(panel, "<", L, -508, 30, function() Step(-1) end)
+Button(panel, ">", L + 192, -508, 30, function() Step(1) end)
+
+Button(panel, T("Сохранить", "Save"), L + 228, -508, 110, function()
+	-- A preset keeps the player's own settings; during a preview the screen shows something else.
+	if preview then
+		Say(T("идёт предпросмотр. Нажмите «Применить» или «Отменить», потом сохраните пресет.",
+			"a preview is on. Press «Apply» or «Cancel», then save the preset."))
+		return
+	end
+	local name = PresetName()
+	if name == "" then
+		local n = #DB.presets + 1
+		while FindPreset(T("Пресет ", "Preset ") .. n) do
+			n = n + 1
+		end
+		name = T("Пресет ", "Preset ") .. n
+	end
+	local i = FindPreset(name)
+	if i then
+		Confirm(T("Перезаписать пресет «", "Overwrite the preset «") .. name .. T("» текущими настройками?", "» with the current settings?"), function()
+			DB.presets[i].code = MakeCode()
+			ShowPreset(i)
+			Say(T("пресет «", "preset «") .. name .. T("» перезаписан.", "» overwritten."))
+		end)
+	elseif #DB.presets >= MAX_PRESETS then
+		Say(T("пресетов уже 10. Удалите ненужный, чтобы сохранить новый.", "there are 10 presets already. Delete one to save a new one."))
+	else
+		table.insert(DB.presets, { name = name, code = MakeCode() })
+		ShowPreset(#DB.presets)
+		Say(T("пресет «", "preset «") .. name .. T("» сохранён.", "» saved."))
+	end
+end)
+
+Button(panel, T("Загрузить", "Load"), L + 344, -508, 110, function()
+	local name = PresetName()
+	local i = FindPreset(name)
+	if not i then
+		Say(T("пресета с таким названием нет.", "there is no preset with this name."))
+		return
+	end
+	Confirm(T("Загрузить пресет «", "Load the preset «") .. name .. T("»? Текущие настройки заменятся.", "»? It replaces the current settings."), function()
+		local t = ParseCode(DB.presets[i].code)
+		if not t then
+			Say(T("пресет повреждён.", "the preset is damaged."))
+			return
+		end
+		preview, previewBase, previewStyle = nil, nil, nil
+		bar:Hide()
+		for k, v in pairs(t) do
+			DB[k] = v
+		end
+		UpdateZone()
+		presetIndex = i
+		Refresh()
+		Paint()
+		Say(T("пресет «", "preset «") .. name .. T("» загружен.", "» loaded."))
+	end)
+end)
+
+Button(panel, T("Удалить", "Delete"), L + 460, -508, 110, function()
+	local name = PresetName()
+	local i = FindPreset(name)
+	if not i then
+		Say(T("пресета с таким названием нет.", "there is no preset with this name."))
+		return
+	end
+	Confirm(T("Удалить пресет «", "Delete the preset «") .. name .. "»?", function()
+		table.remove(DB.presets, i)
+		ShowPreset(math.min(i, #DB.presets))
+		Say(T("пресет «", "preset «") .. name .. T("» удалён.", "» deleted."))
+	end)
+end)
+
 local note = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 note:SetPoint("BOTTOMLEFT", 16, 16)
 note:SetWidth(600)
@@ -536,6 +812,8 @@ panel:SetScript("OnShow", Refresh)
 panel.okay = function() end
 panel.cancel = function() end
 panel.default = function()
+	preview, previewBase, previewStyle = nil, nil, nil
+	bar:Hide()
 	for k, v in pairs(DEFAULTS) do
 		DB[k] = v
 	end
@@ -553,19 +831,24 @@ local title2 = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title2:SetPoint("TOPLEFT", 16, -16)
 title2:SetText("GU-WOW: " .. page.name)
 
-Header(page, T("Цветовой стиль", "Colour style"), 16, -50)
+local sub2 = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+sub2:SetPoint("TOPLEFT", title2, "BOTTOMLEFT", 0, -6)
+sub2:SetWidth(590)
+sub2:SetJustifyH("LEFT")
+sub2:SetText(T("Стили, профили и коды сначала только показываются. Сохраняет их кнопка «Применить».",
+	"Styles, profiles and codes are only shown at first. «Apply» saves them."))
+
+Header(page, T("Цветовой стиль", "Colour style"), 16, -62)
 local STYLE_NAMES = { T("Нет", "None"), T("Тёплый", "Warm"), T("Холодный", "Cold"), T("Плёнка", "Film"), T("Сочный", "Vivid") }
 local styleButtons = {}
 for i, n in ipairs(STYLE_NAMES) do
-	styleButtons[i] = Button(page, n, 16 + (i - 1) * 116, -68, 110, function()
-		DB.style = i - 1
-		Refresh()
-		Paint()
+	styleButtons[i] = Button(page, n, 16 + (i - 1) * 116, -80, 110, function()
+		Preview({ style = i - 1 }, nil, n)
 	end)
 end
 widgets.styles = { Refresh = function()
 	for i, b in ipairs(styleButtons) do
-		if (DB.style or 0) == i - 1 then
+		if (V("style") or 0) == i - 1 then
 			b:LockHighlight()
 		else
 			b:UnlockHighlight()
@@ -573,7 +856,7 @@ widgets.styles = { Refresh = function()
 	end
 end }
 
-Header(page, T("Готовые профили", "Ready profiles"), 16, -104)
+Header(page, T("Готовые профили", "Ready profiles"), 16, -116)
 local PROFILES = {
 	{ T("Кино", "Cinema"), { fog = true, rays = true, night = true, weather = true, eye = true, fogThickness = 70, fogDistance = 60, mist = 80, mistDensity = 55, raysStrength = 100, nightDarkness = 85, nightDepth = 30, lightGlow = 75, caveDarkness = 55, sharpness = 15, grade = 90, vignette = 40, ao = 50, style = 3 } },
 	{ T("Ясный день", "Clear day"), { fog = true, rays = true, night = true, fogThickness = 35, fogDistance = 90, mist = 40, mistDensity = 35, raysStrength = 90, nightDarkness = 60, nightDepth = 0, lightGlow = 60, caveDarkness = 30, sharpness = 25, grade = 50, vignette = 15, ao = 35, style = 0 } },
@@ -581,70 +864,45 @@ local PROFILES = {
 	{ T("Больше FPS", "More FPS"), { rays = false, eye = false, wet = false, mist = 0, ao = 0, sharpness = 0 } },
 }
 for i, p in ipairs(PROFILES) do
-	Button(page, p[1], 16 + (i - 1) * 145, -122, 140, function()
-		for k, v in pairs(p[2]) do
-			DB[k] = v
-		end
-		Refresh()
-		Paint()
+	Button(page, p[1], 16 + (i - 1) * 145, -134, 140, function()
+		Preview(p[2], p[1])
 	end)
 end
 
-Header(page, T("Мои слоты", "My slots"), 16, -158)
-for slot = 1, 3 do
-	local y = -176 - (slot - 1) * 26
-	local label = page:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	label:SetPoint("TOPLEFT", 20, y - 4)
-	label:SetText(T("Слот ", "Slot ") .. slot)
-	Button(page, T("Сохранить", "Save"), 90, y, 110, function()
-		DB.slots[slot] = MakeCode()
-		print("|cffffd200GU-WOW:|r " .. T("сохранено в слот ", "saved to slot ") .. slot)
-	end)
-	Button(page, T("Загрузить", "Load"), 206, y, 110, function()
-		if DB.slots[slot] and ApplyCode(DB.slots[slot]) then
-			Refresh()
-			Paint()
-		else
-			print("|cffffd200GU-WOW:|r " .. T("слот пуст", "the slot is empty"))
-		end
-	end)
-end
-
-Header(page, T("Код настройки: поделиться или вставить чужой", "Settings code: share yours or paste another"), 16, -262)
+Header(page, T("Код настройки: поделиться или вставить чужой", "Settings code: share yours or paste another"), 16, -170)
 local codeBox = CreateFrame("EditBox", "LegionGUCodeBox", page, "InputBoxTemplate")
-codeBox:SetPoint("TOPLEFT", 22, -282)
+codeBox:SetPoint("TOPLEFT", 22, -190)
 codeBox:SetWidth(460)
 codeBox:SetHeight(20)
 codeBox:SetAutoFocus(false)
 codeBox:SetMaxLetters(200)
-Button(page, T("Мой код", "My code"), 16, -308, 140, function()
+Button(page, T("Мой код", "My code"), 16, -216, 140, function()
 	codeBox:SetText(MakeCode())
 	codeBox:HighlightText()
 	codeBox:SetFocus()
 end)
-Button(page, T("Применить код", "Apply code"), 162, -308, 140, function()
-	if ApplyCode(codeBox:GetText()) then
-		Refresh()
-		Paint()
-		print("|cffffd200GU-WOW:|r " .. T("настройка применена", "settings applied"))
+Button(page, T("Попробовать код", "Try the code"), 162, -216, 140, function()
+	local t = ParseCode(codeBox:GetText())
+	if t then
+		Preview(t, T("код настройки", "settings code"))
 	else
-		print("|cffffd200GU-WOW:|r " .. T("это не код GU-WOW", "this is not a GU-WOW code"))
+		Say(T("это не код GU-WOW.", "this is not a GU-WOW code."))
 	end
 end)
 
-Header(page, T("Фото", "Photo"), 16, -344)
-Check(page, "orbit", T("Медленный облёт камеры", "Slow camera orbit"), 16, -362)
-Check(page, "hideNames", T("Прятать имена над головами", "Hide names above heads"), 16, -388)
-Check(page, "cinema", T("Кинорамка", "Cinema bars"), 16, -414)
-Button(page, T("Фоторежим", "Photo mode"), 330, -366, 150, GUWOW_TogglePhoto)
-Button(page, T("Чистый снимок", "Clean screenshot"), 330, -394, 150, GUWOW_Screenshot)
+Header(page, T("Фото", "Photo"), 16, -252)
+Check(page, "orbit", T("Медленный облёт камеры", "Slow camera orbit"), 16, -270)
+Check(page, "hideNames", T("Прятать имена над головами", "Hide names above heads"), 16, -296)
+Check(page, "cinema", T("Кинорамка", "Cinema bars"), 16, -322)
+Button(page, T("Фоторежим", "Photo mode"), 330, -274, 150, GUWOW_TogglePhoto)
+Button(page, T("Чистый снимок", "Clean screenshot"), 330, -302, 150, GUWOW_Screenshot)
 
-Header(page, T("Прочее", "Other"), 16, -450)
-Check(page, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), 16, -468, function()
+Header(page, T("Прочее", "Other"), 16, -358)
+Check(page, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), 16, -376, function()
 	UpdateZone()
 end)
-Check(page, "autoQuality", T("Автокачество: упрощать тяжёлое при низких кадрах", "Auto quality: lighten heavy effects at low FPS"), 16, -494)
-Slider(page, "targetFps", T("Держать кадров не ниже", "Keep FPS at least"), 330, -470, 20, 120)
+Check(page, "autoQuality", T("Автокачество: упрощать тяжёлое при низких кадрах", "Auto quality: lighten heavy effects at low FPS"), 16, -402)
+Slider(page, "targetFps", T("Держать кадров не ниже", "Keep FPS at least"), 330, -382, 20, 120)
 
 page:SetScript("OnShow", Refresh)
 page.refresh = Refresh
@@ -811,7 +1069,16 @@ events:SetScript("OnEvent", function(self, event, arg1)
 				DB[k] = v
 			end
 		end
-		DB.slots = DB.slots or {}
+		-- The three slots of 1.5.0 become the first presets, so nothing saved in them is lost.
+		DB.presets = DB.presets or {}
+		if DB.slots then
+			for slot = 1, 3 do
+				if DB.slots[slot] and #DB.presets < MAX_PRESETS then
+					table.insert(DB.presets, { name = T("Слот ", "Slot ") .. slot, code = DB.slots[slot] })
+				end
+			end
+			DB.slots = nil
+		end
 		PlaceMinimapButton()
 	end
 	if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then

@@ -1,9 +1,39 @@
-LegionGU by levan, based on comfyatmosphere by aloofbit (https://github.com/aloofbit/comfyatmosphere, commit bf9740c), a fog and sun rays mod for the WoW 1.12 client. Licensed GPL-3.0 (see LICENSE).
-LegionGUbylevan.fx (fog and sun rays) reuses the original's shader code and formulas, so it is licensed under the GNU General Public License v3.0, the same as the original.
-Modified in 2026: the Direct3D 9 hook was rewritten as a ReShade FX effect for the Direct3D 11 client of WoW Legion 7.3.5 (Tauri), with its own fog colour estimate, sun search, ray shaping and player controls.
-LegionGUNightsbylevan.fx (night and lights) is new work in the same package, built on the depth and sky code of LegionGUbylevan.fx, and is licensed GPL-3.0 as well.
-ReShade itself is not part of this package. It comes from https://reshade.me under its own licence.
+GU-WOW by levan, https://github.com/iievan/GU-wow
+English text below.
 
-wowGU.exe bundles ReshadeEffectShaderToggler (REST) 1.3.23 by 4lex4nder, MIT licence, see REST-LICENSE.txt:
-https://github.com/4lex4nder/ReshadeEffectShaderToggler
-ReShade itself is not bundled: wowGU downloads the official setup from reshade.me.
+ЭФФЕКТЫ: ПАПКИ SHADERS И TEXTURES, ЛИЦЕНЗИЯ GPL-3.0
+LegionGUbylevan.fx (туман и лучи) основан на comfyatmosphere автора aloofbit: https://github.com/aloofbit/comfyatmosphere, коммит bf9740c. Это мод тумана и лучей для клиента WoW 1.12.
+Файл повторно использует код и формулы оригинала. Поэтому он распространяется по GNU General Public License v3.0, как и оригинал, см. LICENSE.
+В 2026 году levan переписал перехват Direct3D 9 как эффект ReShade FX для клиента Direct3D 11. Он добавил свою оценку цвета тумана, поиск солнца, форму лучей, лунный свет, низовой туман, погодное настроение, тени в щелях, мокрую землю и управление из игры.
+LegionGUNightsbylevan.fx (ночь, огни, картинка и фоторежим) сделал levan. В файл перенесены код глубины и неба, формула тумана и механизм лучей из LegionGUbylevan.fx. Этот код основан на comfyatmosphere, поэтому файл тоже распространяется по GPL-3.0.
+
+Дополнительные условия по разделу 7 GPL-3.0. Они действуют на всё, что добавил и изменил levan:
+1) Копии и изменённые версии сохраняют указание «GU-WOW by levan» и ссылку https://github.com/iievan/GU-wow (раздел 7, пункт b).
+2) Изменённые версии явно помечаются как изменённые. Их нельзя выдавать за оригинал или за официальную версию GU-WOW (раздел 7, пункт c).
+3) GPL-3.0 не даёт права использовать название GU-WOW и имя автора levan как товарный знак или название другого проекта (раздел 7, пункт e).
+
+МЕНЮ В ИГРЕ, УСТАНОВЩИК, ГОТОВАЯ НАСТРОЙКА И ТЕКСТЫ
+Лицензия автора: без согласия автора запрещено раздавать изменённые версии и делать клоны. См. LICENSE-GUWOW.txt.
+
+СТОРОННИЕ ЧАСТИ
+GU-WOW.exe содержит ReshadeEffectShaderToggler (REST) 1.3.23 автора 4lex4nder: https://github.com/4lex4nder/ReshadeEffectShaderToggler. Он распространяется по лицензии MIT, см. REST-LICENSE.txt.
+ReShade (автор crosire) в пакет не входит. Установщик скачивает официальную программу установки с https://reshade.me, она распространяется по своей лицензии.
+
+
+EFFECTS: THE SHADERS AND TEXTURES FOLDERS, GPL-3.0
+LegionGUbylevan.fx (fog and rays) is based on comfyatmosphere by aloofbit: https://github.com/aloofbit/comfyatmosphere, commit bf9740c. comfyatmosphere is a fog and sun rays mod for the WoW 1.12 client.
+The file reuses the original's code and formulas. Therefore it is licensed under the GNU General Public License v3.0, the same as the original, see LICENSE.
+In 2026 levan rewrote the Direct3D 9 hook as a ReShade FX effect for the Direct3D 11 client. He added his own fog colour estimate, sun search, ray shaping, moonlight, ground mist, weather mood, contact shadows, wet ground and in-game controls.
+LegionGUNightsbylevan.fx (night, lights, picture and photo mode) is made by levan. It carries the depth and sky code, the fog formula and the rays pipeline of LegionGUbylevan.fx. That code is based on comfyatmosphere, so this file is licensed under GPL-3.0 as well.
+
+Additional terms under section 7 of GPL-3.0. They apply to everything levan added and changed:
+1) Copies and modified versions keep the credit "GU-WOW by levan" and the link https://github.com/iievan/GU-wow (section 7, item b).
+2) Modified versions are clearly marked as modified. They must not be presented as the original or as an official GU-WOW version (section 7, item c).
+3) GPL-3.0 grants no right to use the name GU-WOW or the author's name levan as a trademark or as the name of another project (section 7, item e).
+
+IN-GAME MENU, INSTALLER, READY SETTINGS AND TEXTS
+The author's licence: sharing changed versions and making clones need the author's consent. See LICENSE-GUWOW.txt.
+
+THIRD-PARTY PARTS
+GU-WOW.exe contains ReshadeEffectShaderToggler (REST) 1.3.23 by 4lex4nder: https://github.com/4lex4nder/ReshadeEffectShaderToggler. It is licensed under MIT, see REST-LICENSE.txt.
+ReShade (by crosire) is not part of the package. The installer downloads the official setup from https://reshade.me. The setup comes under its own licence.
