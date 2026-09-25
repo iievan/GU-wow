@@ -24,7 +24,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.6.3-release";
+	const string Version = "1.6.4-release";
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
 	// turned out unreachable on laptops, where Scroll Lock needs Fn as well.
 	const string OverlayKey = "116,0,0,0";

@@ -1,5 +1,17 @@
 # GU-WOW: история версий / Version history
 
+## 1.6.4-release «Лунная тропа» / "Moonlit Path"
+
+### Русский
+
+**Новое**
+- Под чатом лёгкая подложка: текст не тонет в текстурах мира, поверх которых лежат туман и ночь. Это штатное затемнение окна чата, знакомое по табличке «Непрозрачность»; галочка «Подложка под чатом» на странице «Профили и фото» её включает и выключает, своя настройка непрозрачности у игрока остаётся главной.
+
+### English
+
+**New**
+- A light shade sits behind the chat: the text does not sink into the world textures under the fog and the night. It is the game's own chat window shade, the one from the «Opacity» setting; the «Shade behind the chat» box on the «Profiles and photo» page turns it on and off, and the player's own opacity choice stays in charge.
+
 ## 1.6.3-release «Лунная тропа» / "Moonlit Path"
 
 ### Русский
