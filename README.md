@@ -5,13 +5,13 @@
 Графическое улучшение World of Warcraft. Основные работы проводятся на версии Legion 7.3.5. 
 Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
-Текущая сборка: **1.6.1-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **1.6.2-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.6.1-release
+## Что входит в сборку 1.6.2-release
 
 Всё настраивается в игре: Интерфейс > Модификации > GU-WOW, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -68,7 +68,7 @@
 
 ## Полезно знать
 
-- F11 включает и выключает весь мод. Ctrl и Scroll Lock открывают окно ReShade, обычному игроку оно не нужно. Шрифт в нём крошечный, увеличить его можно Ctrl и колесом мыши.
+- F11 включает и выключает весь мод. F5 открывает окно ReShade, обычному игроку оно не нужно. Шрифт в нём крошечный, увеличить его можно Ctrl и колесом мыши.
 - Если выключить мод клавишей F11, в левом верхнем углу может появиться полоска квадратиков. Чтобы выключить мод без неё, щёлкните правой кнопкой мыши по кнопке у миникарты.
 - Если поменяли разрешение экрана или масштаб отрисовки в настройках игры, запустите `GU-WOW.exe` и нажмите «Установить» ещё раз.
 - Аддон NightIllusion лучше выключить, иначе ночь затемнится дважды.
@@ -119,13 +119,13 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 A graphical enhancement for World of Warcraft. The main development work is being carried out for Legion 7.3.5.
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
-Current build: **1.6.1-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **1.6.2-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.6.1-release
+## What is in build 1.6.2-release
 
 Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -182,7 +182,7 @@ To remove: `GU-WOW.exe`, the "Удалить" (Remove) button.
 
 ## Good to know
 
-- F11 turns the whole mod on and off. Ctrl and Scroll Lock open the ReShade window, which a regular player does not need. Its font is tiny; Ctrl and the mouse wheel make it bigger.
+- F11 turns the whole mod on and off. F5 opens the ReShade window, which a regular player does not need. Its font is tiny; Ctrl and the mouse wheel make it bigger.
 - If you turn the mod off with F11, a strip of small squares may show in the top left corner. To turn the mod off without it, right click the minimap button.
 - If you change the screen resolution or the render scale in the game settings, run `GU-WOW.exe` and press "Установить" (Install) again.
 - Better turn off the NightIllusion add-on, or the night gets darkened twice.

@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.6.1-release"
+local VERSION = "1.6.2-release"
 local CELL = 4
 local CELLS = 55
 
@@ -553,8 +553,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.6.1.\n\nПолзунок «Свет огней» управляет яркостью огней ночью по-настоящему: костры и фонари отвечают на него всей силой. Карта в окне не выключает эффекты, ночь остаётся вокруг окна карты.\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.6.1.\n\nThe light glow slider truly drives the fires at night: bonfires and lamps answer it with their full strength. The windowed map does not switch the effects off, the night stays around the map window.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.6.2.\n\nПолзунок «Свет огней» управляет яркостью огней ночью по-настоящему: костры и фонари отвечают на него всей силой. Карта в окне не выключает эффекты, ночь остаётся вокруг окна карты.\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.6.2.\n\nThe light glow slider truly drives the fires at night: bonfires and lamps answer it with their full strength. The windowed map does not switch the effects off, the night stays around the map window.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,

@@ -1,5 +1,17 @@
 # GU-WOW: история версий / Version history
 
+## 1.6.2-release «Лунная тропа» / "Moonlit Path"
+
+### Русский
+
+**Изменено**
+- Окно ReShade открывается клавишей F5. Старое сочетание Ctrl и Scroll Lock на ноутбуках требовало ещё и Fn, и до окна было не добраться. Установщик переводит на F5 и старые сборки; клавиша, выбранная игроком вручную, не трогается.
+
+### English
+
+**Changed**
+- The ReShade window opens with F5. The old Ctrl and Scroll Lock combination needed Fn as well on laptops, and the window was out of reach. The installer moves older builds to F5 too; a key the player chose by hand stays.
+
 ## 1.6.1-release «Лунная тропа» / "Moonlit Path"
 
 ### Русский

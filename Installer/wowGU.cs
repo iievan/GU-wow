@@ -24,9 +24,10 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.6.1-release";
-	// Ctrl + Scroll Lock opens the ReShade window: key, Ctrl, Shift, Alt.
-	const string OverlayKey = "145,1,0,0";
+	const string Version = "1.6.2-release";
+	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
+	// turned out unreachable on laptops, where Scroll Lock needs Fn as well.
+	const string OverlayKey = "116,0,0,0";
 	// Releases of GU-WOW: the window says when a newer one is out and opens its page; it never downloads by itself.
 	const string ReleasesApi = "https://api.github.com/repos/iievan/GU-wow/releases/latest";
 	const string ReShadeUrl = "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe";
@@ -317,10 +318,11 @@ static class WowGU
 			IniSet(rs, "INPUT", "KeyEffects", "122,0,0,0", false);
 		}
 		IniSet(rs, "OVERLAY", "TutorialProgress", "4", true);
-		// Home (1.2) and the bare Scroll Lock (1.3 to 1.5.3) were GU-WOW's own keys: with the 1 px font the ReShade
-		// window opens unreadable and holds the mouse, so a stray key press must not open it. Ctrl + Scroll Lock now.
+		// Our old keys move to F5: Home (1.2), the bare Scroll Lock (1.3 to 1.5.3), Ctrl + Scroll Lock (1.5.4 to
+		// 1.6.1) and the empty value, which opens the window with nothing at all. A key the player chose stays.
 		var overlay = IniGet(rs, "INPUT", "KeyOverlay");
-		if (overlay == "36,0,0,0" || overlay == "145,0,0,0") IniSet(rs, "INPUT", "KeyOverlay", OverlayKey, true);
+		if (overlay == "36,0,0,0" || overlay == "145,0,0,0" || overlay == "145,1,0,0" || overlay == "0,0,0,0" || string.IsNullOrEmpty(overlay))
+			IniSet(rs, "INPUT", "KeyOverlay", OverlayKey, true);
 		// The ReShade banner at the game start. ReShade shows it while the effects compile and 5 s after, always opaque;
 		// its height is fixed paddings plus three lines of text. With the default font size 13 it also scales the font
 		// by the screen height, 1.5 at 1440 lines and 2 at 4K. A 1 px font (8 at scale 0.125, ImGui draws no smaller)
@@ -377,7 +379,7 @@ static class WowGU
 		// Only the keys the player really has.
 		var done = "Готово. Запустите игру.";
 		if (IniGet(rs, "INPUT", "KeyEffects") == "122,0,0,0") done += " F11 включает и выключает весь мод.";
-		if (IniGet(rs, "INPUT", "KeyOverlay") == OverlayKey) done += " Ctrl + Scroll Lock открывает окно ReShade.";
+		if (IniGet(rs, "INPUT", "KeyOverlay") == OverlayKey) done += " F5 открывает окно ReShade.";
 		Say(done);
 	}
 
