@@ -24,7 +24,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.5.2-release";
+	const string Version = "1.5.3-release";
 	// Releases of GU-WOW: the window says when a newer one is out and opens its page; it never downloads by itself.
 	const string ReleasesApi = "https://api.github.com/repos/iievan/GU-wow/releases/latest";
 	const string ReShadeUrl = "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe";
@@ -316,16 +316,24 @@ static class WowGU
 		}
 		IniSet(rs, "OVERLAY", "TutorialProgress", "4", true);
 		if (IniGet(rs, "INPUT", "KeyOverlay") == "36,0,0,0") IniSet(rs, "INPUT", "KeyOverlay", "145,0,0,0", true);
-		// The ReShade banner at the game start. ReShade shows it while the effects compile and 5 s after, always opaque.
-		// With the default font size 13 it scales the font by the screen height, 1.5 at 1440 lines and 2 at 4K:
-		// a 10 px font at scale 1 makes it about half as big. The compiled effects kept in the game folder, not in Temp
-		// that disk cleaners wipe, keep the compile to a second, so the banner stays about 5 s. A size or a cache
-		// folder the player chose stays as it is.
+		// The ReShade banner at the game start. ReShade shows it while the effects compile and 5 s after, always opaque;
+		// its height is fixed paddings plus three lines of text. With the default font size 13 it also scales the font
+		// by the screen height, 1.5 at 1440 lines and 2 at 4K. A 1 px font (8 at scale 0.125, ImGui draws no smaller)
+		// leaves a thin empty strip, about 37 px. The OSD (FPS, clock) keeps ReShade's default size through FPSScale:
+		// its text is FontSize x FPSScale x FontScale. The compiled effects kept in the game folder, not in Temp that
+		// disk cleaners wipe, keep the compile to a second, so the banner stays about 5 s. A font size or a cache
+		// folder the player chose stays as it is; the 10 px of 1.5.2 is ours.
 		var fontSize = IniGet(rs, "STYLE", "FontSize");
-		if (string.IsNullOrEmpty(fontSize) || fontSize.StartsWith("13"))
+		bool ours152 = fontSize != null && fontSize.StartsWith("10") && (IniGet(rs, "STYLE", "FontScale") ?? "").StartsWith("1.0");
+		if (string.IsNullOrEmpty(fontSize) || fontSize.StartsWith("13") || ours152)
 		{
-			IniSet(rs, "STYLE", "FontSize", "10.000000", true);
-			IniSet(rs, "STYLE", "FontScale", "1.000000", true);
+			int h = WindowSize().Height;
+			double auto = h >= 2160 ? 2.0 : h >= 1440 ? 1.5 : 1.0;
+			IniSet(rs, "STYLE", "FontSize", "8.000000", true);
+			IniSet(rs, "STYLE", "FontScale", "0.125000", true);
+			var osd = IniGet(rs, "STYLE", "FPSScale");
+			if (string.IsNullOrEmpty(osd) || osd.StartsWith("1.0"))
+				IniSet(rs, "STYLE", "FPSScale", (13 * auto).ToString("0.000000", System.Globalization.CultureInfo.InvariantCulture), true);
 		}
 		const string cache = @".\reshade-shaders\Cache";
 		var cachePath = IniGet(rs, "GENERAL", "IntermediateCachePath");
@@ -333,7 +341,7 @@ static class WowGU
 			IniSet(rs, "GENERAL", "IntermediateCachePath", cache, true);
 		if (IniGet(rs, "GENERAL", "IntermediateCachePath") == cache)
 			Directory.CreateDirectory(G(@"reshade-shaders\Cache"));
-		Say("Надпись ReShade при запуске игры стала мельче, собранные эффекты хранятся в папке игры.");
+		Say("Надпись ReShade при запуске игры сжата до тонкой полосы, собранные эффекты хранятся в папке игры.");
 		// Without the addon there is no signal from the game world: the effects must not wait for it.
 		if (current.Major < 3)
 		{
@@ -508,7 +516,8 @@ static class WowGU
 	}
 
 	// The size the world is drawn at: the window (the screen when maximized) times the render scale.
-	static Size RenderSize()
+	// The game window as Config.wtf sets it, the screen when the window is maximized.
+	static Size WindowSize()
 	{
 		var size = Screen.PrimaryScreen.Bounds.Size;
 		bool windowed = ConfigValue(current.Dir, "gxWindow") != "0";
@@ -516,6 +525,12 @@ static class WowGU
 		var res = ConfigValue(current.Dir, windowed ? "gxWindowedResolution" : "gxFullscreenResolution");
 		var m = Regex.Match(res, @"(\d+)x(\d+)");
 		if (m.Success && !(windowed && maximized)) size = new Size(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value));
+		return size;
+	}
+
+	static Size RenderSize()
+	{
+		var size = WindowSize();
 		double scale;
 		if (!double.TryParse(ConfigValue(current.Dir, "RenderScale"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out scale) || scale <= 0) scale = 1.0;
 		return new Size((int)Math.Round(size.Width * scale), (int)Math.Round(size.Height * scale));
