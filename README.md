@@ -5,13 +5,13 @@
 Графическое улучшение World of Warcraft. Основные работы проводятся на версии Legion 7.3.5. 
 Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
-Текущая сборка: **1.5.8-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **1.6.0-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.5.8-release
+## Что входит в сборку 1.6.0-release
 
 Всё настраивается в игре: Интерфейс > Модификации > GU-WOW, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -19,7 +19,9 @@
 |---|---|---|---|
 | Атмосфера | Туман | Воздушная дымка вдали. Ползунки «Густота тумана» и «Дальность тумана» | до 1.3 |
 | Атмосфера | Низовой туман | Туман стелется по земле. Ползунки «Низовой туман» и «Плотность низового тумана» | 1.3 |
-| Атмосфера | Лучи солнца | Лучи сквозь кроны и туман. Ползунок «Сила лучей» | до 1.3 |
+| Атмосфера | Туман с высоты | Стелющийся туман виден с горы, с обрыва и в полёте: внизу лежат одеяла тумана. Ползунок, 0 даёт чистый воздух сверху | 1.6.0 |
+| Атмосфера | Лучи солнца | Лучи сквозь кроны и туман. Ползунки «Сила лучей» и «Чёткость лучей»: от мягкого свечения до отдельных снопов | до 1.3 |
+| Атмосфера | Слежение за кадром | Эффекты знают, куда уехала картинка при повороте камеры: солнце не теряется, цвет тумана не плывёт, огни не отстают | 1.6.0 |
 | Атмосфера | Погодное настроение | В пасмурную погоду и в дождь дымка гуще, цвет холоднее, контраст мягче. Работает, только когда включён туман | 1.3 |
 | Атмосфера | Тени в щелях | Мягкие тени под камнями, травой и у стен, предметы садятся на землю | 1.4 |
 | Атмосфера | Мокрая земля | В дождь и в пасмурную погоду земля темнеет, блестит и отражает небо | 1.4 |
@@ -43,7 +45,7 @@
 | Удобство | Что нового | После обновления игра один раз показывает, что появилось | 1.5.4 |
 | Удобство | Мои пресеты | До 10 своих настроек с названиями на странице «Профили и фото». Их можно сохранить, загрузить и удалить. Перед загрузкой, удалением и перезаписью меню спрашивает подтверждение | 1.5.1 |
 | Удобство | Предпросмотр | Готовые пресеты, стили и чужие коды сначала только показываются на экране. Ваши настройки меняются, только если нажать «Применить» | 1.5.1 |
-| Удобство | Готовые пресеты | На главной странице меню: Default (настройки автора), Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir, More FPS. Стрелки показывают пресет сразу, «Применить» оставляет его, ползунки подстраивают его до применения. «+» сохраняет свои настройки как «Пользовательские #1» и дальше по номерам, до 10, «-» удаляет показанный | 1.5.8 |
+| Удобство | Готовые пресеты | На главной странице меню: Default (настройки автора), Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir, More FPS. Стрелки показывают пресет сразу, «Применить» оставляет его, ползунки подстраивают его до применения. «+» сохраняет свои настройки как «Пользовательские #1» и дальше по номерам, до 10, «-» удаляет показанный | 1.6.0 |
 | Удобство | Коды настройки | Кнопка «Мой код» даёт строку с вашими настройками. Друг вставляет её и нажимает «Попробовать код» | 1.5 |
 | Удобство | Кнопка у миникарты | Щелчок левой кнопкой мыши открывает меню, правой включает и выключает мод. Shift с левой кнопкой или средняя кнопка запускают фоторежим. Кнопку можно перетащить по кругу миникарты | 1.5 |
 | Удобство | Автокачество | По умолчанию выключено, включается на странице «Профили и фото». Если кадров меньше, чем задано ползунком «Держать кадров не ниже» (по умолчанию 45), тени в щелях, низовой туман, резкость, мокрая земля и привыкание глаз временно отключаются | 1.5 |
@@ -117,13 +119,13 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 A graphical enhancement for World of Warcraft. The main development work is being carried out for Legion 7.3.5.
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
-Current build: **1.5.8-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **1.6.0-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.5.8-release
+## What is in build 1.6.0-release
 
 Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -131,7 +133,9 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 |---|---|---|---|
 | Atmosphere | Fog | Haze in the distance. Sliders "Fog density" and "Fog distance" | before 1.3 |
 | Atmosphere | Ground mist | Mist that lies on the ground. Sliders "Ground mist" and "Ground mist thickness" | 1.3 |
-| Atmosphere | Sun rays | Rays through the trees and the fog. Slider "Ray strength" | before 1.3 |
+| Atmosphere | Mist from a height | The ground mist shows from a hill, a cliff and in flight: blankets of mist lie below. A slider, 0 gives clear air from above | 1.6.0 |
+| Atmosphere | Sun rays | Rays through the trees and the fog. Sliders "Ray strength" and "Ray definition": from a soft glow to separate shafts | before 1.3 |
+| Atmosphere | Frame tracking | The effects know where the picture went as the camera turns: the sun is not lost, the fog colour does not swim, the lights do not trail | 1.6.0 |
 | Atmosphere | Weather mood | In overcast weather and rain the haze gets thicker, the colours cooler and the contrast softer. Works only with the fog on | 1.3 |
 | Atmosphere | Contact shadows | Soft shadows under stones, grass and near walls, objects sit on the ground | 1.4 |
 | Atmosphere | Wet ground | In rain and overcast weather the ground darkens, shines and reflects the sky | 1.4 |
@@ -155,7 +159,7 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 | Convenience | What is new | After an update the game shows once what has appeared | 1.5.4 |
 | Convenience | My presets | Up to 10 named sets of your own settings on the "Profiles and photo" page. You can save, load and delete them. Before loading, deleting or overwriting, the menu asks you to confirm | 1.5.1 |
 | Convenience | Preview | Ready presets, styles and friends' codes are first only shown on screen. Your settings change only when you press "Apply" | 1.5.1 |
-| Convenience | Ready presets | On the main menu page: Default (the author's settings), Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir, More FPS. The arrows show a preset at once, «Apply» keeps it, the sliders tune it before that. «+» saves your settings as «Custom #1» and up by number, 10 at most, «-» deletes the shown one | 1.5.8 |
+| Convenience | Ready presets | On the main menu page: Default (the author's settings), Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir, More FPS. The arrows show a preset at once, «Apply» keeps it, the sliders tune it before that. «+» saves your settings as «Custom #1» and up by number, 10 at most, «-» deletes the shown one | 1.6.0 |
 | Convenience | Settings codes | The "My code" button gives a line with your settings. A friend pastes it and presses "Try the code" | 1.5 |
 | Convenience | Minimap button | Left click opens the menu, right click turns the mod on or off. Shift and left click, or middle click, start photo mode. The button can be dragged around the minimap | 1.5 |
 | Convenience | Auto quality | Off by default, turn it on on the "Profiles and photo" page. When the frame rate drops below the "Keep FPS at least" slider (45 by default), contact shadows, ground mist, sharpening, wet ground and eye adaptation pause | 1.5 |

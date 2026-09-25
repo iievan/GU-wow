@@ -157,8 +157,11 @@
 #define LEGIONGU_CTL_EXTRA 20    // 1 heat haze, 2 a hot zone (desert, fire), 4 cinema HDR, 8 bokeh in photo mode
 #define LEGIONGU_CTL_HAZE 21     // heat haze strength, 50 the look of 1.5.4
 #define LEGIONGU_CTL_HDR 22      // cinema HDR strength, 50 the look of 1.5.4
+#define LEGIONGU_CTL_FACING 23   // the player's facing, 0..1 for a full turn counterclockwise from north
+#define LEGIONGU_CTL_MIST_HIGH 24 // how much of the low mist stays seen from above, 1.6.0
+#define LEGIONGU_CTL_RAY_DEF 25  // ray definition: 0 a soft glow, 1 separate wide beams
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 49    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 55    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -167,8 +170,13 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 23; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 26; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+
+// The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
+// moved on screen (uv), z = the confidence 0..1, w = the frame it was written in (see LegionGUFog).
+texture2D LegionGUMotionTex { Width = 1; Height = 1; Format = RGBA32F; };
+sampler2D LegionGUMotionS { Texture = LegionGUMotionTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
 // whatever runs before it.
@@ -233,6 +241,12 @@ int LegionGUStyleValue()
 bool LegionGUExtra(uint bit)
 {
 	return LegionGUPanel() && (uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_EXTRA, 0)).x * 63.0 + 0.5) & bit) != 0u;
+}
+
+// The player's facing in radians, counterclockwise from north, quantised to a 64th of a turn; 0 without the panel.
+float LegionGUFacingRad()
+{
+	return tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_FACING, 0)).x * 63.0 * (6.28318531 / 64.0);
 }
 
 // How much it is night by the game's clock, 0..1 (indoors too: the street is seen through the door): 21 to 5 o'clock with an hour of fade; 0 without the panel.
@@ -777,6 +791,15 @@ namespace LegionGUNights
 	uniform float FrameTime < source = "frametime"; >;
 	uniform uint FrameCount < source = "framecount"; >;
 
+	// The camera's motion this frame in screen uv, from LegionGUMotionTex (LegionGUFog writes it): zero while
+	// the estimate is stale (the fog technique is off) or unsure (a teleport, a loading screen).
+	float2 LegionGUMotionUV()
+	{
+		float4 m = tex2Dfetch(LegionGUMotionS, int2(0, 0));
+		float age = float((FrameCount % 8388608u + 8388608u - uint(m.w + 0.5) % 8388608u) % 8388608u);
+		return age <= 2.0 ? m.xy * m.z : float2(0.0, 0.0);
+	}
+
 	// ---------------------------------------------------------------------------------------------------
 	// Constants
 	// ---------------------------------------------------------------------------------------------------
@@ -1204,6 +1227,7 @@ namespace LegionGUNights
 	texture2D LightPrevTex { Width = LEGIONGU_GLOW_W; Height = LEGIONGU_GLOW_H; Format = RGBA16F; };
 	sampler2D LightRaw { Texture = LightRawTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 	sampler2D LightPrev { Texture = LightPrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+	sampler2D LightPrevLin { Texture = LightPrevTex; AddressU = BORDER; AddressV = BORDER; };
 	texture2D L0Tex { Width = LEGIONGU_GLOW_W; Height = LEGIONGU_GLOW_H; Format = RGBA16F; };
 	texture2D L1Tex { Width = LEGIONGU_L1_W; Height = LEGIONGU_L1_H; Format = RGBA16F; };
 	texture2D L2Tex { Width = LEGIONGU_L2_W; Height = LEGIONGU_L2_H; Format = RGBA16F; };
@@ -1797,6 +1821,9 @@ namespace LegionGUNights
 
 		float reversed = EffectiveReversed(depthState.w);
 		float farFrom = FogSampleFrom * FAR_LAND_SHARE;
+		// While the camera turns fast the frame is new every moment; the fog colour and the openness hold and
+		// settle after the turn, instead of pumping through every colour they pass on the way.
+		float adaptSlow = 1.0 + 3.0 * saturate(length(LegionGUMotionUV()) * 30.0);
 
 		// The frame's average; the far land weighted by distance and by the square of its brightness, so the
 		// farthest and brightest land wins (farN counts it without the weights, for the confidence); the mean
@@ -1841,7 +1868,7 @@ namespace LegionGUNights
 		{
 			bool known = nearN > FOG_KEY_TAPS && depthState.y > 0.5;
 			float4 key = known ? float4(nearC / nearN, 1.0) : float4(tex2Dfetch(FogPrev, int2(2, 0)).rgb, 0.0);
-			return seeded ? lerp(tex2Dfetch(FogPrev, int2(2, 0)), key, Rate(dt, FogColourAdapt)) : key;
+			return seeded ? lerp(tex2Dfetch(FogPrev, int2(2, 0)), key, Rate(dt, FogColourAdapt * adaptSlow)) : key;
 		}
 
 		// The horizon colour, from the sky right above far land in each grid column.
@@ -1860,7 +1887,7 @@ namespace LegionGUNights
 		float horConf = saturate(horW / HORIZON_FULL) * depthState.y;
 		if (texel == 3)
 		{
-			float open = seeded ? lerp(tex2Dfetch(FogPrev, int2(3, 0)).x, horConf, Rate(dt, FogColourAdapt)) : horConf;
+			float open = seeded ? lerp(tex2Dfetch(FogPrev, int2(3, 0)).x, horConf, Rate(dt, FogColourAdapt * adaptSlow)) : horConf;
 			// y and z: the night's darkening and glow strengths (see NightStateTexel), so FogApplyPS knows from the
 			// texel it reads anyway whether the night is on.
 			float4 night = NightStateTexel(5, depthState, dt);
@@ -1904,7 +1931,7 @@ namespace LegionGUNights
 		// The horizon wins when it is in view (HORIZON_FULL columns are full confidence).
 		float3 target = saturate(lerp(land, horizon, horConf));
 
-		float3 colour = seeded ? lerp(prev0.rgb, target, Rate(dt, FogColourAdapt)) : target;
+		float3 colour = seeded ? lerp(prev0.rgb, target, Rate(dt, FogColourAdapt * adaptSlow)) : target;
 		return float4(colour, 1.0);
 	}
 
@@ -1953,7 +1980,9 @@ namespace LegionGUNights
 	float4 LightSteadyPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		float4 now = tex2Dfetch(LightRaw, int2(pos.xy));
-		float4 prev = tex2Dfetch(LightPrev, int2(pos.xy));
+		// Last frame's field rides with the camera, so the pools and the halos stay on their lamps in a turn
+		// instead of trailing behind them.
+		float4 prev = tex2Dlod(LightPrevLin, float4(uv - LegionGUMotionUV(), 0.0, 0.0));
 		float ln = dot(now.rgb, LUMA601);
 		float lp = dot(prev.rgb, LUMA601);
 		float yards = max(ln > 1e-5 ? exp2(now.a / ln) : 0.0, lp > 1e-5 ? exp2(prev.a / lp) : 0.0);
@@ -3052,7 +3081,7 @@ namespace LegionGUNights
 		SunInfo s = CurrentSun();
 		float3 fine = Arc(uv, s.p, ARC_FINE_DEG);
 		float3 wide = Arc(uv, s.p, ARC_WIDE_DEG);
-		float k = 1.0 + 4.0 * RaysDefinition;
+		float k = 1.0 + 4.0 * (LegionGUValue(LEGIONGU_CTL_RAY_DEF, RaysDefinition * 100.0) * 0.01);
 		return float4(max(wide + (fine - wide) * k, 0.0), 1.0);
 	}
 
@@ -3223,11 +3252,20 @@ namespace LegionGUNights
 		{
 			float4 hs = tex2Dfetch(FogCur, int2(1, 0));
 			float hu = DepthU(RawDepth(uv), EffectiveReversed(hs.w));
-			float hz = IsSky(hu) ? 0.0 : smoothstep(HAZE_FROM, HAZE_FULL, Yards(hu));
+			float hzY = Yards(hu);
+			float hz = IsSky(hu) ? 0.0 : smoothstep(HAZE_FROM, HAZE_FULL, hzY);
 			if (hz > 0.0)
 			{
 				float ht = GUTimer * 0.001;
-				float2 wob = float2(sin(uv.y * 700.0 + ht * 5.0 + sin(uv.x * 37.0 + ht * 1.7) * 2.0), 0.5 * sin(uv.y * 530.0 - ht * 4.1 + uv.x * 23.0));
+				// The waver stands in the world, not on the glass: the horizontal phase follows the view azimuth (the
+				// player's facing over the horizontal field of view, 60 degrees vertical assumed), so a camera turn
+				// slides the pattern with the land instead of dragging the land under a fixed pattern; the vertical
+				// phase follows the log distance, so it sticks to the ground bands. The facing is quantised to a 64th
+				// of a turn and the mouse can orbit without turning the player, then the pattern steps or stays: with
+				// ripples of this size that reads as live air, where the old screen-glued ripples read as a film.
+				float ax = uv.x + LegionGUFacingRad() / (2.0 * atan(0.57735 * ASPECT));
+				float ly = log2(max(hzY, 1.0));
+				float2 wob = float2(sin(ly * 160.0 + ht * 5.0 + sin(ax * 37.0 + ht * 1.7) * 2.0), 0.5 * sin(ly * 120.0 - ht * 4.1 + ax * 23.0));
 				float2 off = wob * hz * HAZE_PX * LegionGUValue(LEGIONGU_CTL_HAZE, 50.0) * 0.02 * (float(BUFFER_HEIGHT) / 1080.0) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 				c = tex2Dlod(ColorLinear, float4(uv + off, 0.0, 0.0)).rgb;
 			}

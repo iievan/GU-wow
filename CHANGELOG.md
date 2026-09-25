@@ -1,5 +1,41 @@
 # GU-WOW: история версий / Version history
 
+## 1.6.0-release «Лунная тропа» / "Moonlit Path"
+
+### Русский
+
+**Новое**
+- Эффекты следят за движением кадра. Каждый кадр сравнивается с прошлым, и найденный сдвиг говорит солнцу, туману и огням, куда уехала картинка. Найденное солнце не теряется при повороте камеры, цвет тумана не плывёт через промежуточные цвета, свет и ореолы огней не отстают от своих фонарей. При телепорте и на экранах загрузки слежение само отключается.
+- Ползунок «Туман с высоты». Стелющийся туман виден с горы, с обрыва и в полёте: внизу лежат одеяла тумана. 0 даёт прежний вид, сверху воздух чистый. По умолчанию 50.
+- Ползунок «Чёткость лучей». 0 — мягкое свечение в дымке, 100 — отдельные широкие снопы с тенью между ними. По умолчанию 25, прежний вид.
+- Марево стоит в мире, а не на экране. Рябь привязана к направлению взгляда и к расстоянию: при повороте камеры она едет вместе с землёй.
+
+**Исправлено**
+- Низовой туман на холмистой местности держится ровно. На неровной земле оценка «где земля» сбивалась на каждом шаге, и туман мигал; теперь он плавно тает при плохой оценке и возвращается.
+- В пасмурную погоду и в дождь лучи солнца приглушены до пятой части. Сплошная серая облачность видна по небу, и яркое облако не сходит за солнце со снопами сквозь дождь.
+
+**Изменено**
+- Окно настроек игры шире и выше, пока открыта страница GU-WOW: подписи ползунков помещаются целиком. При выходе со страницы окно возвращается к прежнему размеру.
+- «Атмосфера по зонам» на странице «Профили и фото», рядом с автокачеством: это поведение, а не картинка. Место на главной странице заняли новые ползунки.
+- Пресеты Starry Night, Peaceful Morning и Grim Storm задают свой туман с высоты; More FPS выключает его.
+
+### English
+
+**New**
+- The effects follow the motion of the frame. Every frame is matched against the last one, and the found shift tells the sun, the fog and the lights where the picture went. A found sun is not lost in a camera turn, the fog colour does not swim through in-between colours, the light and the halos of the lamps do not trail behind them. On a teleport and on loading screens the tracking turns itself off.
+- A slider, mist from a height. The ground mist shows from a hill, a cliff and in flight: blankets of mist lie below. 0 gives the old look, clear air from above. 50 by default.
+- A slider, ray definition. 0 is a soft glow in the haze, 100 separate wide shafts with shade between them. 25 by default, the old look.
+- The heat haze stands in the world, not on the screen. The ripples are tied to the view direction and the distance: as the camera turns they ride with the land.
+
+**Fixed**
+- The ground mist holds steady on hilly land. On uneven ground the guess of where the ground stands broke with every stride and the mist blinked; now it fades softly while the guess is poor and comes back.
+- In overcast weather and in rain the sun rays are cut to a fifth. A solid grey sky is read from the sky itself, so a bright cloud does not pass for a sun with shafts through the rain.
+
+**Changed**
+- The game's options window is wider and taller while a GU-WOW page is open: the slider labels fit whole. It returns to its old size when you leave the page.
+- Atmosphere by zone lives on the "Profiles and photo" page, next to auto quality: it is behaviour, not the picture. The new sliders took its place on the main page.
+- The presets Starry Night, Peaceful Morning and Grim Storm set their own mist from a height; More FPS turns it off.
+
 ## 1.5.8-release «Лунная тропа» / "Moonlit Path"
 
 ### Русский

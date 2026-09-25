@@ -174,8 +174,11 @@
 #define LEGIONGU_CTL_EXTRA 20    // 1 heat haze, 2 a hot zone (desert, fire), 4 cinema HDR, 8 bokeh in photo mode
 #define LEGIONGU_CTL_HAZE 21     // heat haze strength, 50 the look of 1.5.4
 #define LEGIONGU_CTL_HDR 22      // cinema HDR strength, 50 the look of 1.5.4
+#define LEGIONGU_CTL_FACING 23   // the player's facing, 0..1 for a full turn counterclockwise from north
+#define LEGIONGU_CTL_MIST_HIGH 24 // how much of the low mist stays seen from above, 1.6.0
+#define LEGIONGU_CTL_RAY_DEF 25  // ray definition: 0 a soft glow, 1 separate wide beams
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 49    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 55    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -184,8 +187,13 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 23; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 26; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+
+// The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
+// moved on screen (uv), z = the confidence 0..1, w = the frame it was written in (see LegionGUFog).
+texture2D LegionGUMotionTex { Width = 1; Height = 1; Format = RGBA32F; };
+sampler2D LegionGUMotionS { Texture = LegionGUMotionTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
 // whatever runs before it.
@@ -246,6 +254,12 @@ int LegionGUStyleValue()
 	return LegionGUPanel() ? int(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_STYLE, 0)).x * 63.0 + 0.5) : -1;
 }
 
+// The player's facing in radians, counterclockwise from north, quantised to a 64th of a turn; 0 without the panel.
+float LegionGUFacingRad()
+{
+	return tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_FACING, 0)).x * 63.0 * (6.28318531 / 64.0);
+}
+
 // How much it is night by the game's clock, 0..1 (indoors too: the street is seen through the door): 21 to 5 o'clock with an hour of fade; 0 without the panel.
 float LegionGUNight()
 {
@@ -254,6 +268,7 @@ float LegionGUNight()
 	float h = LegionGUHour();
 	return saturate(1.0 - smoothstep(4.5, 6.0, h) + smoothstep(20.0, 21.5, h));
 }
+
 
 namespace LegionGU
 {
@@ -299,6 +314,13 @@ namespace LegionGU
 		ui_category = "Атмосфера";
 		ui_label = "Плотность низового тумана";
 		ui_tooltip = "Насколько плотная дымка у земли: 100 как вата, почти непрозрачная в низинах и под кронами.";
+	> = 50.0;
+
+	uniform float MistHighAmount <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Атмосфера";
+		ui_label = "Туман с высоты";
+		ui_tooltip = "Сколько стелющегося тумана видно сверху: с горы, с обрыва и с полёта.\n0: сверху воздух чистый. 100: туман лежит в низинах и под вами.";
 	> = 50.0;
 
 	uniform bool WetGround <
@@ -711,6 +733,15 @@ namespace LegionGU
 
 	uniform float FrameTime < source = "frametime"; >;
 	uniform uint FrameCount < source = "framecount"; >;
+
+	// The camera's motion this frame in screen uv, from LegionGUMotionTex (LegionGUFog writes it): zero while
+	// the estimate is stale (the fog technique is off) or unsure (a teleport, a loading screen).
+	float2 LegionGUMotionUV()
+	{
+		float4 m = tex2Dfetch(LegionGUMotionS, int2(0, 0));
+		float age = float((FrameCount % 8388608u + 8388608u - uint(m.w + 0.5) % 8388608u) % 8388608u);
+		return age <= 2.0 ? m.xy * m.z : float2(0.0, 0.0);
+	}
 
 	// ---------------------------------------------------------------------------------------------------
 	// Constants
@@ -1420,9 +1451,9 @@ namespace LegionGU
 	static const float GROUND_HY_MAX = 6.0;     // a flatter fit is a wall seen straight on, not ground
 	static const float GROUND_SLOW = 1.5;       // seconds for the horizon to settle after a small wobble (grass, a gust)
 	static const float GROUND_FAST = 0.1;       // seconds to settle after a real tilt of the camera
-	static const float GROUND_BIG = 0.25;       // a move of the horizon this large counts as a real tilt
+	static const float GROUND_BIG = 0.45;       // a move of the horizon this large counts as a real tilt
 	static const float GROUND_K_TIME = 0.5;     // seconds to follow the camera height
-	static const float GROUND_LOSE_TIME = 4.0;  // seconds to forget the plane when the ground is not seen
+	static const float GROUND_LOSE_TIME = 6.0;  // seconds to forget the plane when the ground is not seen
 
 	// Texel 6: x = hy, y = K, z = confidence, w = the speed of hy (see the spring below). Grass, bushes, a pet or a
 	// trunk always stand in front of the ground, never behind it, so the farthest tap of a row is the ground
@@ -1483,12 +1514,15 @@ namespace LegionGU
 		float c0 = (sw - c1 * sy) / n;
 		float misfit = sqrt(max(sww - c0 * sw - c1 * syw, 0.0) / n);
 		float hy = c1 < 0.0 ? -c0 / c1 : 1e9;
-		if (hy >= GROUND_HY_MAX || misfit > GROUND_FIT * sw / n)
+		// Uneven ground fits worse without being wrong: the confidence follows the quality of the fit smoothly
+		// and eases, so on hills the mist thins a little instead of blinking in and out with every stride.
+		float q = 1.0 - smoothstep(0.6, 1.6, misfit / max(GROUND_FIT * sw / n, 1e-6));
+		if (hy >= GROUND_HY_MAX || q <= 0.0)
 			return hold;
 
 		float2 plane = float2(hy, clamp(-c1, 1.0 / 60.0, 1.0));
 		if (!known)
-			return float4(plane, 0.5, 0.0);
+			return float4(plane, 0.5 * q, 0.0);
 		// The horizon rides a critically damped spring (the usual smooth damp), w is its speed: it starts softly,
 		// catches up fast and stops without overshoot, so the mist glides with the camera instead of jumping. Its
 		// time follows the size of the change: a small wobble from grass settles slowly, a real tilt fast. A single
@@ -1502,7 +1536,10 @@ namespace LegionGU
 		float speed = (prev.w - omega * pull) * decay;
 		float glide = plane.x + (change + pull) * decay;
 		float rk = Rate(dt, GROUND_K_TIME);
-		return float4(glide, lerp(prev.y, plane.y, rk), lerp(prev.z, 1.0, Rate(dt, 0.3)), speed);
+		// The confidence rises fast and falls slowly: a camera turn spoils one measurement for a moment, and a
+		// symmetric fade made the mist vanish on every turn. A poor fit must hold for seconds to thin the mist.
+		float zq = q > prev.z ? lerp(prev.z, q, Rate(dt, 0.4)) : lerp(prev.z, q, Rate(dt, 4.0));
+		return float4(glide, lerp(prev.y, plane.y, rk), zq, speed);
 	}
 
 	// The weather (texel 5): an overcast or rainy sky is grey, not blue or gold, bright enough to be day, and
@@ -1513,6 +1550,111 @@ namespace LegionGU
 	static const float WEATHER_LUM_LO = 0.08;     // darker skies are the night, not the weather
 	static const float WEATHER_LUM_HI = 0.20;
 	static const float WEATHER_TIME = 4.0;
+
+	// ---------------------------------------------------------------------------------------------------
+	// The camera's motion: one shift per frame, found by matching the downsampled luminance of the frame
+	// against the last one, coarse then fine. A camera turn moves the whole far picture by nearly one shift;
+	// knowing it, the sun tracker and the fog colour stop treating every turn as a new scene, and the night's
+	// lights ride with the picture (LegionGUMotionTex is shared with the other effect file). The confidence
+	// compares the best match with staying put: a teleport or a loading screen matches nowhere, the confidence
+	// falls to 0 and every reader behaves as it did before 1.6.0.
+	// ---------------------------------------------------------------------------------------------------
+
+	static const float MO_CONF_GAIN = 1.5;
+	static const int MO_TAPS_X = 12;
+	static const int MO_TAPS_Y = 7;
+	static const int MO_TAPS = 84;
+
+	texture2D MoSceneTex { Width = 128; Height = 72; Format = R16F; };
+	texture2D MoPrevTex { Width = 128; Height = 72; Format = R16F; };
+	sampler2D MoScene { Texture = MoSceneTex; };
+	sampler2D MoScenePoint { Texture = MoSceneTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+	sampler2D MoPrev { Texture = MoPrevTex; };
+
+	float4 MotionDownPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		float2 o = float2(0.25 / 128.0, 0.25 / 72.0);
+		float l = dot(tex2Dlod(ColorLinear, float4(uv - o, 0.0, 0.0)).rgb
+		            + tex2Dlod(ColorLinear, float4(uv + float2(o.x, -o.y), 0.0, 0.0)).rgb
+		            + tex2Dlod(ColorLinear, float4(uv + float2(-o.x, o.y), 0.0, 0.0)).rgb
+		            + tex2Dlod(ColorLinear, float4(uv + o, 0.0, 0.0)).rgb, LUMA601) * 0.25;
+		return float4(l, 0.0, 0.0, 1.0);
+	}
+
+	float MotionSAD(float sc[MO_TAPS], float2 gs[MO_TAPS], float2 off)
+	{
+		float sum = 0.0;
+		float n = 1e-4;
+		[loop]
+		for (int t = 0; t < MO_TAPS; ++t)
+		{
+			float2 q = gs[t] + off;
+			float inside = (q.x > 0.02 && q.x < 0.98 && q.y > 0.02 && q.y < 0.98) ? 1.0 : 0.0;
+			sum += abs(sc[t] - tex2Dlod(MoPrev, float4(q, 0.0, 0.0)).x) * inside;
+			n += inside;
+		}
+		return sum / n;
+	}
+
+	float4 MotionEstimatePS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		float sc[MO_TAPS];
+		float2 gs[MO_TAPS];
+		[loop]
+		for (int j0 = 0; j0 < MO_TAPS_Y; ++j0)
+		{
+			[loop]
+			for (int i0 = 0; i0 < MO_TAPS_X; ++i0)
+			{
+				int t = j0 * MO_TAPS_X + i0;
+				gs[t] = float2(0.1 + 0.8 * (i0 + 0.5) / MO_TAPS_X, 0.1 + 0.8 * (j0 + 0.5) / MO_TAPS_Y);
+				sc[t] = tex2Dlod(MoScene, float4(gs[t], 0.0, 0.0)).x;
+			}
+		}
+		float2 texel = float2(1.0 / 128.0, 1.0 / 72.0);
+		float sadZero = MotionSAD(sc, gs, float2(0.0, 0.0));
+		float2 best = float2(0.0, 0.0);
+		float sadBest = sadZero;
+		[loop]
+		for (int j = -3; j <= 3; ++j)
+		{
+			[loop]
+			for (int i = -3; i <= 3; ++i)
+			{
+				float2 off = float2(i, j) * (4.0 * texel);
+				float s = MotionSAD(sc, gs, off);
+				if (s < sadBest)
+				{
+					sadBest = s;
+					best = off;
+				}
+			}
+		}
+		float2 coarse = best;
+		[loop]
+		for (int j2 = -2; j2 <= 2; ++j2)
+		{
+			[loop]
+			for (int i2 = -2; i2 <= 2; ++i2)
+			{
+				float2 off = coarse + float2(i2, j2) * texel;
+				float s = MotionSAD(sc, gs, off);
+				if (s < sadBest)
+				{
+					sadBest = s;
+					best = off;
+				}
+			}
+		}
+		// The picture moved by -best: this frame at g matches the last one at g + best.
+		float conf = saturate(MO_CONF_GAIN * (sadZero - sadBest) / max(sadZero, 1e-4));
+		return float4(-best, conf, float(FrameCount % 8388608u));
+	}
+
+	float4 MotionSavePS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		return tex2Dfetch(MoScenePoint, int2(pos.xy));
+	}
 
 	float4 FogStatePS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
@@ -1532,11 +1674,13 @@ namespace LegionGU
 			float share = SunMode == 0 ? saturate(tex2Dfetch(RaysPrev, int2(3, 0)).z) : 0.0;
 			// The point follows the rays' sun almost at once (it moves on screen with every camera turn); only the
 			// switch between the seen sun and the pinned point is eased, which is what made the glow jump.
-			float2 sun = live ? tex2Dfetch(RaysPrev, int2(5, 0)).xy : prev4.xy;
+			// The glow in the fog rides with the camera too, so it does not trail behind the sun on a turn.
+			float2 mv4 = LegionGUMotionUV();
+			float2 sun = live ? tex2Dfetch(RaysPrev, int2(5, 0)).xy : prev4.xy + mv4;
 			float4 target = float4(sun, live ? share : prev4.z, live ? 1.0 : 0.0);
 			if (!seeded)
 				return target;
-			return float4(lerp(prev4.xy, target.xy, Rate(dt, SUN_GLIDE_POS)), lerp(prev4.zw, target.zw, Rate(dt, SUN_GLIDE_STR)));
+			return float4(lerp(prev4.xy + mv4, target.xy, Rate(dt, SUN_GLIDE_POS)), lerp(prev4.zw, target.zw, Rate(dt, SUN_GLIDE_STR)));
 		}
 
 		float4 depthState = DepthDecide(ScanDepth(), prev1, seeded, dt);
@@ -1545,6 +1689,9 @@ namespace LegionGU
 
 		float reversed = EffectiveReversed(depthState.w);
 		float farFrom = FogSampleFrom * FAR_LAND_SHARE;
+		// While the camera turns fast the frame is new every moment; the fog colour and the openness hold and
+		// settle after the turn, instead of pumping through every colour they pass on the way.
+		float adaptSlow = 1.0 + 3.0 * saturate(length(LegionGUMotionUV()) * 30.0);
 
 		if (texel == 6)
 			return GroundPlane(reversed, depthState, tex2Dfetch(FogPrev, int2(6, 0)), seeded, dt);
@@ -1598,23 +1745,29 @@ namespace LegionGU
 		{
 			bool known = nearN > FOG_KEY_TAPS && depthState.y > 0.5;
 			float4 key = known ? float4(nearC / nearN, 1.0) : float4(tex2Dfetch(FogPrev, int2(2, 0)).rgb, 0.0);
-			return seeded ? lerp(tex2Dfetch(FogPrev, int2(2, 0)), key, Rate(dt, FogColourAdapt)) : key;
+			return seeded ? lerp(tex2Dfetch(FogPrev, int2(2, 0)), key, Rate(dt, FogColourAdapt * adaptSlow)) : key;
 		}
 		if (texel == 5)
 		{
 			float4 prev5 = tex2Dfetch(FogPrev, int2(5, 0));
 			float overcast = seeded ? prev5.x : 0.0;
+			float grey = seeded ? prev5.y : 0.0;
 			if (skyN >= WEATHER_SKY_TAPS && depthState.y > 0.5)
 			{
 				float3 s = skyC / skyN;
 				float mx = max(s.r, max(s.g, s.b));
 				float sat = (mx - min(s.r, min(s.g, s.b))) / max(mx, 1e-3);
 				float sunSeen = SunMode == 0 ? saturate(tex2Dfetch(RaysPrev, int2(3, 0)).z) : 0.0;
-				float target = (1.0 - smoothstep(WEATHER_SAT_GREY, WEATHER_SAT_CLEAR, sat))
-							 * smoothstep(WEATHER_LUM_LO, WEATHER_LUM_HI, dot(s, LUMA601)) * (1.0 - sunSeen);
+				// The grey sky itself, and the weather mood's copy discounted by a seen sun. The rays read the first:
+				// in the rain the finder follows a bright cloud and calls it a sun, and that very mistake zeroed the
+				// discounted copy, so the shafts kept beating through the rain.
+				float base = (1.0 - smoothstep(WEATHER_SAT_GREY, WEATHER_SAT_CLEAR, sat))
+							 * smoothstep(WEATHER_LUM_LO, WEATHER_LUM_HI, dot(s, LUMA601));
+				float target = base * (1.0 - sunSeen);
 				overcast = seeded ? lerp(prev5.x, target, Rate(dt, WEATHER_TIME)) : target;
+				grey = seeded ? lerp(prev5.y, base, Rate(dt, WEATHER_TIME)) : base;
 			}
-			return float4(overcast, 0.0, 0.0, 1.0);
+			return float4(overcast, grey, 0.0, 1.0);
 		}
 
 		// The horizon colour, from the sky right above far land in each grid column.
@@ -1634,7 +1787,7 @@ namespace LegionGU
 		if (texel == 3)
 		{
 			float4 prev3 = tex2Dfetch(FogPrev, int2(3, 0));
-			float open = seeded ? lerp(prev3.x, horConf, Rate(dt, FogColourAdapt)) : horConf;
+			float open = seeded ? lerp(prev3.x, horConf, Rate(dt, FogColourAdapt * adaptSlow)) : horConf;
 			float openNow = max(saturate((farRowMax - ENCL_ROW_LO) / (ENCL_ROW_HI - ENCL_ROW_LO)), saturate(skyAll / (ENCL_SKY * GRID_X * GRID_Y)));
 			float enclosedNow = 1.0 - openNow;
 			float held = seeded ? prev3.y : 0.0;
@@ -1682,7 +1835,7 @@ namespace LegionGU
 		// view the fog over all the land turned light and the frame went milky.
 		float3 target = saturate(lerp(land, horizon, horConf * (1.0 - LegionGUNight())));
 
-		float3 colour = seeded ? lerp(prev0.rgb, target, Rate(dt, FogColourAdapt)) : target;
+		float3 colour = seeded ? lerp(prev0.rgb, target, Rate(dt, FogColourAdapt * adaptSlow)) : target;
 		return float4(colour, 1.0);
 	}
 
@@ -1832,10 +1985,16 @@ namespace LegionGU
 		float thick = LegionGUValue(LEGIONGU_CTL_MIST_DENSITY, MistDensity) * 0.01;
 		float4 m = float4(MIST_HEIGHT * lerp(0.5, 1.4, amount), amount < 0.5 ? lerp(25.0, MIST_START, amount * 2.0) : lerp(MIST_START, 6.0, amount * 2.0 - 1.0),
 		                  MIST_DENSITY * 2.0 * amount * exp2(MIST_DENSITY_SPAN * (thick - 0.5)), lerp(MIST_MAX.x, MIST_MAX.y, thick));
-		m.w *= 1.0 - smoothstep(MIST_HIGH.x, MIST_HIGH.y, 1.0 / max(ground.y, 1e-4));
-		// The game knows better: no low mist indoors or in flight.
-		if (LegionGUState(2u) || LegionGUState(4u))
+		// «Туман с высоты»: how much of the mist stays when the eye is high over the ground plane, on a cliff
+		// or in the air. At 0 the land below is clear (the old look), at 100 the valley keeps its blanket
+		// however high the camera stands. In flight the game's word scales it the same way.
+		float high = LegionGUValue(LEGIONGU_CTL_MIST_HIGH, MistHighAmount) * 0.01;
+		m.w *= lerp(1.0 - smoothstep(MIST_HIGH.x, MIST_HIGH.y, 1.0 / max(ground.y, 1e-4)), 1.0, high);
+		// The game knows better: no low mist indoors, and in flight only as much as «Туман с высоты» keeps.
+		if (LegionGUState(2u))
 			m.w = 0.0;
+		if (LegionGUState(4u))
+			m.w *= high;
 		if (amount > 0.0 && m.w > 0.0 && ground.z > 0.0 && depthState.y > 0.5 && depthState.x > 0.0)
 		{
 			float reversed = EffectiveReversed(depthState.w);
@@ -2190,8 +2349,11 @@ namespace LegionGU
 		float share = seeded ? lerp(prev0.z, sun.z, Rate(dt, SUN_FOUND_TIME)) : sun.z;
 		bool follow = seeded ? prev3.w > 0.5 : found;
 		float blendPrev = seeded ? prev3.z : 0.0;
-		float2 tracked = seeded ? prev3.xy : sun.xy;
-		float2 cand = seeded ? prev4.xy : sun.xy;
+		// Last frame's points ride with the camera: a found sun stays close by through a turn, and the rays
+		// follow it at once instead of falling back to the pinned point.
+		float2 mv = LegionGUMotionUV();
+		float2 tracked = seeded ? prev3.xy + mv : sun.xy;
+		float2 cand = seeded ? prev4.xy + mv : sun.xy;
 		float held = seeded ? prev4.z : 0.0;
 		float lost = (seeded && !found) ? min(prev4.w + dt, 10.0) : 0.0;
 		bool snap = !seeded;
@@ -2228,7 +2390,7 @@ namespace LegionGU
 			tracked = BeyondEdge(tracked);
 		}
 
-		float2 shown = snap ? tracked : lerp(prev5.xy, tracked, Rate(dt, SUN_SMOOTH_TIME));
+		float2 shown = snap ? tracked : lerp(prev5.xy + mv, tracked, Rate(dt, SUN_SMOOTH_TIME));
 		// A lost patch keeps its kind, so the point does not drop into the hole while the sun hides.
 		float liftTarget = found ? sun.w * GAP_LIFT : (seeded ? prev5.w : 0.0);
 		float lift = snap ? liftTarget : lerp(prev5.z, liftTarget, Rate(dt, GAP_LIFT_TIME));
@@ -2486,7 +2648,7 @@ namespace LegionGU
 		SunInfo s = CurrentSun();
 		float3 fine = Arc(uv, s.p, ARC_FINE_DEG);
 		float3 wide = Arc(uv, s.p, ARC_WIDE_DEG);
-		float k = 1.0 + 4.0 * RaysDefinition;
+		float k = 1.0 + 4.0 * (LegionGUValue(LEGIONGU_CTL_RAY_DEF, RaysDefinition * 100.0) * 0.01);
 		return float4(max(wide + (fine - wide) * k, 0.0), 1.0);
 	}
 
@@ -2559,6 +2721,9 @@ namespace LegionGU
 		// Open view: a mild glow only. Under leaves: the full shafts.
 		float canopy = saturate((tex2Dfetch(RaysCur, int2(7, 0)).x - CANOPY_LO) / (CANOPY_HI - CANOPY_LO));
 		gain *= lerp(RAYS_OPEN_GAIN, 1.0, canopy);
+		// Under a grey overcast the sun stands behind the clouds: what the finder follows there is a bright
+		// cloud, and its shafts beat through the rain. The grey sky takes up to four fifths of the rays away.
+		gain *= 1.0 - 0.8 * saturate(tex2Dfetch(FogCur, int2(5, 0)).y);
 		// The light is in the air: as much as there is air in front of the pixel.
 		float air = lerp(AIR_NO_DEPTH, tex2Dlod(RaysAir, float4(uv, 0.0, 0.0)).x, depthLive);
 		gain *= air * AIR_GAIN;
@@ -2589,7 +2754,7 @@ namespace LegionGU
 	static const float BRIDGE_GAP = 0.3;    // smallest step between black and white in each channel
 	static const float BRIDGE_HOLD = 2.0;   // seconds the last values stay after the strip is gone
 
-	texture2D BridgePrevTex { Width = 23; Height = 1; Format = RGBA32F; };
+	texture2D BridgePrevTex { Width = 26; Height = 1; Format = RGBA32F; };
 	sampler2D BridgePrev { Texture = BridgePrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 	float3 BridgeCell(int i)
@@ -2638,7 +2803,7 @@ namespace LegionGU
 			bool live = seen || (prev0.x > 0.5 && since <= BRIDGE_HOLD);
 			return float4(live ? 1.0 : 0.0, since, seen ? 1.0 : 0.0, 1.0);
 		}
-		if (seen && texel <= 22)
+		if (seen && texel <= 25)
 			return float4(BridgeValue(1 + 2 * texel, th) / 63.0, 0.0, 0.0, 1.0);
 		return tex2Dfetch(BridgePrev, int2(texel, 0));
 	}
@@ -2833,7 +2998,10 @@ namespace LegionGU
 		             "F11 включает и выключает весь мод, если F11 стоит в поле «Клавиша активации эффекта» на вкладке «Настройки».";
 	>
 	{
+		pass MotionDown { VertexShader = FullscreenVS; PixelShader = MotionDownPS; RenderTarget = MoSceneTex; }
+		pass MotionEstimate { VertexShader = FullscreenVS; PixelShader = MotionEstimatePS; RenderTarget = LegionGUMotionTex; }
 		pass FogState { VertexShader = FullscreenVS; PixelShader = FogStatePS; RenderTarget = FogCurTex; }
+		pass MotionSave { VertexShader = FullscreenVS; PixelShader = MotionSavePS; RenderTarget = MoPrevTex; }
 		pass FogSave { VertexShader = FullscreenVS; PixelShader = FogSavePS; RenderTarget = FogPrevTex; }
 		pass FogApply { VertexShader = FullscreenVS; PixelShader = FogApplyPS; }
 	}

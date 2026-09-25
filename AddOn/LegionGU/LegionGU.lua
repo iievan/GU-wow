@@ -1,13 +1,13 @@
 -- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
--- The settings travel to the shader as a strip of 49 cells, 4 by 4 pixels, in the top left corner of the screen.
+-- The settings travel to the shader as a strip of 55 cells, 4 by 4 pixels, in the top left corner of the screen.
 -- The effect LegionGUBridge (LegionGUbylevan.fx) reads the strip after the interface is drawn and covers it
 -- again, so it is not seen. Each colour channel is black or white, one bit. Cell 0 is black, cell 1 white, cell 2
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.5.8-release"
+local VERSION = "1.6.0-release"
 local CELL = 4
-local CELLS = 49
+local CELLS = 55
 
 -- Russian on a Russian client, English elsewhere.
 local RU = GetLocale() == "ruRU"
@@ -24,6 +24,8 @@ local DEFAULTS = {
 	sharpness = 40, grade = 95, vignette = 55, ao = 50,
 	-- Heat haze and cinema HDR: 0 off, 50 the look of 1.5.4.
 	hazeStrength = 50, hdrStrength = 50, grain = 55, bokeh = false, photoBlur = 50,
+	-- 1.6.0: how much of the low mist stays seen from a height, and how defined the ray shafts are.
+	mistHigh = 50, rayDefinition = 25,
 }
 -- The order of the values in the strip, the same as LEGIONGU_CTL_* in the shaders (after the flags).
 local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDarkness", "lightGlow",
@@ -36,11 +38,12 @@ local CODE_FLAGS = { "fog", "rays", "night", "weather", "wet", "eye", "zones", "
 -- HDR as switches, GUW3 (1.5.8) carries their strengths; the two first bits of the switches stay unused.
 local CODE_KEYS2 = { "grain", "photoBlur" }
 local CODE_KEYS3 = { "grain", "photoBlur", "hazeStrength", "hdrStrength" }
+local CODE_KEYS4 = { "grain", "photoBlur", "hazeStrength", "hdrStrength", "mistHigh", "rayDefinition" }
 local CODE_FLAGS2 = { "heatHaze", "cinemaHdr", "bokeh" }
 -- The look: what a style, a ready profile or a friend's code may change. The zones and the cinema bars are the
 -- player's habits, not the look, so a preview leaves them alone.
 local LOOK = { fog = true, rays = true, night = true, weather = true, wet = true, eye = true,
-	hazeStrength = true, hdrStrength = true, grain = true }
+	hazeStrength = true, hdrStrength = true, grain = true, mistHigh = true, rayDefinition = true }
 for _, k in ipairs(CODE_KEYS) do
 	LOOK[k] = true
 end
@@ -52,9 +55,9 @@ local BASE_PRESETS = {
 	{ "Default", {} },
 	-- Clear air and little mist keep the sky open; the night is dark, not black, the colour cold.
 	{ "Starry Night", { fogThickness = 10, mist = 35, mistDensity = 50, nightDarkness = 85, nightDepth = 45, lightGlow = 100,
-		grade = 100, vignette = 45, hdrStrength = 60, grain = 35, style = 2 } },
+		grade = 100, vignette = 45, hdrStrength = 60, grain = 35, mistHigh = 30, style = 2 } },
 	{ "Peaceful Morning", { fogThickness = 30, fogDistance = 90, mist = 85, mistDensity = 50, grade = 100, sharpness = 30,
-		vignette = 30, ao = 45, hazeStrength = 25, hdrStrength = 35, grain = 25, style = 1 } },
+		vignette = 30, ao = 45, hazeStrength = 25, hdrStrength = 35, grain = 25, mistHigh = 70, style = 1 } },
 	{ "Cinema", { fogThickness = 40, fogDistance = 75, mist = 70, ao = 55, sharpness = 30, vignette = 65, hdrStrength = 70,
 		grain = 65, style = 3 } },
 	{ "Clear Day", { fogThickness = 5, mist = 25, mistDensity = 40, raysStrength = 85, nightDarkness = 75, nightDepth = 30,
@@ -64,11 +67,11 @@ local BASE_PRESETS = {
 	{ "Fairy Forest", { fogThickness = 35, fogDistance = 85, mist = 100, mistDensity = 60, lightGlow = 100, nightDepth = 40,
 		sharpness = 35, vignette = 40, hdrStrength = 40, grain = 20, style = 6 } },
 	{ "Grim Storm", { fogThickness = 75, fogDistance = 45, mist = 100, mistDensity = 85, raysStrength = 60, nightDarkness = 100,
-		nightDepth = 90, caveDarkness = 90, sharpness = 30, vignette = 65, hdrStrength = 60, grain = 60, style = 2 } },
+		nightDepth = 90, caveDarkness = 90, sharpness = 30, vignette = 65, hdrStrength = 60, grain = 60, mistHigh = 80, style = 2 } },
 	{ "Noir", { fogThickness = 30, mist = 60, nightDepth = 80, sharpness = 45, vignette = 70, hdrStrength = 80, grain = 75,
 		style = 7 } },
 	-- The heavy parts off: the same that auto quality lightens, and the rays.
-	{ "More FPS", { wet = false, eye = false, rays = false, mist = 0, ao = 0, sharpness = 0, hazeStrength = 0, grain = 0 } },
+	{ "More FPS", { wet = false, eye = false, rays = false, mist = 0, ao = 0, sharpness = 0, hazeStrength = 0, grain = 0, mistHigh = 0 } },
 }
 for _, p in ipairs(BASE_PRESETS) do
 	local full = {}
@@ -275,8 +278,8 @@ end
 -- ---------------------------------------------------------------------------------------------------------------
 
 -- What only the game knows: 1 live, 2 indoors, 4 flying, 8 photo mode, 16 wet ground on, 32 world map open;
--- and the time of day 0..63 for 0..24 h.
-local lastState, lastTime
+-- the time of day 0..63 for 0..24 h; the player's facing 0..63 for a full turn (0 north, counterclockwise).
+local lastState, lastTime, lastFacing
 local function GameState()
 	local s = 1
 	if IsIndoors and IsIndoors() then
@@ -295,7 +298,9 @@ local function GameState()
 		s = s + 32
 	end
 	local h, m = GetGameTime()
-	return s, math.floor(((h or 12) + (m or 0) / 60) * 63 / 24 + 0.5) % 64
+	local f = GetPlayerFacing and GetPlayerFacing() or 0
+	return s, math.floor(((h or 12) + (m or 0) / 60) * 63 / 24 + 0.5) % 64,
+		math.floor((f or 0) * 63 / (2 * math.pi) + 0.5) % 64
 end
 
 local function Code(v)
@@ -318,13 +323,14 @@ local function Paint()
 		Cell(3 + 2 * i, v)
 		sum = sum + v
 	end
-	local state, time = GameState()
-	lastState, lastTime = state, time
+	local state, time, facing = GameState()
+	lastState, lastTime, lastFacing = state, time, facing
 	local hot = zoneKind == "desert" or zoneKind == "fire"
 	local haze, hdr = V("hazeStrength") or 0, V("hdrStrength") or 0
 	local switches = (haze > 0 and 1 or 0) + (hot and 2 or 0) + (hdr > 0 and 4 or 0) + (DB.bokeh and 8 or 0)
 	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + (DB.cinema and 8 or 0),
-		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches, Code(haze), Code(hdr) }
+		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches, Code(haze), Code(hdr), facing,
+		Code(V("mistHigh") or 0), Code(V("rayDefinition") or 0) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v
@@ -476,16 +482,16 @@ local function MakeCode()
 		end
 	end
 	parts[#parts + 1] = tostring(f)
-	for _, k in ipairs(CODE_KEYS3) do
+	for _, k in ipairs(CODE_KEYS4) do
 		parts[#parts + 1] = tostring(math.floor((DB[k] or 0) + 0.5))
 	end
 	parts[#parts + 1] = tostring(DB.bokeh and 4 or 0)
-	return "GUW3:" .. table.concat(parts, ".")
+	return "GUW4:" .. table.concat(parts, ".")
 end
 
 -- The values a code carries, or nil when the line is not a GU-WOW code.
 local function ParseCode(code)
-	local ver, body = string.match(code or "", "GUW([123]):([%d%.]+)")
+	local ver, body = string.match(code or "", "GUW([1234]):([%d%.]+)")
 	if not body then
 		return nil
 	end
@@ -494,7 +500,7 @@ local function ParseCode(code)
 		nums[#nums + 1] = tonumber(n)
 	end
 	local n1 = #CODE_KEYS + 1
-	local keys2 = ver == "3" and CODE_KEYS3 or CODE_KEYS2
+	local keys2 = ver == "4" and CODE_KEYS4 or (ver == "3" and CODE_KEYS3 or CODE_KEYS2)
 	if #nums ~= (ver == "1" and n1 or n1 + #keys2 + 1) then
 		return nil
 	end
@@ -545,8 +551,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.5.8.\n\nНа главной странице меню появились пресеты: Default, Starry Night, Peaceful Morning и ещё семь. Стрелки показывают пресет сразу, «Применить» оставляет его, «+» сохраняет свои настройки под номером, «-» удаляет.\n\nМарево, кино-HDR и плёночное зерно тоже на главной странице, у каждого свой ползунок силы. Свои пресеты на странице «Профили и фото».\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.5.8.\n\nThe main page of the menu has presets now: Default, Starry Night, Peaceful Morning and seven more. The arrows show a preset at once, «Apply» keeps it, «+» saves your settings under a number, «-» deletes.\n\nHeat haze, cinema HDR and film grain are on the main page too, each with its own strength slider. Your own presets are on the «Profiles and photo» page.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.6.0.\n\nТуман, лучи и огни спокойны при поворотах камеры: эффекты следят за движением кадра. Новый ползунок «Туман с высоты»: стелющийся туман виден с гор и в полёте. Новый ползунок «Чёткость лучей»: от мягкого свечения до отдельных снопов. Марево стоит в мире, рябь едет вместе с землёй.\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.6.0.\n\nFog, rays and lights stay calm as the camera turns: the effects follow the motion of the frame. A new slider, mist from a height: the ground mist shows from hills and in flight. A new slider, ray definition: from a soft glow to separate shafts. The heat haze stands in the world, the ripples ride with the land.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -761,7 +767,35 @@ sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 sub:SetText(T("Всё, что видно в игре. Меняется сразу. Весь мод на клавише F11. Стили, свои пресеты и фото: «Профили и фото».",
 	"Everything seen in the game. Changes apply at once. The whole mod toggles with F11. Styles, own presets, photo: «Profiles and photo»."))
 
-local L, R = 16, 330
+-- The Blizzard options window is small and long labels did not fit. While a GU-WOW page is open the window
+-- grows, and it comes back to the player's size when both pages hide. The check is deferred a moment: switching
+-- between the two pages hides one and shows the other in either order. Plain frame sizing, nothing secure.
+local optSize
+local guPages = {}
+local function GrowOptions()
+	if InterfaceOptionsFrame and not optSize then
+		optSize = { InterfaceOptionsFrame:GetWidth(), InterfaceOptionsFrame:GetHeight() }
+		InterfaceOptionsFrame:SetWidth(math.max(optSize[1], 1020))
+		InterfaceOptionsFrame:SetHeight(math.max(optSize[2], 706))
+	end
+end
+local function ShrinkOptions()
+	After(0.05, function()
+		if not optSize then
+			return
+		end
+		for _, f in ipairs(guPages) do
+			if f:IsShown() then
+				return
+			end
+		end
+		InterfaceOptionsFrame:SetWidth(optSize[1])
+		InterfaceOptionsFrame:SetHeight(optSize[2])
+		optSize = nil
+	end)
+end
+
+local L, R = 16, 470
 Check(panel, "master", T("Включить GU-WOW", "Enable GU-WOW"), L, -60)
 
 -- The presets: the arrows walk through the ready ones and the player's own and show each at once as a preview.
@@ -894,20 +928,19 @@ widgets.base = { Refresh = function()
 end }
 
 Header(panel, T("Атмосфера", "Atmosphere"), L, -94)
-Check(panel, "fog", T("Туман", "Fog"), L, -110)
-Slider(panel, "fogThickness", T("Густота тумана", "Fog density"), L + 6, -150)
-Slider(panel, "fogDistance", T("Дальность тумана", "Fog distance"), L + 6, -192)
-Slider(panel, "mist", T("Низовой туман", "Ground mist"), L + 6, -234)
-Slider(panel, "mistDensity", T("Плотность низового тумана", "Ground mist thickness"), L + 6, -276)
-Check(panel, "weather", T("Погодное настроение", "Weather mood"), L, -300)
-Check(panel, "wet", T("Мокрая земля в дождь", "Wet ground in rain"), L, -326)
-Check(panel, "rays", T("Лучи солнца", "Sun rays"), L, -352)
-Slider(panel, "raysStrength", T("Сила лучей", "Ray strength"), L + 6, -392)
-Slider(panel, "ao", T("Тени в щелях", "Contact shadows"), L + 6, -434)
-Slider(panel, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), L + 6, -476)
-Check(panel, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), L, -500, function()
-	UpdateZone()
-end)
+Check(panel, "fog", T("Туман", "Fog"), L, -108)
+Slider(panel, "fogThickness", T("Густота тумана", "Fog density"), L + 6, -144)
+Slider(panel, "fogDistance", T("Дальность тумана", "Fog distance"), L + 6, -182)
+Slider(panel, "mist", T("Низовой туман", "Ground mist"), L + 6, -220)
+Slider(panel, "mistDensity", T("Плотность низового тумана", "Ground mist thickness"), L + 6, -258)
+Slider(panel, "mistHigh", T("Туман с высоты: с гор и в полёте", "Mist from a height: hills and flight"), L + 6, -296)
+Check(panel, "weather", T("Погодное настроение", "Weather mood"), L, -318)
+Check(panel, "wet", T("Мокрая земля в дождь", "Wet ground in rain"), L, -341)
+Check(panel, "rays", T("Лучи солнца", "Sun rays"), L, -364)
+Slider(panel, "raysStrength", T("Сила лучей", "Ray strength"), L + 6, -400)
+Slider(panel, "rayDefinition", T("Чёткость лучей: от свечения до снопов", "Ray definition: a glow or shafts"), L + 6, -438)
+Slider(panel, "ao", T("Тени в щелях", "Contact shadows"), L + 6, -476)
+Slider(panel, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), L + 6, -514)
 
 Header(panel, T("Ночь", "Night"), R, -94)
 Check(panel, "night", T("Ночь и огни", "Night and lights"), R, -110)
@@ -924,7 +957,11 @@ Slider(panel, "vignette", T("Виньетка", "Vignette"), R + 6, -440)
 Slider(panel, "hdrStrength", T("Кино-HDR: глубже тени, мягче блики", "Cinema HDR: deeper shadows, softer highlights"), R + 6, -480)
 Slider(panel, "grain", T("Плёночное зерно", "Film grain"), R + 6, -520)
 
-panel:SetScript("OnShow", Refresh)
+panel:SetScript("OnShow", function()
+	GrowOptions()
+	Refresh()
+end)
+panel:SetScript("OnHide", ShrinkOptions)
 panel.okay = function() end
 panel.cancel = function() end
 panel.default = function()
@@ -1139,12 +1176,20 @@ Slider(page, "photoBlur", T("Сила размытия", "Blur strength"), 336, 
 Button(page, T("Фоторежим", "Photo mode"), 330, -274, 150, GUWOW_TogglePhoto)
 Button(page, T("Чистый снимок", "Clean screenshot"), 330, -302, 150, GUWOW_Screenshot)
 
-Header(page, T("Производительность", "Performance"), 16, -386)
+Header(page, T("Производительность и поведение", "Performance and behaviour"), 16, -386)
 Check(page, "autoQuality", T("Автокачество: упрощать тяжёлое при низких кадрах", "Auto quality: lighten heavy effects at low FPS"), 16, -404)
+Check(page, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), 16, -430, function()
+	UpdateZone()
+end)
 Slider(page, "targetFps", T("Держать кадров не ниже", "Keep FPS at least"), 330, -408, 20, 120)
 
-page:SetScript("OnShow", Refresh)
+page:SetScript("OnShow", function()
+	GrowOptions()
+	Refresh()
+end)
+page:SetScript("OnHide", ShrinkOptions)
 page.refresh = Refresh
+guPages[1], guPages[2] = panel, page
 
 local category
 if InterfaceOptions_AddCategory then
@@ -1275,8 +1320,8 @@ ticker:SetScript("OnUpdate", function(self, dt)
 	elseif lowQuality then
 		lowQuality, changed = false, true
 	end
-	local s, t = GameState()
-	if changed or s ~= lastState or t ~= lastTime then
+	local s, t, f = GameState()
+	if changed or s ~= lastState or t ~= lastTime or f ~= lastFacing then
 		Paint()
 	end
 end)
