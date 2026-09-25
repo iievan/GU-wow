@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="GUWOW_PHOTO" header="GUWOW">
+		GUWOW_TogglePhoto()
+	</Binding>
+	<Binding name="GUWOW_SHOT" header="GUWOW">
+		GUWOW_Screenshot()
+	</Binding>
+</Bindings>

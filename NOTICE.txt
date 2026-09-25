@@ -1,0 +1,9 @@
+LegionGU by levan, based on comfyatmosphere by aloofbit (https://github.com/aloofbit/comfyatmosphere, commit bf9740c), a fog and sun rays mod for the WoW 1.12 client. Licensed GPL-3.0 (see LICENSE).
+LegionGUbylevan.fx (fog and sun rays) reuses the original's shader code and formulas, so it is licensed under the GNU General Public License v3.0, the same as the original.
+Modified in 2026: the Direct3D 9 hook was rewritten as a ReShade FX effect for the Direct3D 11 client of WoW Legion 7.3.5 (Tauri), with its own fog colour estimate, sun search, ray shaping and player controls.
+LegionGUNightsbylevan.fx (night and lights) is new work in the same package, built on the depth and sky code of LegionGUbylevan.fx, and is licensed GPL-3.0 as well.
+ReShade itself is not part of this package. It comes from https://reshade.me under its own licence.
+
+wowGU.exe bundles ReshadeEffectShaderToggler (REST) 1.3.23 by 4lex4nder, MIT licence, see REST-LICENSE.txt:
+https://github.com/4lex4nder/ReshadeEffectShaderToggler
+ReShade itself is not bundled: wowGU downloads the official setup from reshade.me.
