@@ -24,7 +24,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.5.5-release";
+	const string Version = "1.5.6-release";
 	// Ctrl + Scroll Lock opens the ReShade window: key, Ctrl, Shift, Alt.
 	const string OverlayKey = "145,1,0,0";
 	// Releases of GU-WOW: the window says when a newer one is out and opens its page; it never downloads by itself.

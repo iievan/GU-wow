@@ -2,7 +2,7 @@
 	<Binding name="GUWOW_PHOTO" header="GUWOW">
 		GUWOW_TogglePhoto()
 	</Binding>
-	<Binding name="GUWOW_SHOT" header="GUWOW">
+	<Binding name="GUWOW_SHOT">
 		GUWOW_Screenshot()
 	</Binding>
 </Bindings>

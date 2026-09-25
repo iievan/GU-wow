@@ -1,5 +1,21 @@
 # GU-WOW: история версий / Version history
 
+## 1.5.6-release «Лунная тропа» / "Moonlit Path"
+
+### Русский
+
+**Исправлено**
+- После фоторежима игра могла перестать слушаться клавиатуры, Esc и другие клавиши. Фоторежим прятал интерфейс так, что игра закрывала окна от имени аддона и затем отказывала клавишам. Теперь интерфейс становится прозрачным, окна настроек закрываются заранее, клавиатура отпускается при входе и выходе.
+- Esc, Enter в чат и Alt+Z выходят из фоторежима.
+- Предупреждение «Binding header GUWOW is defined more than once» в журнале игры.
+
+### English
+
+**Fixed**
+- After photo mode the game could stop listening to the keyboard, Esc and other keys. Photo mode hid the interface in a way that made the game close windows as addon code and then refuse keys. Now the interface goes transparent, the options window closes first, the keyboard is let go on entering and leaving.
+- Esc, Enter to chat and Alt+Z leave photo mode.
+- The warning «Binding header GUWOW is defined more than once» in the game log.
+
 ## 1.5.5-release «Лунная тропа» / "Moonlit Path"
 
 > Модификация создана в честь неоспоримого наследия Turtle WoW, а также для жизни и процветания коммьюнити Brothers of Turtle. Лок'Тар!

@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.5.5-release"
+local VERSION = "1.5.6-release"
 local CELL = 4
 local CELLS = 45
 
@@ -322,12 +322,24 @@ local function Names(show)
 	end
 end
 
--- The options window opened from the Esc menu goes back to that menu when it hides, and hiding the interface hides
--- it: the Esc menu would open over the settings page and close the bags. Forgetting the way back keeps the page.
-local function ForgetMenuReturn()
-	if InterfaceOptionsFrame then
-		InterfaceOptionsFrame.lastFrame = nil
+-- The interface goes transparent, not hidden: UIParent:Hide and Show from an addon make Blizzard close every window
+-- as addon code, and after that the game refuses keys, Esc too. Transparency closes nothing and taints nothing.
+local function DropKeyboard()
+	local focus = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()
+	if focus then
+		focus:ClearFocus()
 	end
+end
+
+-- The options window opened from the Esc menu goes back to that menu when it hides: forgetting the way back closes
+-- it alone, so an invisible window does not stay under the mouse.
+local function CloseOptions()
+	if InterfaceOptionsFrame and InterfaceOptionsFrame:IsShown() then
+		InterfaceOptionsFrame.lastFrame = nil
+		HideUIPanel(InterfaceOptionsFrame)
+	end
+	StaticPopup_Hide("GUWOW_NEWS")
+	StaticPopup_Hide("GUWOW_CONFIRM")
 end
 
 local function Photo(on)
@@ -339,9 +351,10 @@ local function Photo(on)
 		return
 	end
 	photo = on
+	DropKeyboard()
 	if on then
-		ForgetMenuReturn()
-		UIParent:Hide()
+		CloseOptions()
+		UIParent:SetAlpha(0)
 		if DB.hideNames then
 			Names(false)
 		end
@@ -353,7 +366,7 @@ local function Photo(on)
 			MoveViewRightStop()
 		end
 		Names(true)
-		UIParent:Show()
+		UIParent:SetAlpha(1)
 	end
 	Paint()
 end
@@ -371,8 +384,7 @@ function GUWOW_Screenshot()
 	end
 	local wasPhoto = photo
 	if not wasPhoto then
-		ForgetMenuReturn()
-		UIParent:Hide()
+		UIParent:SetAlpha(0)
 	end
 	-- The first-draw square goes too: with the strip gone nothing covers it, and it would stay on the shot.
 	strip:Hide()
@@ -382,22 +394,27 @@ function GUWOW_Screenshot()
 		After(0.3, function()
 			strip:Show()
 			first:Show()
-			if not wasPhoto then
-				UIParent:Show()
+			if not wasPhoto and not photo then
+				UIParent:SetAlpha(1)
 			end
 		end)
 	end)
 end
 
--- Alt+Z shows the interface again: photo mode ends with it.
+-- Esc, Enter to chat and Alt+Z end photo mode: the Esc menu shows over the picture, chat is not typed blind.
+GameMenuFrame:HookScript("OnShow", function()
+	if photo then
+		Photo(false)
+	end
+end)
+hooksecurefunc("ChatEdit_ActivateChat", function()
+	if photo then
+		Photo(false)
+	end
+end)
 UIParent:HookScript("OnShow", function()
 	if photo then
-		photo = false
-		if MoveViewRightStop then
-			MoveViewRightStop()
-		end
-		Names(true)
-		Paint()
+		Photo(false)
 	end
 end)
 
@@ -485,8 +502,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.5.5.\n\nНовое: марево в пустынях, стили «Закат», «Сказка» и «Нуар», кино-HDR, плёночное зерно, сила размытия и боке в фоторежиме, кнопка «Настройки автора». Всё новое выключено, включается на странице «Профили и фото».\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.5.5.\n\nNew: heat haze in deserts, the Sunset, Fairy tale and Noir styles, cinema HDR, film grain, blur strength and bokeh in photo mode, the Author's settings button. All new things are off; turn them on on the «Profiles and photo» page.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.5.6.\n\nНовое: марево в пустынях, стили «Закат», «Сказка» и «Нуар», кино-HDR, плёночное зерно, сила размытия и боке в фоторежиме, кнопка «Настройки автора». Всё новое выключено, включается на странице «Профили и фото».\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.5.6.\n\nNew: heat haze in deserts, the Sunset, Fairy tale and Noir styles, cinema HDR, film grain, blur strength and bokeh in photo mode, the Author's settings button. All new things are off; turn them on on the «Profiles and photo» page.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
