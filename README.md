@@ -207,3 +207,8 @@ The build does not interfere with game servers and does not automate play. The e
 The project is not affiliated with the operators of the game servers mentioned here. Their names are given only to describe compatibility.
 
 The build is free and provided "as is", without any warranty. You use it at your own risk. The author is not liable for the consequences of its use, including decisions by the game's rights holder or by server operators.
+
+## 
+
+Героизму первопроходства самого сплоченного сообщества Turtle WoW. Честь и слава Черепашке!
+To the pioneering heroism of the most united Turtle WoW community. Honor and glory to the Turtle!
