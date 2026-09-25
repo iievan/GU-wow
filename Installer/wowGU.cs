@@ -24,7 +24,9 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.5.3-release";
+	const string Version = "1.5.4-release";
+	// Ctrl + Scroll Lock opens the ReShade window: key, Ctrl, Shift, Alt.
+	const string OverlayKey = "145,1,0,0";
 	// Releases of GU-WOW: the window says when a newer one is out and opens its page; it never downloads by itself.
 	const string ReleasesApi = "https://api.github.com/repos/iievan/GU-wow/releases/latest";
 	const string ReShadeUrl = "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe";
@@ -311,11 +313,14 @@ static class WowGU
 		// means the player cleared the key on purpose.
 		if (!updating)
 		{
-			IniSet(rs, "INPUT", "KeyOverlay", "145,0,0,0", false);
+			IniSet(rs, "INPUT", "KeyOverlay", OverlayKey, false);
 			IniSet(rs, "INPUT", "KeyEffects", "122,0,0,0", false);
 		}
 		IniSet(rs, "OVERLAY", "TutorialProgress", "4", true);
-		if (IniGet(rs, "INPUT", "KeyOverlay") == "36,0,0,0") IniSet(rs, "INPUT", "KeyOverlay", "145,0,0,0", true);
+		// Home (1.2) and the bare Scroll Lock (1.3 to 1.5.3) were GU-WOW's own keys: with the 1 px font the ReShade
+		// window opens unreadable and holds the mouse, so a stray key press must not open it. Ctrl + Scroll Lock now.
+		var overlay = IniGet(rs, "INPUT", "KeyOverlay");
+		if (overlay == "36,0,0,0" || overlay == "145,0,0,0") IniSet(rs, "INPUT", "KeyOverlay", OverlayKey, true);
 		// The ReShade banner at the game start. ReShade shows it while the effects compile and 5 s after, always opaque;
 		// its height is fixed paddings plus three lines of text. With the default font size 13 it also scales the font
 		// by the screen height, 1.5 at 1440 lines and 2 at 4K. A 1 px font (8 at scale 0.125, ImGui draws no smaller)
@@ -369,7 +374,11 @@ static class WowGU
 		}
 		WriteMarker(marker);
 		Say("");
-		Say("Готово. Запустите игру. F11 включает и выключает весь мод, Scroll Lock открывает окно ReShade.");
+		// Only the keys the player really has.
+		var done = "Готово. Запустите игру.";
+		if (IniGet(rs, "INPUT", "KeyEffects") == "122,0,0,0") done += " F11 включает и выключает весь мод.";
+		if (IniGet(rs, "INPUT", "KeyOverlay") == OverlayKey) done += " Ctrl + Scroll Lock открывает окно ReShade.";
+		Say(done);
 	}
 
 	static void Uninstall()

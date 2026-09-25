@@ -5,9 +5,9 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.5.3-release"
+local VERSION = "1.5.4-release"
 local CELL = 4
-local CELLS = 39
+local CELLS = 45
 
 -- Russian on a Russian client, English elsewhere.
 local RU = GetLocale() == "ruRU"
@@ -22,6 +22,8 @@ local DEFAULTS = {
 	fogThickness = 50, fogDistance = 97, mist = 100, mistDensity = 50, raysStrength = 95,
 	nightDarkness = 80, nightDepth = 0, lightGlow = 70, caveDarkness = 50,
 	sharpness = 10, grade = 90, vignette = 19, ao = 35,
+	-- 1.5.4: all off by default, so the author's picture stays as it is; the photo blur is a third of 1.5.3's.
+	heatHaze = false, cinemaHdr = false, grain = 0, bokeh = false, photoBlur = 35,
 }
 -- The order of the values in the strip, the same as LEGIONGU_CTL_* in the shaders (after the flags).
 local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDarkness", "lightGlow",
@@ -30,9 +32,13 @@ local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDa
 local CODE_KEYS = { "fogThickness", "fogDistance", "mist", "mistDensity", "raysStrength", "nightDarkness", "nightDepth",
 	"lightGlow", "caveDarkness", "sharpness", "grade", "vignette", "ao", "style" }
 local CODE_FLAGS = { "fog", "rays", "night", "weather", "wet", "eye", "zones", "cinema" }
+-- Since 1.5.4 a code (GUW2) carries these too; a GUW1 code leaves them as they are.
+local CODE_KEYS2 = { "grain", "photoBlur" }
+local CODE_FLAGS2 = { "heatHaze", "cinemaHdr", "bokeh" }
 -- The look: what a style, a ready profile or a friend's code may change. The zones and the cinema bars are the
 -- player's habits, not the look, so a preview leaves them alone.
-local LOOK = { fog = true, rays = true, night = true, weather = true, wet = true, eye = true }
+local LOOK = { fog = true, rays = true, night = true, weather = true, wet = true, eye = true,
+	heatHaze = true, cinemaHdr = true, grain = true }
 for _, k in ipairs(CODE_KEYS) do
 	LOOK[k] = true
 end
@@ -277,7 +283,10 @@ local function Paint()
 	end
 	local state, time = GameState()
 	lastState, lastTime = state, time
-	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + (DB.cinema and 8 or 0) }
+	local hot = zoneKind == "desert" or zoneKind == "fire"
+	local switches = (V("heatHaze") and 1 or 0) + (hot and 2 or 0) + (V("cinemaHdr") and 4 or 0) + (DB.bokeh and 8 or 0)
+	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + (DB.cinema and 8 or 0),
+		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v
@@ -412,12 +421,22 @@ local function MakeCode()
 		end
 	end
 	parts[#parts + 1] = tostring(f)
-	return "GUW1:" .. table.concat(parts, ".")
+	for _, k in ipairs(CODE_KEYS2) do
+		parts[#parts + 1] = tostring(math.floor((DB[k] or 0) + 0.5))
+	end
+	local f2 = 0
+	for i, k in ipairs(CODE_FLAGS2) do
+		if DB[k] then
+			f2 = f2 + 2 ^ (i - 1)
+		end
+	end
+	parts[#parts + 1] = tostring(f2)
+	return "GUW2:" .. table.concat(parts, ".")
 end
 
 -- The values a code carries, or nil when the line is not a GU-WOW code.
 local function ParseCode(code)
-	local body = code and string.match(code, "GUW1:([%d%.]+)")
+	local ver, body = string.match(code or "", "GUW([12]):([%d%.]+)")
 	if not body then
 		return nil
 	end
@@ -425,16 +444,26 @@ local function ParseCode(code)
 	for n in string.gmatch(body, "%d+") do
 		nums[#nums + 1] = tonumber(n)
 	end
-	if #nums ~= #CODE_KEYS + 1 then
+	local n1 = #CODE_KEYS + 1
+	if #nums ~= (ver == "2" and n1 + #CODE_KEYS2 + 1 or n1) then
 		return nil
 	end
 	local t = {}
 	for i, k in ipairs(CODE_KEYS) do
-		t[k] = k == "style" and math.min(nums[i], 4) or math.min(nums[i], 100)
+		t[k] = k == "style" and math.min(nums[i], 7) or math.min(nums[i], 100)
 	end
-	local f = nums[#nums]
+	local f = nums[n1]
 	for i, k in ipairs(CODE_FLAGS) do
 		t[k] = math.floor(f / 2 ^ (i - 1)) % 2 == 1
+	end
+	if ver == "2" then
+		for i, k in ipairs(CODE_KEYS2) do
+			t[k] = math.min(nums[n1 + i], 100)
+		end
+		local f2 = nums[#nums]
+		for i, k in ipairs(CODE_FLAGS2) do
+			t[k] = math.floor(f2 / 2 ^ (i - 1)) % 2 == 1
+		end
 	end
 	return t
 end
@@ -454,6 +483,17 @@ local function Say(text)
 end
 
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
+-- What is new, once after an update.
+StaticPopupDialogs["GUWOW_NEWS"] = {
+	text = T("GU-WOW обновлён до 1.5.4.\n\nНовое: марево в пустынях, стили «Закат», «Сказка» и «Нуар», кино-HDR, плёночное зерно, сила размытия и боке в фоторежиме, кнопка «Настройки автора». Всё новое выключено, включается на странице «Профили и фото».\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.5.4.\n\nNew: heat haze in deserts, the Sunset, Fairy tale and Noir styles, cinema HDR, film grain, blur strength and bokeh in photo mode, the Author's settings button. All new things are off; turn them on on the «Profiles and photo» page.\n\nMenu: /gu or the minimap button."),
+	button1 = OKAY or "OK",
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+	preferredIndex = 3,
+}
+
 StaticPopupDialogs["GUWOW_CONFIRM"] = {
 	text = "%s",
 	button1 = ACCEPT or "OK",
@@ -803,10 +843,9 @@ end)
 
 local note = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 note:SetPoint("BOTTOMLEFT", 16, 16)
-note:SetWidth(600)
+note:SetWidth(430)
 note:SetJustifyH("LEFT")
-note:SetText(T("Профили, цветовые стили, фоторежим и снимки: страница «Профили и фото» в списке слева.",
-	"Profiles, colour styles, photo mode and screenshots: the «Profiles and photo» page in the list on the left."))
+note:SetText(T("Стили, профили, фото и новые эффекты: страница «Профили и фото».", "Styles, profiles, photo and new effects: the «Profiles and photo» page."))
 
 panel:SetScript("OnShow", Refresh)
 panel.okay = function() end
@@ -821,6 +860,20 @@ panel.default = function()
 	Paint()
 end
 panel.refresh = Refresh
+
+-- The author's settings in one click, after a question. Blizzard's «Defaults» at the bottom of the window can also
+-- reset the whole game interface, this button only GU-WOW.
+local authorButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+authorButton:SetWidth(160)
+authorButton:SetHeight(22)
+authorButton:SetPoint("BOTTOMRIGHT", -16, 12)
+authorButton:SetText(T("Настройки автора", "Author's settings"))
+authorButton:SetScript("OnClick", function()
+	Confirm(T("Вернуть настройки автора? Ваши нынешние заменятся. Пресеты останутся.", "Restore the author's settings? Your current ones are replaced. Presets stay."), function()
+		panel.default()
+		Say(T("настройки автора вернулись.", "the author's settings are back."))
+	end)
+end)
 
 -- The second page.
 local page = CreateFrame("Frame", "LegionGUPanel2", UIParent)
@@ -839,10 +892,11 @@ sub2:SetText(T("Стили, профили и коды сначала тольк
 	"Styles, profiles and codes are only shown at first. «Apply» saves them."))
 
 Header(page, T("Цветовой стиль", "Colour style"), 16, -62)
-local STYLE_NAMES = { T("Нет", "None"), T("Тёплый", "Warm"), T("Холодный", "Cold"), T("Плёнка", "Film"), T("Сочный", "Vivid") }
+local STYLE_NAMES = { T("Нет", "None"), T("Тёплый", "Warm"), T("Холодный", "Cold"), T("Плёнка", "Film"), T("Сочный", "Vivid"),
+	T("Закат", "Sunset"), T("Сказка", "Fairy tale"), T("Нуар", "Noir") }
 local styleButtons = {}
 for i, n in ipairs(STYLE_NAMES) do
-	styleButtons[i] = Button(page, n, 16 + (i - 1) * 116, -80, 110, function()
+	styleButtons[i] = Button(page, n, 16 + (i - 1) * 73, -80, 70, function()
 		Preview({ style = i - 1 }, nil, n)
 	end)
 end
@@ -894,15 +948,22 @@ Header(page, T("Фото", "Photo"), 16, -252)
 Check(page, "orbit", T("Медленный облёт камеры", "Slow camera orbit"), 16, -270)
 Check(page, "hideNames", T("Прятать имена над головами", "Hide names above heads"), 16, -296)
 Check(page, "cinema", T("Кинорамка", "Cinema bars"), 16, -322)
+Check(page, "bokeh", T("Боке огней на размытом фоне", "Bokeh of lights in the blur"), 16, -348)
+Slider(page, "photoBlur", T("Сила размытия", "Blur strength"), 336, -346)
 Button(page, T("Фоторежим", "Photo mode"), 330, -274, 150, GUWOW_TogglePhoto)
 Button(page, T("Чистый снимок", "Clean screenshot"), 330, -302, 150, GUWOW_Screenshot)
 
-Header(page, T("Прочее", "Other"), 16, -358)
-Check(page, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), 16, -376, function()
+Header(page, T("Прочее", "Other"), 16, -384)
+Check(page, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), 16, -402, function()
 	UpdateZone()
 end)
-Check(page, "autoQuality", T("Автокачество: упрощать тяжёлое при низких кадрах", "Auto quality: lighten heavy effects at low FPS"), 16, -402)
-Slider(page, "targetFps", T("Держать кадров не ниже", "Keep FPS at least"), 330, -382, 20, 120)
+Check(page, "autoQuality", T("Автокачество: упрощать тяжёлое при низких кадрах", "Auto quality: lighten heavy effects at low FPS"), 16, -428)
+Slider(page, "targetFps", T("Держать кадров не ниже", "Keep FPS at least"), 330, -408, 20, 120)
+
+Header(page, T("Новые эффекты", "New effects"), 16, -464)
+Check(page, "heatHaze", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), 16, -482)
+Check(page, "cinemaHdr", T("Кино-HDR: глубже тени, мягче блики", "Cinema HDR: deeper shadows, softer highlights"), 16, -508)
+Slider(page, "grain", T("Плёночное зерно", "Film grain"), 336, -494)
 
 page:SetScript("OnShow", Refresh)
 page.refresh = Refresh
@@ -1083,6 +1144,12 @@ events:SetScript("OnEvent", function(self, event, arg1)
 	end
 	if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
 		UpdateZone()
+	end
+	if event == "PLAYER_ENTERING_WORLD" and DB.newsSeen ~= VERSION then
+		DB.newsSeen = VERSION
+		After(6, function()
+			StaticPopup_Show("GUWOW_NEWS")
+		end)
 	end
 	Layout()
 	Paint()

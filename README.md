@@ -5,13 +5,13 @@
 Графическое улучшение World of Warcraft. Основные работы проводятся на версии Legion 7.3.5. 
 Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
-Текущая сборка: **1.5.3-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **1.5.4-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.5.3-release
+## Что входит в сборку 1.5.4-release
 
 Всё настраивается в игре: Интерфейс > Модификации > GU-WOW, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -23,6 +23,7 @@
 | Атмосфера | Погодное настроение | В пасмурную погоду и в дождь дымка гуще, цвет холоднее, контраст мягче. Работает, только когда включён туман | 1.3 |
 | Атмосфера | Тени в щелях | Мягкие тени под камнями, травой и у стен, предметы садятся на землю | 1.4 |
 | Атмосфера | Мокрая земля | В дождь и в пасмурную погоду земля темнеет, блестит и отражает небо | 1.4 |
+| Атмосфера | Марево | В пустынях и огненных землях дальняя земля дрожит от жара. Персонажи и небо не искажаются. Включается на странице «Профили и фото» | 1.5.4 |
 | Атмосфера | Атмосфера по зонам | В болотах и лесах гуще низовой туман, в пустынях воздух прозрачнее, в снегах больше дымки. В выжженных землях и в городах низового тумана меньше. Ползунки игрока остаются главными | 1.5 |
 | Ночь | Ночь по игровым часам | Темнеет с 21:00 до 5:00 с плавным переходом. Ползунки «Темнота ночи» и «Глубина ночи» | 1.3 |
 | Ночь | Свет огней | Огонь, окна и лава светят тёплым светом. Ползунок «Свет огней» | до 1.3 |
@@ -30,11 +31,16 @@
 | Ночь | Ночь за окном | Из таверны и домов видна ночь на улице | 1.4 |
 | Ночь | Лунный свет | Ночью луна даёт мягкие холодные лучи | 1.5 |
 | Картинка | Резкость, цвет по времени суток, виньетка, привыкание глаз | Чёткость без мыла, золотистые вечер и утро, прохладные тени ночью, мягкое затемнение краёв, глаза привыкают к темноте и свету | 1.3 |
-| Картинка | Цветовые стили | «Тёплый», «Холодный», «Плёнка», «Сочный». Меняют характер цвета, как фильтр фотоаппарата | 1.5 |
+| Картинка | Цветовые стили | «Тёплый», «Холодный», «Плёнка», «Сочный», а с 1.5.4 ещё «Закат», «Сказка» и «Нуар». Меняют характер цвета, как фильтр фотоаппарата | 1.5 |
+| Картинка | Кино-HDR | Тени глубже, яркое не выгорает в белое, цвет чуть плотнее, как на киноплёнке. Переключатель | 1.5.4 |
+| Картинка | Плёночное зерно | Лёгкое зерно плёнки, ползунок | 1.5.4 |
 | Фото | Фоторежим | Интерфейс прячется, персонаж в фокусе, фон размыт. Не работает в бою | 1.4 |
+| Фото | Сила размытия и боке | Ползунок силы размытия фона. По умолчанию размытие втрое мягче, чем в 1.5.3. Боке превращает огни на размытом фоне в мягкие кружки | 1.5.4 |
 | Фото | Облёт, имена, кинорамка | В фоторежиме: медленный облёт камеры вокруг персонажа, скрытие имён над головами, кинорамка. На экранах 21:9 кинорамки почти не видно | 1.5 |
 | Фото | Чистый снимок | Вне боя интерфейс прячется на мгновение, игра делает снимок, всё возвращается. В бою снимок будет с интерфейсом | 1.5 |
 | Удобство | Меню в игре | Все переключатели и ползунки, изменения видны сразу | 1.3 |
+| Удобство | Настройки автора | Кнопка возвращает настройки автора после вопроса. Пресеты остаются | 1.5.4 |
+| Удобство | Что нового | После обновления игра один раз показывает, что появилось | 1.5.4 |
 | Удобство | Мои пресеты | До 10 своих настроек с названиями в основном разделе меню. Их можно сохранить, загрузить и удалить. Перед загрузкой, удалением и перезаписью меню спрашивает подтверждение | 1.5.1 |
 | Удобство | Предпросмотр | Стили, готовые профили и чужие коды сначала только показываются на экране. Ваши настройки меняются, только если нажать «Применить» | 1.5.1 |
 | Удобство | Готовые профили | «Кино», «Ясный день», «Мрачно», «Больше FPS» | 1.4 |
@@ -60,7 +66,7 @@
 
 ## Полезно знать
 
-- F11 включает и выключает весь мод. Scroll Lock открывает окно ReShade, обычному игроку оно не нужно.
+- F11 включает и выключает весь мод. Ctrl и Scroll Lock открывают окно ReShade, обычному игроку оно не нужно. Шрифт в нём крошечный, увеличить его можно Ctrl и колесом мыши.
 - Если выключить мод клавишей F11, в левом верхнем углу может появиться полоска квадратиков. Чтобы выключить мод без неё, щёлкните правой кнопкой мыши по кнопке у миникарты.
 - Если поменяли разрешение экрана или масштаб отрисовки в настройках игры, запустите `GU-WOW.exe` и нажмите «Установить» ещё раз.
 - Аддон NightIllusion лучше выключить, иначе ночь затемнится дважды.
@@ -111,13 +117,13 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 A graphical enhancement for World of Warcraft. The main development work is being carried out for Legion 7.3.5.
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
-Current build: **1.5.3-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **1.5.4-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.5.3-release
+## What is in build 1.5.4-release
 
 Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -129,6 +135,7 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 | Atmosphere | Weather mood | In overcast weather and rain the haze gets thicker, the colours cooler and the contrast softer. Works only with the fog on | 1.3 |
 | Atmosphere | Contact shadows | Soft shadows under stones, grass and near walls, objects sit on the ground | 1.4 |
 | Atmosphere | Wet ground | In rain and overcast weather the ground darkens, shines and reflects the sky | 1.4 |
+| Atmosphere | Heat haze | In deserts and fire lands the far ground wavers in the heat. Characters and the sky stay still. Turned on on the "Profiles and photo" page | 1.5.4 |
 | Atmosphere | Atmosphere by zone | Thicker ground mist in swamps and forests, clearer air in deserts, more haze in the snow. Less ground mist in scorched lands and cities. Your sliders stay in charge | 1.5 |
 | Night | Night by the game clock | It gets dark from 21:00 to 5:00 with a smooth fade. Sliders "Night darkness" and "Night depth" | 1.3 |
 | Night | Light glow | Fire, windows and lava glow with warm light. Slider "Light glow" | before 1.3 |
@@ -136,11 +143,16 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 | Night | Night outside | From a tavern or a house you see the night outside | 1.4 |
 | Night | Moonlight | At night the moon casts soft cold rays | 1.5 |
 | Picture | Sharpness, time of day colour, vignette, eye adaptation | Crisp picture without blur, golden evenings and mornings, cool shadows at night, soft dark edges, eyes that adapt to dark and light | 1.3 |
-| Picture | Colour styles | Warm, Cold, Film, Vivid. They change the mood of the colours, like a camera filter | 1.5 |
+| Picture | Colour styles | Warm, Cold, Film, Vivid, and since 1.5.4 Sunset, Fairy tale and Noir. They change the mood of the colours, like a camera filter | 1.5 |
+| Picture | Cinema HDR | Deeper shadows, bright areas no longer burn to white, a little denser colour, like film. A switch | 1.5.4 |
+| Picture | Film grain | A light film grain, a slider | 1.5.4 |
 | Photo | Photo mode | The interface hides, your character stays in focus, the background is blurred. Not available in combat | 1.4 |
+| Photo | Blur strength and bokeh | A slider for the background blur. By default the blur is three times softer than in 1.5.3. Bokeh turns lights in the blur into soft discs | 1.5.4 |
 | Photo | Orbit, names, cinema bars | In photo mode: a slow camera orbit around your character, names above heads hidden, cinema bars. On 21:9 screens the bars barely show | 1.5 |
 | Photo | Clean screenshot | Out of combat the interface hides for a moment, the game takes the shot, everything comes back. In combat the shot includes the interface | 1.5 |
 | Convenience | In-game menu | All switches and sliders, changes show at once | 1.3 |
+| Convenience | Author's settings | A button restores the author's settings after a question. Presets stay | 1.5.4 |
+| Convenience | What is new | After an update the game shows once what has appeared | 1.5.4 |
 | Convenience | My presets | Up to 10 named sets of your own settings in the main menu page. You can save, load and delete them. Before loading, deleting or overwriting, the menu asks you to confirm | 1.5.1 |
 | Convenience | Preview | Styles, ready profiles and friends' codes are first only shown on screen. Your settings change only when you press "Apply" | 1.5.1 |
 | Convenience | Ready profiles | Cinema, Clear day, Gloomy, More FPS | 1.4 |
@@ -166,7 +178,7 @@ To remove: `GU-WOW.exe`, the "Удалить" (Remove) button.
 
 ## Good to know
 
-- F11 turns the whole mod on and off. Scroll Lock opens the ReShade window, which a regular player does not need.
+- F11 turns the whole mod on and off. Ctrl and Scroll Lock open the ReShade window, which a regular player does not need. Its font is tiny; Ctrl and the mouse wheel make it bigger.
 - If you turn the mod off with F11, a strip of small squares may show in the top left corner. To turn the mod off without it, right click the minimap button.
 - If you change the screen resolution or the render scale in the game settings, run `GU-WOW.exe` and press "Установить" (Install) again.
 - Better turn off the NightIllusion add-on, or the night gets darkened twice.

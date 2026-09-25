@@ -151,9 +151,12 @@
 #define LEGIONGU_CTL_TIME 14     // the game's time of day, 0..1 for 0..24 hours
 #define LEGIONGU_CTL_NIGHT_DEPTH 15
 #define LEGIONGU_CTL_AO 16
-#define LEGIONGU_CTL_STYLE 17    // the colour style 0..4, plus 8 for the cinema frame in photo mode
+#define LEGIONGU_CTL_STYLE 17    // the colour style 0..7, plus 8 for the cinema frame in photo mode
+#define LEGIONGU_CTL_GRAIN 18    // film grain
+#define LEGIONGU_CTL_PHOTO_BLUR 19 // the photo mode blur
+#define LEGIONGU_CTL_EXTRA 20    // 1 heat haze, 2 a hot zone (desert, fire), 4 cinema HDR, 8 bokeh in photo mode
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 39    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 45    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -162,7 +165,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 18; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 21; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
@@ -222,6 +225,12 @@ float LegionGUHour()
 int LegionGUStyleValue()
 {
 	return LegionGUPanel() ? int(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_STYLE, 0)).x * 63.0 + 0.5) : -1;
+}
+
+// A switch of LEGIONGU_CTL_EXTRA; all off without the panel.
+bool LegionGUExtra(uint bit)
+{
+	return LegionGUPanel() && (uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_EXTRA, 0)).x * 63.0 + 0.5) & bit) != 0u;
 }
 
 // How much it is night by the game's clock, 0..1 (indoors too: the street is seen through the door): 21 to 5 o'clock with an hour of fade; 0 without the panel.
@@ -343,11 +352,27 @@ namespace LegionGUNights
 
 	uniform int ColourStyle <
 		ui_type = "combo";
-		ui_items = "Нет\0Тёплый\0Холодный\0Плёнка\0Сочный\0";
+		ui_items = "Нет\0Тёплый\0Холодный\0Плёнка\0Сочный\0Закат\0Сказка\0Нуар\0";
 		ui_category = "Картинка";
 		ui_label = "Цветовой стиль";
 		ui_tooltip = "Общий характер цвета, как фильтр фотоаппарата. В игре выбирается в меню GU-WOW.";
 	> = 0;
+
+	uniform float FilmGrain <
+		ui_type = "slider"; ui_min = 0; ui_max = 100; ui_step = 1;
+		ui_category = "Картинка";
+		ui_label = "Плёночное зерно";
+		ui_tooltip = "Лёгкое зерно плёнки, сильнее в средних тонах. В игре настраивается в меню GU-WOW.";
+	> = 0;
+
+	uniform float PhotoBlur <
+		ui_type = "slider"; ui_min = 0; ui_max = 100; ui_step = 1;
+		ui_category = "Картинка";
+		ui_label = "Размытие в фоторежиме";
+		ui_tooltip = "Насколько размыт фон в фоторежиме. В игре настраивается в меню GU-WOW.";
+	> = 35;
+
+	uniform float GUTimer < source = "timer"; >;
 
 	uniform bool PhotoMode <
 		ui_category = "Картинка";
@@ -3141,6 +3166,10 @@ namespace LegionGUNights
 	static const float3 GRADE_GOLD = float3(1.06, 1.0, 0.9);
 	static const float3 GRADE_MOON = float3(0.93, 0.98, 1.07);
 	static const float VIGNETTE_MAX = 0.22;      // darkening of the corners at «Виньетка» 100
+	static const float HAZE_FROM = 60.0;         // heat haze starts at this many yards: the character and the near world stay still
+	static const float HAZE_FULL = 250.0;        // and is full from here on
+	static const float HAZE_PX = 1.2;            // the largest waver in pixels at 1080 lines
+	static const float GRAIN_MAX = 0.06;         // film grain at «Плёночное зерно» 100
 
 	texture2D PicLumTex { Width = 64; Height = 32; Format = RG16F; MipLevels = 7; };
 	sampler2D PicLum { Texture = PicLumTex; };
@@ -3185,6 +3214,22 @@ namespace LegionGUNights
 		if (!LegionGUOn(1u) || LegionGUInStrip(pos.xy))
 			return c4;
 		float3 c = c4.rgb;
+
+		// Heat haze over hot land (the addon's switch, in a desert or fire zone): the far ground wavers a pixel or so,
+		// the sky and everything nearer than HAZE_FROM stay still.
+		if (LegionGUExtra(1u) && LegionGUExtra(2u))
+		{
+			float4 hs = tex2Dfetch(FogCur, int2(1, 0));
+			float hu = DepthU(RawDepth(uv), EffectiveReversed(hs.w));
+			float hz = IsSky(hu) ? 0.0 : smoothstep(HAZE_FROM, HAZE_FULL, Yards(hu));
+			if (hz > 0.0)
+			{
+				float ht = GUTimer * 0.001;
+				float2 wob = float2(sin(uv.y * 700.0 + ht * 5.0 + sin(uv.x * 37.0 + ht * 1.7) * 2.0), 0.5 * sin(uv.y * 530.0 - ht * 4.1 + uv.x * 23.0));
+				float2 off = wob * hz * HAZE_PX * (float(BUFFER_HEIGHT) / 1080.0) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+				c = tex2Dlod(ColorLinear, float4(uv + off, 0.0, 0.0)).rgb;
+			}
+		}
 
 		// Sharpening, AMD's contrast adaptive kind: soft detail gains, hard edges and flat areas stay as they are.
 		float sharp = LegionGUValue(LEGIONGU_CTL_SHARP, Sharpness) * 0.01;
@@ -3250,7 +3295,8 @@ namespace LegionGUNights
 			c = saturate(lerp(c, graded, g));
 		}
 
-		// The colour style: 1 warm, 2 cold, 3 film (lifted blacks, softer colour, warm lights over cool shadows), 4 vivid.
+		// The colour style: 1 warm, 2 cold, 3 film (lifted blacks, softer colour, warm lights over cool shadows), 4 vivid,
+		// 5 sunset (golden light, violet shadows), 6 fairy tale (soft pastel, bright middle), 7 noir (nearly black and white).
 		int styleValue = LegionGUStyleValue();
 		int style = styleValue >= 0 ? styleValue % 8 : ColourStyle;
 		if (style > 0)
@@ -3268,7 +3314,29 @@ namespace LegionGUNights
 			}
 			else if (style == 4)
 				c = lerp(float3(ls, ls, ls), c, 1.2) * 1.02;
+			else if (style == 5)
+			{
+				c = lerp(float3(ls, ls, ls), c, 1.1) * float3(1.08, 0.98, 0.86);
+				c += float3(0.02, 0.0, 0.035) * (1.0 - smoothstep(0.0, 0.4, ls));
+			}
+			else if (style == 6)
+			{
+				c = 0.04 + lerp(float3(ls, ls, ls), c, 0.9) * 0.94;
+				c = pow(saturate(c), 0.93) * lerp(float3(1.0, 1.0, 1.03), float3(1.04, 1.0, 1.02), smoothstep(0.4, 0.9, ls));
+			}
+			else if (style == 7)
+				c = (lerp(float3(ls, ls, ls), c, 0.15) - 0.5) * 1.15 + 0.5 * float3(0.98, 1.0, 1.03);
 			c = saturate(c);
+		}
+
+		// Cinema HDR (the addon's switch): the shadows a little deeper, the highlights rolled off before white and a touch
+		// more colour, like a film print. On the luminance, so the hues stay.
+		if (LegionGUExtra(4u))
+		{
+			float hl = max(dot(c, LUMA601), 1e-4);
+			float tl = hl < 0.25 ? hl * lerp(0.8, 1.0, hl / 0.25) : hl;
+			tl = tl > 0.65 ? 0.65 + (tl - 0.65) * (1.0 - 0.25 * (tl - 0.65) / 0.35) : tl;
+			c = saturate(lerp(float3(tl, tl, tl), c * (tl / hl), 1.08));
 		}
 
 		// A light vignette: the corners a little darker, the middle as it is.
@@ -3277,6 +3345,18 @@ namespace LegionGUNights
 		{
 			float2 d = uv * 2.0 - 1.0;
 			c *= 1.0 - v * VIGNETTE_MAX * smoothstep(0.5, 2.0, dot(d, d));
+		}
+
+		// Film grain (the slider): a new pattern every frame, strongest in the middle tones.
+		float grain = LegionGUValue(LEGIONGU_CTL_GRAIN, FilmGrain) * 0.01;
+		if (grain > 0.0)
+		{
+			uint gh = uint(p.x) * 1973u + uint(p.y) * 9277u + FrameCount * 26699u;
+			gh = (gh ^ (gh >> 13u)) * 1274126177u;
+			gh ^= gh >> 16u;
+			float gn = float(gh & 65535u) / 65535.0 - 0.5;
+			float gl = dot(c, LUMA601);
+			c = saturate(c + gn * grain * GRAIN_MAX * (0.3 + 2.8 * gl * (1.0 - gl)));
 		}
 		return float4(c, c4.a);
 	}
@@ -3299,7 +3379,8 @@ namespace LegionGUNights
 	// the panel. Off, every pass returns at once.
 	// ---------------------------------------------------------------------------------------------------
 
-	static const float DOF_MAX_PX = 12.0;      // largest blur radius in half-resolution pixels
+	static const float DOF_MAX_PX = 12.0;      // largest blur radius in half-resolution pixels at «Размытие» 100
+	static const float BOKEH_GAIN = 8.0;       // bright taps weigh up to this much more with bokeh on: lights open into discs
 	static const float DOF_SPAN = 1.2;         // this share of the focus distance behind the focus is fully blurred
 	static const float DOF_NEAR = 3.0;         // in front of the focus the blur grows this much faster
 	static const float DOF_FOCUS_TIME = 0.3;   // seconds for the focus to follow the character
@@ -3363,7 +3444,9 @@ namespace LegionGUNights
 			return float4(0.0, 0.0, 0.0, 0.0);
 		float4 centre = tex2Dlod(DofPoint, float4(uv, 0.0, 0.0));
 		float2 px = 2.0 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
-		float r = centre.a * DOF_MAX_PX;
+		float maxPx = DOF_MAX_PX * LegionGUValue(LEGIONGU_CTL_PHOTO_BLUR, PhotoBlur) * 0.01;
+		bool bokeh = LegionGUExtra(8u);
+		float r = centre.a * maxPx;
 		float3 sum = centre.rgb;
 		float wsum = 1.0;
 		[unroll]
@@ -3372,7 +3455,9 @@ namespace LegionGUNights
 			float d = sqrt(float(i) / 24.0);
 			float a = float(i) * 2.3999632;
 			float4 t = tex2Dlod(Dof, float4(uv + float2(cos(a), sin(a)) * d * r * px, 0.0, 0.0));
-			float w = saturate(t.a * DOF_MAX_PX - d * r + 1.0);
+			float w = saturate(t.a * maxPx - d * r + 1.0);
+			if (bokeh)
+				w *= 1.0 + BOKEH_GAIN * pow(saturate((dot(t.rgb, LUMA601) - 0.55) / 0.45), 2.0);
 			sum += t.rgb * w;
 			wsum += w;
 		}

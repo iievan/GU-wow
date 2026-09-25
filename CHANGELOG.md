@@ -1,5 +1,47 @@
 # GU-WOW: история версий / Version history
 
+## 1.5.4-release «Лунная тропа» / "Moonlit Path"
+
+> Модификация создана в честь неоспоримого наследия Turtle WoW, а также для жизни и процветания коммьюнити Brothers of Turtle. Лок'Тар!
+>
+> This mod is made in honour of the undeniable legacy of Turtle WoW, and for the life and prosperity of the Brothers of Turtle community. Lok'tar!
+
+### Русский
+
+Всё новое выключено, чтобы привычная картинка не менялась. Включается на странице «Профили и фото».
+
+**Новое**
+- Марево: в пустынях и огненных землях дальняя земля дрожит от жара. Персонажи и небо не искажаются.
+- Три цветовых стиля: «Закат», «Сказка» и «Нуар».
+- Кино-HDR: тени глубже, яркое не выгорает в белое, цвет чуть плотнее.
+- Плёночное зерно с ползунком.
+- Фоторежим: ползунок силы размытия и боке, огни на размытом фоне становятся мягкими кружками.
+- Кнопка «Настройки автора» в основном разделе меню. Она спрашивает подтверждение и не трогает пресеты.
+- После обновления игра один раз показывает, что нового.
+
+**Исправлено**
+- Размытие в фоторежиме по умолчанию втрое мягче.
+- Окно ReShade открывается сочетанием Ctrl и Scroll Lock. Случайное нажатие Scroll Lock больше не открывает нечитаемое окно, которое держит мышь.
+- Установщик в конце называет только те клавиши, которые у вас действительно работают.
+
+### English
+
+All new things are off, so the familiar picture does not change. Turn them on on the "Profiles and photo" page.
+
+**New**
+- Heat haze: in deserts and fire lands the far ground wavers in the heat. Characters and the sky stay still.
+- Three colour styles: Sunset, Fairy tale and Noir.
+- Cinema HDR: deeper shadows, bright areas no longer burn to white, a little denser colour.
+- Film grain with a slider.
+- Photo mode: a blur strength slider and bokeh, lights in the blur become soft discs.
+- An "Author's settings" button in the main menu page. It asks first and leaves the presets alone.
+- After an update the game shows once what is new.
+
+**Fixed**
+- The photo mode blur is three times softer by default.
+- The ReShade window opens with Ctrl and Scroll Lock. A stray Scroll Lock no longer opens an unreadable window that holds the mouse.
+- At the end the installer names only the keys that really work for you.
+
 ## 1.5.3-release «Лунная тропа» / "Moonlit Path"
 
 > Модификация создана в честь неоспоримого наследия Turtle WoW, а также для жизни и процветания коммьюнити Brothers of Turtle. Лок'Тар!
