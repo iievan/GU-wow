@@ -1,5 +1,21 @@
 # GU-WOW: история версий / Version history
 
+## 1.5.5-release «Лунная тропа» / "Moonlit Path"
+
+> Модификация создана в честь неоспоримого наследия Turtle WoW, а также для жизни и процветания коммьюнити Brothers of Turtle. Лок'Тар!
+>
+> This mod is made in honour of the undeniable legacy of Turtle WoW, and for the life and prosperity of the Brothers of Turtle community. Lok'tar!
+
+### Русский
+
+**Исправлено**
+- После работы с пресетами игра могла перестать слушаться клавиатуры, даже Esc. Поле названия пресета держало ввод и после закрытия меню. Теперь оно отпускает клавиатуру при закрытии меню и при нажатии кнопок пресетов. Поле кода настройки тоже.
+
+### English
+
+**Fixed**
+- After working with presets the game could stop listening to the keyboard, even Esc. The preset name box kept the input after the menu closed. Now it lets the keyboard go when the menu closes and when a preset button is pressed. The settings code box too.
+
 ## 1.5.4-release «Лунная тропа» / "Moonlit Path"
 
 > Модификация создана в честь неоспоримого наследия Turtle WoW, а также для жизни и процветания коммьюнити Brothers of Turtle. Лок'Тар!

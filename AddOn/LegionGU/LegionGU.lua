@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.5.4-release"
+local VERSION = "1.5.5-release"
 local CELL = 4
 local CELLS = 45
 
@@ -485,8 +485,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.5.4.\n\nНовое: марево в пустынях, стили «Закат», «Сказка» и «Нуар», кино-HDR, плёночное зерно, сила размытия и боке в фоторежиме, кнопка «Настройки автора». Всё новое выключено, включается на странице «Профили и фото».\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.5.4.\n\nNew: heat haze in deserts, the Sunset, Fairy tale and Noir styles, cinema HDR, film grain, blur strength and bokeh in photo mode, the Author's settings button. All new things are off; turn them on on the «Profiles and photo» page.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.5.5.\n\nНовое: марево в пустынях, стили «Закат», «Сказка» и «Нуар», кино-HDR, плёночное зерно, сила размытия и боке в фоторежиме, кнопка «Настройки автора». Всё новое выключено, включается на странице «Профили и фото».\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.5.5.\n\nNew: heat haze in deserts, the Sunset, Fairy tale and Noir styles, cinema HDR, film grain, blur strength and bokeh in photo mode, the Author's settings button. All new things are off; turn them on on the «Profiles and photo» page.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -732,6 +732,8 @@ nameBox:SetAutoFocus(false)
 nameBox:SetMaxLetters(24)
 nameBox:SetScript("OnEnterPressed", nameBox.ClearFocus)
 nameBox:SetScript("OnEscapePressed", nameBox.ClearFocus)
+-- A hidden box that keeps the focus keeps the whole keyboard, Esc too: it lets go when the menu closes.
+nameBox:SetScript("OnHide", nameBox.ClearFocus)
 
 local function ShowPreset(i)
 	presetIndex = i
@@ -767,10 +769,11 @@ local function Step(d)
 		ShowPreset((presetIndex - 1 + d) % n + 1)
 	end
 end
-Button(panel, "<", L, -508, 30, function() Step(-1) end)
-Button(panel, ">", L + 192, -508, 30, function() Step(1) end)
+Button(panel, "<", L, -508, 30, function() nameBox:ClearFocus() Step(-1) end)
+Button(panel, ">", L + 192, -508, 30, function() nameBox:ClearFocus() Step(1) end)
 
 Button(panel, T("Сохранить", "Save"), L + 228, -508, 110, function()
+	nameBox:ClearFocus()
 	-- A preset keeps the player's own settings; during a preview the screen shows something else.
 	if preview then
 		Say(T("идёт предпросмотр. Нажмите «Применить» или «Отменить», потом сохраните пресет.",
@@ -802,6 +805,7 @@ Button(panel, T("Сохранить", "Save"), L + 228, -508, 110, function()
 end)
 
 Button(panel, T("Загрузить", "Load"), L + 344, -508, 110, function()
+	nameBox:ClearFocus()
 	local name = PresetName()
 	local i = FindPreset(name)
 	if not i then
@@ -828,6 +832,7 @@ Button(panel, T("Загрузить", "Load"), L + 344, -508, 110, function()
 end)
 
 Button(panel, T("Удалить", "Delete"), L + 460, -508, 110, function()
+	nameBox:ClearFocus()
 	local name = PresetName()
 	local i = FindPreset(name)
 	if not i then
@@ -930,6 +935,9 @@ codeBox:SetWidth(460)
 codeBox:SetHeight(20)
 codeBox:SetAutoFocus(false)
 codeBox:SetMaxLetters(200)
+codeBox:SetScript("OnEnterPressed", codeBox.ClearFocus)
+codeBox:SetScript("OnEscapePressed", codeBox.ClearFocus)
+codeBox:SetScript("OnHide", codeBox.ClearFocus)
 Button(page, T("Мой код", "My code"), 16, -216, 140, function()
 	codeBox:SetText(MakeCode())
 	codeBox:HighlightText()
