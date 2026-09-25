@@ -2,7 +2,8 @@
 
 **Русский** · [English](#english)
 
-Графическое улучшение World of Warcraft, созданное для сообщества Brothers of Turtle. Проверено на Tauri (Legion 7.3.5).
+Графическое улучшение World of Warcraft, созданное в знак солидарности сообществу Brothers of Turtle. Основные работы проводятся на версии Legion 7.3.5. 
+Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
 Текущая сборка: **1.5.1-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
@@ -102,7 +103,8 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 
 ## English
 
-A graphics upgrade for World of Warcraft, made for the Brothers of Turtle community. Tested on Tauri (Legion 7.3.5).
+A graphical enhancement for World of Warcraft created as a sign of solidarity with the Brothers of Turtle community. The main development work is being carried out for Legion 7.3.5.
+Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
 Current build: **1.5.1-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
