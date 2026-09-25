@@ -210,8 +210,6 @@ The build is free and provided "as is", without any warranty. You use it at your
 
 ## P.S.
 
-Чести Turtle WoW. Слава Черепашке!
-Создано в знак солидарности сообществу Brothers of Turtle.
+Создано в знак солидарности сообществу Brothers of Turtle. Честь и слава Черепашке!
 
-Honor to Turtle WoW. Glory to the Turtle!
-Created as a sign of solidarity with the Brothers of Turtle community.
+Created in solidarity with the Brothers of Turtle community. Honor and glory to Turtle WoW!
