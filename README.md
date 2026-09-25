@@ -7,6 +7,10 @@
 
 Текущая сборка: **1.5.1-release «Лунная тропа»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
+## Поддержка систем
+
+Поддержка осуществляется только на ОС Windows 10-11.
+
 ## Что входит в сборку 1.5.1-release
 
 Всё настраивается в игре: Интерфейс > Модификации > GU-WOW, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
@@ -65,8 +69,8 @@
 
 | Клиент | Состояние |
 |---|---|
-| Legion 7.3.5 (Tauri) | проверено, интерфейс не затрагивается |
-| WotLK 3.3.5, Cataclysm 4.3.4, MoP 5.4.8 | ставится, в игре не проверено, туман ложится и на интерфейс |
+| Legion 7.3.5 | проверено, интерфейс не затрагивается |
+| WotLK 3.3.5, Cataclysm 4.3.4, MoP 5.4.8 | ставится, в игре не проверено |
 | Classic 1.12, TBC 2.4.3 | ставится без меню в игре, настройки в окне ReShade |
 
 ## Лицензии
@@ -107,6 +111,10 @@ A graphical enhancement for World of Warcraft created as a sign of solidarity wi
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
 Current build: **1.5.1-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+
+## System Support
+
+Supported operating systems: Windows 10 and Windows 11 only.
 
 ## What is in build 1.5.1-release
 
