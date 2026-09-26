@@ -5,4 +5,7 @@
 	<Binding name="GUWOW_SHOT">
 		GUWOW_Screenshot()
 	</Binding>
+	<Binding name="GUWOW_TOGGLE">
+		GUWOW_ToggleMod()
+	</Binding>
 </Bindings>

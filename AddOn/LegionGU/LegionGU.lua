@@ -1,13 +1,13 @@
 -- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
--- The settings travel to the shader as a strip of 55 cells, 4 by 4 pixels, in the top left corner of the screen.
+-- The settings travel to the shader as a strip of 57 cells, 4 by 4 pixels, in the top left corner of the screen.
 -- The effect LegionGUBridge (LegionGUbylevan.fx) reads the strip after the interface is drawn and covers it
 -- again, so it is not seen. Each colour channel is black or white, one bit. Cell 0 is black, cell 1 white, cell 2
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.6.7-release"
+local VERSION = "1.6.9-release"
 local CELL = 4
-local CELLS = 55
+local CELLS = 57
 
 -- Russian on a Russian client, English elsewhere.
 local RU = GetLocale() == "ruRU"
@@ -27,6 +27,8 @@ local DEFAULTS = {
 	hazeStrength = 50, hdrStrength = 50, grain = 55, bokeh = false, photoBlur = 50,
 	-- 1.6.0: how much of the low mist stays seen from a height, and how defined the ray shafts are.
 	mistHigh = 50, rayDefinition = 25,
+	-- 1.6.7: the drift of the mist.
+	mistFlow = 25,
 }
 -- The order of the values in the strip, the same as LEGIONGU_CTL_* in the shaders (after the flags).
 local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDarkness", "lightGlow",
@@ -40,11 +42,12 @@ local CODE_FLAGS = { "fog", "rays", "night", "weather", "wet", "eye", "zones", "
 local CODE_KEYS2 = { "grain", "photoBlur" }
 local CODE_KEYS3 = { "grain", "photoBlur", "hazeStrength", "hdrStrength" }
 local CODE_KEYS4 = { "grain", "photoBlur", "hazeStrength", "hdrStrength", "mistHigh", "rayDefinition" }
+local CODE_KEYS5 = { "grain", "photoBlur", "hazeStrength", "hdrStrength", "mistHigh", "rayDefinition", "mistFlow" }
 local CODE_FLAGS2 = { "heatHaze", "cinemaHdr", "bokeh" }
 -- The look: what a style, a ready profile or a friend's code may change. The zones and the cinema bars are the
 -- player's habits, not the look, so a preview leaves them alone.
 local LOOK = { fog = true, rays = true, night = true, weather = true, wet = true, eye = true,
-	hazeStrength = true, hdrStrength = true, grain = true, mistHigh = true, rayDefinition = true }
+	hazeStrength = true, hdrStrength = true, grain = true, mistHigh = true, rayDefinition = true, mistFlow = true }
 for _, k in ipairs(CODE_KEYS) do
 	LOOK[k] = true
 end
@@ -90,6 +93,8 @@ local DB
 -- experiments do not touch the player's own settings. Gone after /reload.
 local preview, previewBase, previewStyle
 local photo = false
+-- The depth check view (/gu check): the shaders draw the depth instead of the picture, bit 16 of the switches.
+local checkView = false
 local lowQuality = false
 local zoneKind
 local cells = {}
@@ -331,9 +336,10 @@ local function Paint()
 	local hot = zoneKind == "desert" or zoneKind == "fire"
 	local haze, hdr = V("hazeStrength") or 0, V("hdrStrength") or 0
 	local switches = (haze > 0 and 1 or 0) + (hot and 2 or 0) + (hdr > 0 and 4 or 0) + (DB.bokeh and 8 or 0)
+		+ (checkView and 16 or 0)
 	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + (DB.cinema and 8 or 0),
 		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches, Code(haze), Code(hdr), facing,
-		Code(V("mistHigh") or 0), Code(V("rayDefinition") or 0) }
+		Code(V("mistHigh") or 0), Code(V("rayDefinition") or 0), Code(V("mistFlow") or 0) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v
@@ -422,6 +428,17 @@ function GUWOW_TogglePhoto()
 	Photo(not photo)
 end
 
+-- The mod on and off, for the key the player picks in the game's key bindings and for the minimap button.
+function GUWOW_ToggleMod()
+	if not DB then
+		return
+	end
+	DB.master = not DB.master
+	Refresh()
+	Paint()
+	print("|cffffd200GU-WOW:|r " .. (DB.master and T("включён", "on") or T("выключен", "off")))
+end
+
 -- A clean shot: the interface and the strip hide for a moment (the shader keeps the last settings), the game takes
 -- the screenshot, everything comes back.
 function GUWOW_Screenshot()
@@ -466,6 +483,7 @@ UIParent:HookScript("OnShow", function()
 end)
 
 BINDING_HEADER_GUWOW = "GU-WOW"
+BINDING_NAME_GUWOW_TOGGLE = T("Включить или выключить GU-WOW", "Turn GU-WOW on or off")
 BINDING_NAME_GUWOW_PHOTO = T("Фоторежим (прячет интерфейс, размывает фон)", "Photo mode (hides the interface, blurs the background)")
 BINDING_NAME_GUWOW_SHOT = T("Чистый снимок экрана", "Clean screenshot")
 
@@ -485,16 +503,16 @@ local function MakeCode()
 		end
 	end
 	parts[#parts + 1] = tostring(f)
-	for _, k in ipairs(CODE_KEYS4) do
+	for _, k in ipairs(CODE_KEYS5) do
 		parts[#parts + 1] = tostring(math.floor((DB[k] or 0) + 0.5))
 	end
 	parts[#parts + 1] = tostring(DB.bokeh and 4 or 0)
-	return "GUW4:" .. table.concat(parts, ".")
+	return "GUW5:" .. table.concat(parts, ".")
 end
 
 -- The values a code carries, or nil when the line is not a GU-WOW code.
 local function ParseCode(code)
-	local ver, body = string.match(code or "", "GUW([1234]):([%d%.]+)")
+	local ver, body = string.match(code or "", "GUW([12345]):([%d%.]+)")
 	if not body then
 		return nil
 	end
@@ -503,7 +521,7 @@ local function ParseCode(code)
 		nums[#nums + 1] = tonumber(n)
 	end
 	local n1 = #CODE_KEYS + 1
-	local keys2 = ver == "4" and CODE_KEYS4 or (ver == "3" and CODE_KEYS3 or CODE_KEYS2)
+	local keys2 = ver == "5" and CODE_KEYS5 or (ver == "4" and CODE_KEYS4 or (ver == "3" and CODE_KEYS3 or CODE_KEYS2))
 	if #nums ~= (ver == "1" and n1 or n1 + #keys2 + 1) then
 		return nil
 	end
@@ -554,8 +572,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.6.7.\n\nВыход из таверны плавный: ночь, туман и вечерний свет набирают силу за пару секунд на пороге, вход в дом гасит их быстро. Резкого скачка на двери нет.\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.6.7.\n\nLeaving a tavern is smooth: the night, the fog and the evening light gain strength over a couple of seconds at the doorstep, and entering a house dims them fast. No hard snap at the door.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.6.9.\n\nРассвет и закат золотые, земля темнеет и блестит в дождь, костры греют ночной туман вокруг себя. Персонажи, мобы и доспехи ночью не светятся сами по себе. Новый ползунок «Движение тумана»: дымка плывёт и дышит. Страницы GU-WOW сами подстраиваются под окно настроек, у рискованных ползунков предупреждения. Клавиша вкл/выкл мода назначается в «Управлении». Команды: /gu fix чинит сбои, /gu report отправляет сообщение об ошибке, /gu check проверяет глубину, /gu help список.\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.6.9.\n\nSunrise and sunset are golden, the ground darkens and shines in the rain, fires warm the night mist around them. Characters, mobs and gear no longer glow at night by themselves. A new slider, fog motion: the mist drifts and breathes. The GU-WOW pages fit the options window by themselves, risky sliders warn about artifacts. The mod toggle key is set in Key Bindings. Commands: /gu fix heals faults, /gu report files a bug, /gu check tests the depth, /gu help lists them.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -587,6 +605,8 @@ end
 -- A change in the panel during a preview tunes the preview: «Apply» saves it with the change, «Cancel» brings back
 -- the player's own settings untouched.
 local CancelPreview
+-- Declared below, used by the self-heal above their bodies.
+local ChatBack, PlaceMinimapButton
 
 -- Where a change goes: into the preview while one is on, into the player's settings otherwise.
 local function Set(key, v)
@@ -629,7 +649,9 @@ local function Check(parent, key, label, x, y, onClick)
 end
 
 local sliderCount = 0
-local function Slider(parent, key, label, x, y, lo, hi)
+-- warn: from this value on a small orange note under the slider says artifacts are possible. tip: a tooltip.
+-- onChange: called with the new value after it is stored (the menu scale applies itself this way).
+local function Slider(parent, key, label, x, y, lo, hi, warn, tip, onChange)
 	sliderCount = sliderCount + 1
 	lo, hi = lo or 0, hi or 100
 	local name = "LegionGUSlider" .. sliderCount
@@ -644,13 +666,41 @@ local function Slider(parent, key, label, x, y, lo, hi)
 	_G[name .. "Low"]:SetText(tostring(lo))
 	_G[name .. "High"]:SetText(tostring(hi))
 	local text = _G[name .. "Text"]
+	local warnText
+	if warn then
+		warnText = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		warnText:SetPoint("TOP", s, "BOTTOM", 0, 3)
+		warnText:SetTextColor(1.0, 0.55, 0.1)
+		warnText:SetText(T("значения от " .. warn .. " могут добавлять артефакты", "values of " .. warn .. " and up may add artifacts"))
+		warnText:Hide()
+	end
+	if tip then
+		s:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(tip, nil, nil, nil, nil, true)
+			GameTooltip:Show()
+		end)
+		s:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+	end
 	s:SetScript("OnValueChanged", function(self, v)
 		v = math.floor(v + 0.5)
 		text:SetText(label .. ": " .. v)
+		if warnText then
+			if v >= warn then
+				warnText:Show()
+			else
+				warnText:Hide()
+			end
+		end
 		if refreshing or not DB or V(key) == v then
 			return
 		end
 		Set(key, v)
+		if onChange then
+			onChange(v)
+		end
 		Paint()
 	end)
 	s.Refresh = function(self)
@@ -758,44 +808,56 @@ Button(bar, T("Отменить", "Cancel"), 318, -6, 76, function()
 	Say(T("предпросмотр отменён. На экране снова ваши настройки.", "preview cancelled. Your own settings are back on screen."))
 end)
 
+-- The welcome page (1.6.9): what GU-WOW is, the hints and the bug report. The settings live on the three
+-- child pages: «Основные», «Дополнительно», «Фоторежим».
+local home = CreateFrame("Frame", "LegionGUHome", UIParent)
+home.name = "GU-WOW"
+home:Hide()
+local homeTitle = home:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+homeTitle:SetPoint("TOPLEFT", 16, -16)
+homeTitle:SetText("GU-WOW " .. VERSION)
+local homeText = home:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+homeText:SetPoint("TOPLEFT", 16, -52)
+homeText:SetWidth(600)
+homeText:SetJustifyH("LEFT")
+homeText:SetSpacing(4)
+homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Основные» — атмосфера, ночь, картинка и готовые пресеты.\n«Дополнительно» — стили, коды, свои пресеты и поведение.\n«Фоторежим» — снимки и всё, что нужно только для них.\n\nПодсказки:\nF11 включает и выключает весь мод. Своя клавиша: Меню → Управление → GU-WOW.\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
+	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMain — the atmosphere, the night, the picture and the ready presets.\nExtras — styles, codes, your presets and behaviour.\nPhoto mode — screenshots and what only they need.\n\nHints:\nF11 toggles the whole mod. Your own key: Menu → Key Bindings → GU-WOW.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode.\nChat commands: /gu menu · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
+
 local panel = CreateFrame("Frame", "LegionGUPanel", UIParent)
-panel.name = "GU-WOW"
+panel.name = T("Основные", "Main")
+panel.parent = home.name
 panel:Hide()
 
 local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("GU-WOW " .. VERSION)
+title:SetText("GU-WOW: " .. panel.name)
 local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-sub:SetText(T("Всё, что видно в игре. Меняется сразу. Весь мод на клавише F11. Стили, свои пресеты и фото: «Профили и фото».",
-	"Everything seen in the game. Changes apply at once. The whole mod toggles with F11. Styles, own presets, photo: «Profiles and photo»."))
+sub:SetText(T("Всё, что видно в игре. Меняется сразу. Пресет листается стрелками, «Применить» на полоске вверху экрана оставляет его.",
+	"Everything seen in the game. Changes apply at once. The arrows walk the presets, «Apply» on the top bar keeps one."))
 
--- The Blizzard options window is small and long labels did not fit. While a GU-WOW page is open the window
--- grows, and it comes back to the player's size when both pages hide. The check is deferred a moment: switching
--- between the two pages hides one and shows the other in either order. Plain frame sizing, nothing secure.
-local optSize
+-- The GU-WOW pages are laid out about 745 by 585 points and the Blizzard options window is smaller. The pages
+-- scale themselves into the window on show (1.6.9): the window itself never changes size and no manual font
+-- slider is needed — the fit follows the player's own window and UI scale.
 local guPages = {}
-local function GrowOptions()
-	if InterfaceOptionsFrame and not optSize then
-		optSize = { InterfaceOptionsFrame:GetWidth(), InterfaceOptionsFrame:GetHeight() }
-		InterfaceOptionsFrame:SetWidth(math.max(optSize[1], 1020))
-		InterfaceOptionsFrame:SetHeight(math.max(optSize[2], 706))
+local function FitPages()
+	local c = InterfaceOptionsFramePanelContainer
+	if not c then
+		return
+	end
+	local sc = math.min(1, c:GetWidth() / 748, c:GetHeight() / 588)
+	if sc < 0.5 then
+		sc = 0.5
+	end
+	for _, f in ipairs(guPages) do
+		f:SetScale(sc)
 	end
 end
+local function GrowOptions()
+	FitPages()
+end
 local function ShrinkOptions()
-	After(0.05, function()
-		if not optSize then
-			return
-		end
-		for _, f in ipairs(guPages) do
-			if f:IsShown() then
-				return
-			end
-		end
-		InterfaceOptionsFrame:SetWidth(optSize[1])
-		InterfaceOptionsFrame:SetHeight(optSize[2])
-		optSize = nil
-	end)
 end
 
 local L, R = 16, 470
@@ -935,30 +997,50 @@ Check(panel, "fog", T("Туман", "Fog"), L, -108)
 Slider(panel, "fogThickness", T("Густота тумана", "Fog density"), L + 6, -144)
 Slider(panel, "fogDistance", T("Дальность тумана", "Fog distance"), L + 6, -182)
 Slider(panel, "mist", T("Низовой туман", "Ground mist"), L + 6, -220)
-Slider(panel, "mistDensity", T("Плотность низового тумана", "Ground mist thickness"), L + 6, -258)
+Slider(panel, "mistDensity", T("Плотность низового тумана", "Ground mist thickness"), L + 6, -258, nil, nil, 86)
 Slider(panel, "mistHigh", T("Туман с высоты: с гор и в полёте", "Mist from a height: hills and flight"), L + 6, -296)
 Check(panel, "weather", T("Погодное настроение", "Weather mood"), L, -318)
 Check(panel, "wet", T("Мокрая земля в дождь", "Wet ground in rain"), L, -341)
 Check(panel, "rays", T("Лучи солнца", "Sun rays"), L, -364)
 Slider(panel, "raysStrength", T("Сила лучей", "Ray strength"), L + 6, -400)
-Slider(panel, "rayDefinition", T("Чёткость лучей: от свечения до снопов", "Ray definition: a glow or shafts"), L + 6, -438)
+Slider(panel, "rayDefinition", T("Чёткость лучей: от свечения до снопов", "Ray definition: a glow or shafts"), L + 6, -438, nil, nil, 71)
 Slider(panel, "ao", T("Тени в щелях", "Contact shadows"), L + 6, -476)
-Slider(panel, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), L + 6, -514)
+Slider(panel, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), L + 6, -514, nil, nil, 71)
 
 Header(panel, T("Ночь", "Night"), R, -94)
 Check(panel, "night", T("Ночь и огни", "Night and lights"), R, -110)
 Slider(panel, "nightDarkness", T("Темнота ночи", "Night darkness"), R + 6, -150)
-Slider(panel, "nightDepth", T("Глубина ночи", "Night depth"), R + 6, -192)
+Slider(panel, "nightDepth", T("Глубина ночи", "Night depth"), R + 6, -192, nil, nil, nil,
+	T("Дополнительная тьма поверх «Темноты ночи»: 0 обычная ночь, 100 глухая", "Extra darkness over the night darkness: 0 a plain night, 100 pitch dark"))
 Slider(panel, "lightGlow", T("Свет огней", "Light glow"), R + 6, -234)
 Slider(panel, "caveDarkness", T("Темнота подземелий", "Dungeon darkness"), R + 6, -276)
 
 Header(panel, T("Картинка", "Picture"), R, -306)
 Check(panel, "eye", T("Привыкание глаз", "Eye adaptation"), R, -322)
-Slider(panel, "sharpness", T("Резкость", "Sharpness"), R + 6, -360)
-Slider(panel, "grade", T("Цвет по времени суток", "Time of day colour"), R + 6, -400)
+Slider(panel, "sharpness", T("Резкость", "Sharpness"), R + 6, -360, nil, nil, 61)
+Slider(panel, "grade", T("Цвет по времени суток", "Time of day colour"), R + 6, -400, nil, nil, nil,
+	T("Золото вечера и утра, холод ночи: сила окраски по игровым часам", "The gold of the evening and the cool of the night, by the game clock"))
 Slider(panel, "vignette", T("Виньетка", "Vignette"), R + 6, -440)
 Slider(panel, "hdrStrength", T("Кино-HDR: глубже тени, мягче блики", "Cinema HDR: deeper shadows, softer highlights"), R + 6, -480)
-Slider(panel, "grain", T("Плёночное зерно", "Film grain"), R + 6, -520)
+Slider(panel, "grain", T("Плёночное зерно", "Film grain"), R + 6, -520, nil, nil, 71)
+
+-- The lesson of 1.6.2: with MSAA on the effects see no depth and quietly stop. Say it in the menu.
+local msaaWarn = home:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+msaaWarn:SetPoint("BOTTOMLEFT", 16, 14)
+msaaWarn:SetWidth(600)
+msaaWarn:SetJustifyH("LEFT")
+msaaWarn:SetTextColor(1.0, 0.35, 0.35)
+msaaWarn:SetText(T("Включено сглаживание (MSAA): туман, лучи и ночь не работают без глубины. Выключите сглаживание: Меню игры → Система → Графика.",
+	"Anti-aliasing (MSAA) is on: the fog, the rays and the night cannot see depth. Turn anti-aliasing off: Game Menu → System → Graphics."))
+msaaWarn:Hide()
+widgets.msaa = { Refresh = function()
+	local q = tonumber(GetCVar and (GetCVar("MSAAQuality") or GetCVar("gxMultisample")) or 0) or 0
+	if q > (GetCVar and GetCVar("gxMultisample") and not GetCVar("MSAAQuality") and 1 or 0) then
+		msaaWarn:Show()
+	else
+		msaaWarn:Hide()
+	end
+end }
 
 panel:SetScript("OnShow", function()
 	GrowOptions()
@@ -992,10 +1074,156 @@ authorButton:SetScript("OnClick", function()
 	end)
 end)
 
--- The second page.
+-- The self-heal (/gu fix, 1.6.9): mends everything the addon side can reach and names what it did. The
+-- shaders cannot be touched from Lua; for them it points at the two known killers (MSAA, a stale install).
+local function SelfHeal()
+	local did = {}
+	if checkView then
+		checkView = false
+		did[#did + 1] = T("выключен вид проверки", "check view off")
+	end
+	if preview then
+		CancelPreview()
+		did[#did + 1] = T("сброшен предпросмотр", "preview cancelled")
+	end
+	for k, v in pairs(DEFAULTS) do
+		if type(v) == "number" and type(DB[k]) ~= "number" then
+			DB[k] = v
+			did[#did + 1] = T("исправлена настройка ", "healed setting ") .. k
+		end
+	end
+	if type(DB.presets) ~= "table" then
+		DB.presets = {}
+		did[#did + 1] = T("восстановлен список пресетов", "presets list restored")
+	end
+	PlaceMinimapButton()
+	if DB.chatBack then
+		ChatBack()
+	end
+	UpdateZone()
+	Refresh()
+	Paint()
+	Say(T("самолечение: ", "self-heal: ") .. (#did > 0 and table.concat(did, ", ") or T("поломок на стороне меню нет", "nothing broken on the menu side")) .. ".")
+	local msaa = tonumber(GetCVar and (GetCVar("MSAAQuality") or GetCVar("gxMultisample")) or 0) or 0
+	if msaa > 1 then
+		Say(T("ВНИМАНИЕ: включено сглаживание (MSAA), туман, лучи и ночь не видят глубину. Выключите: Меню игры → Система → Графика → Сглаживание: Нет.",
+			"WARNING: anti-aliasing (MSAA) is on, the fog, the rays and the night see no depth. Turn it off: Game Menu → System → Graphics."))
+	end
+	Say(T("если эффекты всё равно не работают: закройте игру и запустите GU-WOW.exe → «Установить» ещё раз, затем /gu check в игре.",
+		"if the effects still do not work: close the game, run GU-WOW.exe → Install again, then /gu check in game."))
+end
+
+-- The bug report (1.6.9): a small window with a title and a description. Saving puts the text and a machine
+-- snapshot into the saved variables; the game writes them to disk on logout, and GU-WOW.exe picks the report
+-- up with the logs and opens a prefilled GitHub issue. The game itself cannot reach the internet.
+local reportFrame
+local function OpenReport()
+	if reportFrame then
+		reportFrame:Show()
+		return
+	end
+	local fr = CreateFrame("Frame", "LegionGUReport", UIParent)
+	reportFrame = fr
+	fr:SetWidth(440)
+	fr:SetHeight(340)
+	fr:SetPoint("CENTER")
+	fr:SetFrameStrata("DIALOG")
+	fr:SetMovable(true)
+	fr:EnableMouse(true)
+	fr:RegisterForDrag("LeftButton")
+	fr:SetScript("OnDragStart", fr.StartMoving)
+	fr:SetScript("OnDragStop", fr.StopMovingOrSizing)
+	local back = fr:CreateTexture(nil, "BACKGROUND")
+	back:SetAllPoints(fr)
+	if back.SetColorTexture then back:SetColorTexture(0, 0, 0, 0.85) else back:SetTexture(0, 0, 0, 0.85) end
+	local head = fr:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	head:SetPoint("TOP", 0, -12)
+	head:SetText(T("Сообщение об ошибке GU-WOW", "GU-WOW bug report"))
+	local l1 = fr:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	l1:SetPoint("TOPLEFT", 16, -44)
+	l1:SetText(T("Название ошибки:", "Title:"))
+	local titleBox = CreateFrame("EditBox", "LegionGUReportTitle", fr, "InputBoxTemplate")
+	titleBox:SetPoint("TOPLEFT", 24, -60)
+	titleBox:SetWidth(396)
+	titleBox:SetHeight(22)
+	titleBox:SetAutoFocus(false)
+	titleBox:SetMaxLetters(90)
+	titleBox:SetScript("OnEscapePressed", titleBox.ClearFocus)
+	titleBox:SetScript("OnHide", titleBox.ClearFocus)
+	local l2 = fr:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	l2:SetPoint("TOPLEFT", 16, -92)
+	l2:SetText(T("Что случилось и как повторить:", "What happened and how to repeat it:"))
+	local textBox = CreateFrame("EditBox", "LegionGUReportText", fr)
+	textBox:SetPoint("TOPLEFT", 24, -110)
+	textBox:SetWidth(392)
+	textBox:SetHeight(110)
+	textBox:SetMultiLine(true)
+	textBox:SetAutoFocus(false)
+	textBox:SetMaxLetters(1200)
+	textBox:SetFontObject(GameFontHighlightSmall)
+	textBox:SetScript("OnEscapePressed", textBox.ClearFocus)
+	textBox:SetScript("OnHide", textBox.ClearFocus)
+	-- A bare multiline EditBox takes no clicks: a button-like catcher over its area passes the focus in.
+	local textCatch = CreateFrame("Button", nil, fr)
+	textCatch:SetPoint("TOPLEFT", 20, -106)
+	textCatch:SetPoint("BOTTOMRIGHT", fr, "TOPRIGHT", -20, -226)
+	textCatch:SetScript("OnClick", function()
+		textBox:SetFocus()
+	end)
+	textBox:EnableMouse(true)
+	textBox:SetScript("OnMouseDown", function(self)
+		self:SetFocus()
+	end)
+	local tb = fr:CreateTexture(nil, "BORDER")
+	tb:SetPoint("TOPLEFT", 20, -106)
+	tb:SetPoint("BOTTOMRIGHT", fr, "TOPRIGHT", -20, -226)
+	if tb.SetColorTexture then tb:SetColorTexture(1, 1, 1, 0.08) else tb:SetTexture(1, 1, 1, 0.08) end
+	-- The warning before the reload: the player is told the interface blinks for a moment and why.
+	local warn = fr:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+	warn:SetPoint("BOTTOMLEFT", 16, 54)
+	warn:SetWidth(408)
+	warn:SetJustifyH("LEFT")
+	warn:SetText(T("Для отправки GU-WOW снимет вашу конфигурацию и ошибки интерфейса и перезагрузит игровой интерфейс. Это займёт пару секунд, и вы вернётесь в игру.",
+		"To send the report, GU-WOW takes your setup and interface errors and reloads the game interface. It takes a couple of seconds, and you are back in the game."))
+	local note = fr:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	note:SetPoint("BOTTOMLEFT", warn, "TOPLEFT", 0, 6)
+	note:SetWidth(408)
+	note:SetJustifyH("LEFT")
+	note:SetText(T("Служебные данные (версия, настройки, логи) прилагаются автоматически.",
+		"The service data (version, settings, logs) is attached for you."))
+	Button(fr, T("Отправить", "Send"), 60, -298, 150, function()
+		titleBox:ClearFocus()
+		textBox:ClearFocus()
+		local build, _, _, iface = GetBuildInfo()
+		DB.report = {
+			v = VERSION, when = date("%Y-%m-%d %H:%M:%S"),
+			title = string.gsub(titleBox:GetText() or "", "|", ""),
+			text = string.gsub(textBox:GetText() or "", "|", ""),
+			code = MakeCode(), fps = math.floor(GetFramerate() or 0),
+			msaa = GetCVar and (GetCVar("MSAAQuality") or GetCVar("gxMultisample")) or "?",
+			win = GetCVar and GetCVar("gxWindow") or "?", build = tostring(build) .. "/" .. tostring(iface),
+		}
+		fr:Hide()
+		-- The game writes saved variables to disk only on logout or a UI reload, and the support helper reads
+		-- the disk: the reload hands the report over at once. The helper tells the outcome in a Windows balloon.
+		-- The reload runs inside the click itself: the game ignores it from a timer, outside a key or mouse press.
+		ReloadUI()
+	end)
+	Button(fr, T("Закрыть", "Close"), 240, -298, 130, function()
+		fr:Hide()
+	end)
+	fr:Show()
+end
+
+
+-- The welcome page buttons, created here so SelfHeal and OpenReport already exist.
+Button(home, T("Самолечение", "Self-heal"), 16, -300, 170, function() SelfHeal() end)
+Button(home, T("Сообщить об ошибке", "Report a bug"), 196, -300, 170, function() OpenReport() end)
+
+-- The extras page.
 local page = CreateFrame("Frame", "LegionGUPanel2", UIParent)
-page.name = T("Профили и фото", "Profiles and photo")
-page.parent = panel.name
+page.name = T("Дополнительно", "Extras")
+page.parent = home.name
 page:Hide()
 local title2 = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title2:SetPoint("TOPLEFT", 16, -16)
@@ -1005,8 +1233,8 @@ local sub2 = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub2:SetPoint("TOPLEFT", title2, "BOTTOMLEFT", 0, -6)
 sub2:SetWidth(590)
 sub2:SetJustifyH("LEFT")
-sub2:SetText(T("Стили и коды сначала только показываются. Сохраняет их кнопка «Применить». Готовые пресеты на главной странице.",
-	"Styles and codes are only shown at first. «Apply» saves them. The ready presets are on the main page."))
+sub2:SetText(T("Стили и коды сначала только показываются. Сохраняет их кнопка «Применить». Готовые пресеты на странице «Основные».",
+	"Styles and codes are only shown at first. «Apply» saves them. The ready presets are on the Main page."))
 
 Header(page, T("Цветовой стиль", "Colour style"), 16, -62)
 local STYLE_NAMES = { T("Нет", "None"), T("Тёплый", "Warm"), T("Холодный", "Cold"), T("Плёнка", "Film"), T("Сочный", "Vivid"),
@@ -1169,24 +1397,39 @@ Button(page, T("Удалить", "Delete"), L + 460, -216, 110, function()
 	end)
 end)
 
--- Photo: only what works in photo mode and on the clean screenshot.
-Header(page, T("Фото", "Photo"), 16, -252)
-Check(page, "orbit", T("Медленный облёт камеры", "Slow camera orbit"), 16, -270)
-Check(page, "hideNames", T("Прятать имена над головами", "Hide names above heads"), 16, -296)
-Check(page, "cinema", T("Кинорамка", "Cinema bars"), 16, -322)
-Check(page, "bokeh", T("Боке огней на размытом фоне", "Bokeh of lights in the blur"), 16, -348)
-Slider(page, "photoBlur", T("Сила размытия", "Blur strength"), 336, -346)
-Button(page, T("Фоторежим", "Photo mode"), 330, -274, 150, GUWOW_TogglePhoto)
-Button(page, T("Чистый снимок", "Clean screenshot"), 330, -302, 150, GUWOW_Screenshot)
+-- The photo page: only what works in photo mode and on the clean screenshot.
+local pagePhoto = CreateFrame("Frame", "LegionGUPanel3", UIParent)
+pagePhoto.name = T("Фоторежим", "Photo mode")
+pagePhoto.parent = home.name
+pagePhoto:Hide()
+local title3 = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+title3:SetPoint("TOPLEFT", 16, -16)
+title3:SetText("GU-WOW: " .. pagePhoto.name)
+local sub3 = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+sub3:SetPoint("TOPLEFT", title3, "BOTTOMLEFT", 0, -6)
+sub3:SetText(T("Интерфейс прячется, персонаж в фокусе, фон размыт. Выход: Esc, Enter или сама клавиша фоторежима.",
+	"The interface hides, your character stays in focus, the background is blurred. Leave with Esc, Enter or the photo key."))
+Check(pagePhoto, "orbit", T("Медленный облёт камеры", "Slow camera orbit"), 16, -70)
+Check(pagePhoto, "hideNames", T("Прятать имена над головами", "Hide names above heads"), 16, -96)
+Check(pagePhoto, "cinema", T("Кинорамка", "Cinema bars"), 16, -122)
+Check(pagePhoto, "bokeh", T("Боке огней на размытом фоне", "Bokeh of lights in the blur"), 16, -148)
+Slider(pagePhoto, "photoBlur", T("Сила размытия", "Blur strength"), 336, -146)
+Button(pagePhoto, T("Фоторежим", "Photo mode"), 330, -74, 150, GUWOW_TogglePhoto)
+Button(pagePhoto, T("Чистый снимок", "Clean screenshot"), 330, -102, 150, GUWOW_Screenshot)
+pagePhoto:SetScript("OnShow", function()
+	GrowOptions()
+	Refresh()
+end)
+pagePhoto:SetScript("OnHide", ShrinkOptions)
 
-Header(page, T("Производительность и поведение", "Performance and behaviour"), 16, -386)
-Check(page, "autoQuality", T("Автокачество: упрощать тяжёлое при низких кадрах", "Auto quality: lighten heavy effects at low FPS"), 16, -404)
-Check(page, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), 16, -430, function()
+Header(page, T("Поведение и производительность", "Behaviour and performance"), 16, -252)
+Check(page, "autoQuality", T("Автокачество: упрощать тяжёлое при низких кадрах", "Auto quality: lighten heavy effects at low FPS"), 16, -270)
+Check(page, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), 16, -296, function()
 	UpdateZone()
 end)
 -- The chat over the fogged world: the game's own window shade, so the text does not sink into the textures.
 -- The game's mechanism (FCF_SetWindowAlpha), so the player's later choice in the chat tab menu simply wins.
-local function ChatBack()
+ChatBack = function()
 	if not FCF_SetWindowAlpha then
 		return
 	end
@@ -1197,8 +1440,11 @@ local function ChatBack()
 		end
 	end
 end
-Check(page, "chatBack", T("Подложка под чатом, чтобы текст не тонул в мире", "A shade behind the chat, so the text does not sink into the world"), 16, -456, ChatBack)
-Slider(page, "targetFps", T("Держать кадров не ниже", "Keep FPS at least"), 330, -408, 20, 120)
+Check(page, "chatBack", T("Подложка под чатом, чтобы текст не тонул в мире", "A shade behind the chat, so the text does not sink into the world"), 16, -322, ChatBack)
+Slider(page, "targetFps", T("Держать кадров не ниже", "Keep FPS at least"), 330, -274, 20, 120)
+Slider(page, "mistFlow", T("Движение тумана: дымка плывёт", "Fog motion: the mist drifts"), 336, -320, nil, nil, 81,
+	T("Низовой туман медленно течёт и дышит. 0 — неподвижный туман, как раньше", "The ground mist slowly flows and breathes. 0 keeps it still, as before"))
+
 
 page:SetScript("OnShow", function()
 	GrowOptions()
@@ -1206,14 +1452,21 @@ page:SetScript("OnShow", function()
 end)
 page:SetScript("OnHide", ShrinkOptions)
 page.refresh = Refresh
-guPages[1], guPages[2] = panel, page
+guPages[1], guPages[2], guPages[3], guPages[4] = home, panel, page, pagePhoto
+home:SetScript("OnShow", function()
+	GrowOptions()
+	Refresh()
+end)
+home:SetScript("OnHide", ShrinkOptions)
 
 local category
 if InterfaceOptions_AddCategory then
+	InterfaceOptions_AddCategory(home)
 	InterfaceOptions_AddCategory(panel)
 	InterfaceOptions_AddCategory(page)
+	InterfaceOptions_AddCategory(pagePhoto)
 elseif Settings and Settings.RegisterCanvasLayoutCategory then
-	category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+	category = Settings.RegisterCanvasLayoutCategory(home, home.name)
 	Settings.RegisterAddOnCategory(category)
 end
 
@@ -1235,6 +1488,24 @@ SlashCmdList["LEGIONGU"] = function(msg)
 		GUWOW_TogglePhoto()
 	elseif msg == "shot" or msg == "снимок" then
 		GUWOW_Screenshot()
+	elseif msg == "check" or msg == "проверка" then
+		checkView = not checkView
+		Paint()
+		if checkView then
+			Say(T("вид проверки: близкое светлое, дальнее темнее, небо чёрное. Красная рамка = эффекты не видят глубину (чаще всего включено сглаживание). Выключить: /gu check.",
+				"check view: near is bright, far is darker, the sky is black. A red border means the effects see no depth (usually anti-aliasing is on). Turn off: /gu check."))
+		else
+			Say(T("вид проверки выключен.", "the check view is off."))
+		end
+	elseif msg == "news" or msg == "новости" then
+		StaticPopup_Show("GUWOW_NEWS")
+	elseif msg == "fix" or msg == "лечение" then
+		SelfHeal()
+	elseif msg == "report" or msg == "ошибка" then
+		OpenReport()
+	elseif msg == "help" or msg == "помощь" then
+		Say(T("/gu меню · /gu photo фоторежим · /gu shot чистый снимок · /gu check проверка глубины · /gu fix самолечение · /gu report сообщить об ошибке · /gu news что нового",
+			"/gu menu · /gu photo photo mode · /gu shot clean screenshot · /gu check depth check · /gu fix self-heal · /gu report a bug · /gu news what is new"))
 	else
 		OpenPanel()
 	end
@@ -1263,7 +1534,7 @@ mmBorder:SetHeight(53)
 mmBorder:SetPoint("TOPLEFT")
 mm:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
-local function PlaceMinimapButton()
+PlaceMinimapButton = function()
 	local a = math.rad(DB.minimapAngle or 200)
 	mm:ClearAllPoints()
 	mm:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * 80, math.sin(a) * 80)
@@ -1276,6 +1547,7 @@ mm:SetScript("OnDragStart", function(self)
 		local s = Minimap:GetEffectiveScale()
 		DB.minimapAngle = math.deg(math.atan2(cy / s - my, cx / s - mx))
 		PlaceMinimapButton()
+		FitPages()
 	end)
 end)
 mm:SetScript("OnDragStop", function(self)
@@ -1283,10 +1555,7 @@ mm:SetScript("OnDragStop", function(self)
 end)
 mm:SetScript("OnClick", function(self, button)
 	if button == "RightButton" then
-		DB.master = not DB.master
-		Refresh()
-		Paint()
-		print("|cffffd200GU-WOW:|r " .. (DB.master and T("включён", "on") or T("выключен", "off")))
+		GUWOW_ToggleMod()
 	elseif button == "MiddleButton" or IsShiftKeyDown() then
 		GUWOW_TogglePhoto()
 	else
@@ -1376,6 +1645,14 @@ events:SetScript("OnEvent", function(self, event, arg1)
 		for k, v in pairs(DEFAULTS) do
 			if DB[k] == nil then
 				DB[k] = v
+			end
+			-- A corrupt or out-of-range number goes back to the default, so a broken save cannot wedge a slider.
+			if type(v) == "number" and type(DB[k]) == "number" then
+				local lo = k == "targetFps" and 20 or 0
+				local hi = k == "targetFps" and 120 or (k == "style" and 7 or 100)
+				if DB[k] < lo or DB[k] > hi then
+					DB[k] = v
+				end
 			end
 		end
 		-- The three slots of 1.5.0 become the first presets, so nothing saved in them is lost.

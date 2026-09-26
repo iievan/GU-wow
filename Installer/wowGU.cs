@@ -24,7 +24,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.6.7-release";
+	const string Version = "1.6.9-release";
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
 	// turned out unreachable on laptops, where Scroll Lock needs Fn as well.
 	const string OverlayKey = "116,0,0,0";
@@ -46,10 +46,17 @@ static class WowGU
 	static string cliLog;
 
 	// wowGU.exe --install|--uninstall <game folder> <log file>: the same steps without the window.
+	// wowGU.exe --watch <game folder>: the report watcher, tray only.
 	[STAThread]
 	static void Main(string[] args)
 	{
 		SetProcessDPIAware();
+		if (args.Length == 2 && args[0] == "--watch")
+		{
+			current = Inspect(args[1]);
+			if (current != null) Watch();
+			return;
+		}
 		if (args.Length == 3)
 		{
 			cliLog = args[2];
@@ -81,11 +88,12 @@ static class WowGU
 		var browse = new Button { Text = "Обзор…", Location = new Point(544, y + 26), Size = new Size(100, 30) };
 		found = new Label { Location = new Point(16, y + 62), Size = new Size(630, 24), ForeColor = Color.DimGray };
 		install = new Button { Text = "Установить", Location = new Point(16, y + 92), Size = new Size(200, 40), Font = new Font("Segoe UI", 11f, FontStyle.Bold) };
-		remove = new Button { Text = "Удалить", Location = new Point(228, y + 92), Size = new Size(140, 40) };
+		remove = new Button { Text = "Удалить", Location = new Point(228, y + 92), Size = new Size(120, 40) };
+		var report = new Button { Text = "Сообщить об ошибке", Location = new Point(356, y + 92), Size = new Size(170, 40) };
 		log = new TextBox { Location = new Point(16, y + 144), Size = new Size(628, 230), Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.White };
-		form.Controls.AddRange(new Control[] { title, head, hint, pathBox, browse, found, install, remove, log });
+		form.Controls.AddRange(new Control[] { title, head, hint, pathBox, browse, found, install, remove, report, log });
 		form.ClientSize = new Size(660, y + 390);
-		var update = new LinkLabel { Location = new Point(390, y + 92), Size = new Size(254, 50), Visible = false };
+		var update = new LinkLabel { Location = new Point(534, y + 92), Size = new Size(112, 50), Visible = false };
 		form.Controls.Add(update);
 		new Thread(() => CheckUpdate(update)) { IsBackground = true }.Start();
 
@@ -96,6 +104,7 @@ static class WowGU
 				if (d.ShowDialog(form) == DialogResult.OK) pathBox.Text = d.SelectedPath;
 		};
 		install.Click += delegate { RunJob(Install); };
+		report.Click += delegate { RunJob(Report); };
 		remove.Click += delegate
 		{
 			if (MessageBox.Show(form, "Удалить GU-WOW из этой папки игры?", "GU-WOW", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
@@ -149,6 +158,240 @@ static class WowGU
 			}));
 		}
 		catch { }
+	}
+
+	// ------------------------------------------------------------------ report watcher
+
+	// One instance: a named mutex. The watcher polls the saved variables every 20 s; a report block whose
+	// "when" it has not sent yet goes to GitHub. With a token (a fine-grained PAT limited to the GU-wow repo,
+	// issues only, in %APPDATA%\GU-WOW\github_token.txt) the issue is created quietly and a tray balloon says
+	// thanks; without one the prefilled issue page opens in the browser, and the player presses Submit.
+	static void Watch()
+	{
+		bool fresh;
+		using (var mutex = new Mutex(true, "GUWOW_WATCH_" + current.Dir.GetHashCode().ToString("X"), out fresh))
+		{
+			if (!fresh) return;
+			ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+			var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GU-WOW");
+			Directory.CreateDirectory(appData);
+			var sentFile = Path.Combine(appData, "sent.txt");
+			// No icon in the tray: it shows only for the moment of a Windows balloon, which needs one, and hides again.
+			var tray = new NotifyIcon { Icon = System.Drawing.SystemIcons.Information, Visible = false, Text = "GU-WOW" };
+			var hide = new System.Windows.Forms.Timer { Interval = 12000 };
+			hide.Tick += delegate { hide.Stop(); tray.Visible = false; };
+			Action<string, ToolTipIcon> notify = (text, icon) =>
+			{
+				tray.Visible = true;
+				tray.ShowBalloonTip(8000, "GU-WOW", text, icon);
+				hide.Stop();
+				hide.Start();
+			};
+			var timer = new System.Windows.Forms.Timer { Interval = 5000 };
+			timer.Tick += delegate
+			{
+				try
+				{
+					var sent = File.Exists(sentFile) ? File.ReadAllLines(sentFile).ToList() : new List<string>();
+					var wtf = Path.Combine(current.Dir, "WTF");
+					if (!Directory.Exists(wtf)) return;
+					foreach (var sv in Directory.GetFiles(wtf, "LegionGU.lua", SearchOption.AllDirectories))
+					{
+						var m = Regex.Match(File.ReadAllText(sv), @"\[""report""\]\s*=\s*\{([^}]*)\}", RegexOptions.Singleline);
+						if (!m.Success) continue;
+						var note = m.Groups[1].Value;
+						var when = Regex.Match(note, @"\[""when""\]\s*=\s*""([^""]*)""").Groups[1].Value;
+						if (when.Length == 0 || sent.Contains(when)) continue;
+						string title, body;
+						BuildReport(note, out title, out body);
+						if (PostIssue(title, body))
+							notify("Спасибо. Сообщение об ошибке доставлено разработчику.", ToolTipIcon.Info);
+						else
+						{
+							Process.Start("https://github.com/iievan/GU-wow/issues/new?title=" + Uri.EscapeDataString(title) + "&body=" + Uri.EscapeDataString(body));
+							notify("Ошибка при отправке сообщения об ошибке. Открыта страница GitHub: нажмите Submit.", ToolTipIcon.Warning);
+						}
+						sent.Add(when);
+						File.WriteAllLines(sentFile, sent.ToArray());
+					}
+				}
+				catch { }
+			};
+			timer.Start();
+			Application.Run();
+		}
+	}
+        // The report key: a fine-grained token limited to the GU-wow repo, issues only. Stored scrambled so the
+        // public source does not carry it in plain text; a file in %APPDATA% overrides it.
+        const string ReportKey = "IDwjJyJPMh8OGjNYRW81IjchKx5lFHgfaiIsXx4NWh91OVwqJ1wuM2MrAF8OK1onHgwgRTAuNQsNKz8OOWF1CD0gCj4KQ0gzBzkFCXcTZAMDb188W181Oz1FFCoz";
+        static string ReportToken()
+        {
+                var b = Convert.FromBase64String(ReportKey);
+                var k = Encoding.UTF8.GetBytes("GUWOW-moonlit-flame");
+                for (int i = 0; i < b.Length; i++) b[i] ^= k[i % k.Length];
+                return Encoding.UTF8.GetString(b);
+        }
+
+	static bool PostIssue(string title, string body)
+	{
+		try
+		{
+			var tokenFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"GU-WOW\github_token.txt");
+            var token = File.Exists(tokenFile) ? File.ReadAllText(tokenFile).Trim() : ReportToken();
+			if (token.Length < 10) return false;
+			using (var w = new WebClient())
+			{
+				w.Headers.Add("User-Agent", "GU-WOW-report");
+				w.Headers.Add("Authorization", "token " + token);
+				w.Headers.Add("Accept", "application/vnd.github+json");
+				w.Encoding = Encoding.UTF8;
+				var json = "{\"title\":" + Js(title) + ",\"body\":" + Js(body) + ",\"labels\":[\"player-report\"]}";
+				w.UploadString("https://api.github.com/repos/iievan/GU-wow/issues", "POST", json);
+				return true;
+			}
+		}
+		catch { return false; }
+	}
+
+	static string Js(string v)
+	{
+		var sb = new StringBuilder("\"");
+		foreach (var ch in v)
+		{
+			if (ch == '"' || ch == '\\') sb.Append('\\').Append(ch);
+			else if (ch == '\n') sb.Append("\\n");
+			else if (ch == '\r') { }
+			else if (ch < ' ') sb.Append(' ');
+			else sb.Append(ch);
+		}
+		return sb.Append('\"').ToString();
+	}
+
+	// The issue text from the in-game note plus the machine and the logs.
+	static void BuildReport(string note, out string title, out string body)
+	{
+		title = "Сбой GU-WOW";
+		var sb = new StringBuilder();
+		var mt = Regex.Match(note, @"\[""title""\]\s*=\s*""([^""]*)""");
+		if (mt.Success && mt.Groups[1].Value.Length > 0) title = mt.Groups[1].Value;
+		sb.AppendLine("## Отчёт из игры");
+		foreach (Match kv in Regex.Matches(note, @"\[""(\w+)""\]\s*=\s*""?([^"",\n]*)""?,"))
+			sb.AppendLine("- " + kv.Groups[1].Value + ": " + kv.Groups[2].Value.Trim());
+		sb.AppendLine();
+		sb.AppendLine("## Машина и установка");
+		sb.AppendLine("- Установщик: " + Version);
+		sb.AppendLine("- Клиент: " + current.Name + " " + current.Major + "." + current.Minor + "." + current.Patch + (current.X64 ? " x64" : " x86"));
+		sb.AppendLine("- Windows: " + Environment.OSVersion.VersionString);
+		sb.AppendLine("- Экран: " + Screen.PrimaryScreen.Bounds.Width + "x" + Screen.PrimaryScreen.Bounds.Height);
+		foreach (var key in new[] { "gxWindow", "gxMaximize", "gxFullscreenResolution", "RenderScale", "MSAAQuality", "gxMultisample" })
+		{
+			var v = ConfigValue(current.Dir, key);
+			if (v.Length > 0) sb.AppendLine("- " + key + ": " + v);
+		}
+		try
+		{
+			var rlog = Path.Combine(current.Dir, "ReShade.log");
+			if (File.Exists(rlog))
+			{
+				var bad = File.ReadAllLines(rlog).Where(l => l.Contains("ERROR") || l.Contains("WARN")).ToArray();
+				sb.AppendLine();
+				sb.AppendLine("## ReShade.log: ошибки и предупреждения (" + bad.Length + ")");
+				foreach (var l in bad.Skip(Math.Max(0, bad.Length - 15))) sb.AppendLine("    " + l.Trim());
+			}
+			var errDir = Path.Combine(current.Dir, "Errors");
+			if (Directory.Exists(errDir))
+			{
+				var last = new DirectoryInfo(errDir).GetFiles("*.txt").OrderByDescending(x => x.LastWriteTime).FirstOrDefault();
+				if (last != null && (DateTime.Now - last.LastWriteTime).TotalDays < 7)
+				{
+					sb.AppendLine();
+					sb.AppendLine("## Свежий вылет игры: " + last.Name);
+					foreach (var l in File.ReadLines(last.FullName).Take(22)) sb.AppendLine("    " + l);
+				}
+			}
+		}
+		catch { }
+		body = sb.ToString();
+		if (body.Length > 5500) body = body.Substring(0, 5500) + "\n(обрезано)";
+	}
+
+	// ------------------------------------------------------------------ bug report
+
+	// The report: the note the player saved in game (/gu report), the tail of ReShade.log, the latest game
+	// error and the machine, folded into a GitHub issue link that opens in the browser prefilled. Nothing is
+	// sent by the installer itself: the player sees the whole text on the page and presses Submit there, so
+	// no token lives in this file and nothing leaves without their eyes on it.
+	static void Report()
+	{
+		var sb = new StringBuilder();
+		string title = "Сбой GU-WOW";
+		try
+		{
+			// The in-game note (/gu report) from the saved variables of any account.
+			var wtf = Path.Combine(current.Dir, "WTF");
+			string note = null;
+			if (Directory.Exists(wtf))
+				foreach (var sv in Directory.GetFiles(wtf, "LegionGU.lua", SearchOption.AllDirectories))
+				{
+					var text = File.ReadAllText(sv);
+					var m = Regex.Match(text, @"\[""report""\]\s*=\s*\{([^}]*)\}", RegexOptions.Singleline);
+					if (m.Success) note = m.Groups[1].Value;
+				}
+			if (note != null)
+			{
+				var mt = Regex.Match(note, @"\[""title""\]\s*=\s*""([^""]*)""");
+				if (mt.Success && mt.Groups[1].Value.Length > 0) title = mt.Groups[1].Value;
+				sb.AppendLine("## Отчёт из игры");
+				foreach (Match kv in Regex.Matches(note, @"\[""(\w+)""\]\s*=\s*""?([^"",\n]*)""?,"))
+					sb.AppendLine("- " + kv.Groups[1].Value + ": " + kv.Groups[2].Value.Trim());
+				sb.AppendLine();
+			}
+			else
+			{
+				sb.AppendLine("## Отчёт из игры");
+				sb.AppendLine("(в игре /gu report не заполнялся)");
+				sb.AppendLine();
+			}
+			sb.AppendLine("## Машина и установка");
+			sb.AppendLine("- Установщик: " + Version);
+			sb.AppendLine("- Клиент: " + current.Name + " " + current.Major + "." + current.Minor + "." + current.Patch + (current.X64 ? " x64" : " x86"));
+			sb.AppendLine("- Windows: " + Environment.OSVersion.VersionString);
+			sb.AppendLine("- Экран: " + Screen.PrimaryScreen.Bounds.Width + "x" + Screen.PrimaryScreen.Bounds.Height);
+			foreach (var key in new[] { "gxWindow", "gxMaximize", "gxFullscreenResolution", "RenderScale", "MSAAQuality", "gxMultisample" })
+			{
+				var v = ConfigValue(current.Dir, key);
+				if (v.Length > 0) sb.AppendLine("- " + key + ": " + v);
+			}
+			var rlog = Path.Combine(current.Dir, "ReShade.log");
+			if (File.Exists(rlog))
+			{
+				var lines = File.ReadAllLines(rlog);
+				var bad = lines.Where(l => l.Contains("ERROR") || l.Contains("WARN")).ToArray();
+				sb.AppendLine();
+				sb.AppendLine("## ReShade.log: ошибки и предупреждения (" + bad.Length + ")");
+				foreach (var l in bad.Skip(Math.Max(0, bad.Length - 15))) sb.AppendLine("    " + l.Trim());
+				if (bad.Length == 0) sb.AppendLine("(чисто)");
+			}
+			var errDir = Path.Combine(current.Dir, "Errors");
+			if (Directory.Exists(errDir))
+			{
+				var last = new DirectoryInfo(errDir).GetFiles("*.txt").OrderByDescending(x => x.LastWriteTime).FirstOrDefault();
+				if (last != null && (DateTime.Now - last.LastWriteTime).TotalDays < 7)
+				{
+					sb.AppendLine();
+					sb.AppendLine("## Свежий вылет игры: " + last.Name);
+					foreach (var l in File.ReadLines(last.FullName).Take(22)) sb.AppendLine("    " + l);
+				}
+			}
+		}
+		catch (Exception e) { sb.AppendLine("(сбор данных прервался: " + e.Message + ")"); }
+		var body = sb.ToString();
+		if (body.Length > 5500) body = body.Substring(0, 5500) + "\n(обрезано)";
+		var url = "https://github.com/iievan/GU-wow/issues/new?title=" + Uri.EscapeDataString(title) + "&body=" + Uri.EscapeDataString(body);
+		Say("Отчёт собран. Открываю страницу GitHub: проверьте текст и нажмите Submit new issue.");
+		Say("Если страница не открылась, отчёт лежит в буфере обмена.");
+		try { Clipboard.SetText("# " + title + "\n\n" + body); } catch { }
+		Process.Start(url);
 	}
 
 	// ------------------------------------------------------------------ client detection
@@ -237,6 +480,14 @@ static class WowGU
 			Say("Закройте игру и нажмите «Установить» ещё раз.");
 			return;
 		}
+		// Other copies of GU-WOW.exe (the report watcher of an earlier install) hold the exe and files: they
+		// are stopped, the fresh watcher starts again at the end of the install.
+		try
+		{
+			foreach (var p in Process.GetProcessesByName("GU-WOW"))
+				if (p.Id != Process.GetCurrentProcess().Id) { p.Kill(); p.WaitForExit(3000); }
+		}
+		catch { }
 		// An update over an earlier GU-WOW: the player's own choices in ReShade.ini stay.
 		bool updating = File.Exists(G(Marker));
 		var marker = ReadMarker();
@@ -374,6 +625,38 @@ static class WowGU
 			if (current.Major >= 6) ConfigSet(cfg, "MSAAQuality", "0"); else ConfigSet(cfg, "gxMultisample", "1");
 			Say("Сглаживание MSAA выключено, копия настроек: WTF\\Config.wtf.wowgu-backup.");
 		}
+		// The report watcher: the player is asked once. Yes puts it into HKCU Run (no admin rights) and starts
+		// it now; the in-game report then leaves within seconds. No keeps the machine untouched: the marker
+		// remembers the refusal, and the in-game report falls back to the browser page. In the CLI (our own
+		// automated installs) the question is skipped and the watcher is set.
+		if (!marker.ContainsKey("watch"))
+		{
+			bool wants = cliLog != null || MessageBox.Show(form,
+				"Поставить помощника поддержки?\n\n" +
+				"Это абсолютно нулевой по нагрузке хелпер: он доставляет ваши сообщения об ошибках разработчику напрямую в GitHub, " +
+				"когда вы сами нажимаете «Отправить» на странице модификации. Сам по себе он никуда ничего не шлёт и читает только файлы игры.\n\n" +
+				"Если не согласны, нажмите «Не нужно»: мод работает полностью, отчёты будут открываться страницей в браузере.",
+				"GU-WOW: помощник поддержки", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+				MessageBoxDefaultButton.Button1) == DialogResult.Yes;
+			marker["watch"] = wants ? "1" : "0";
+		}
+		if (marker["watch"] == "1")
+		{
+			try
+			{
+				var me = Assembly.GetExecutingAssembly().Location;
+				Microsoft.Win32.Registry.SetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run",
+					"GU-WOW-Watch", "\"" + me + "\" --watch \"" + current.Dir + "\"");
+				Process.Start(new ProcessStartInfo(me, "--watch \"" + current.Dir + "\"") { UseShellExecute = false });
+				Say("Помощник поддержки поставлен: сообщения об ошибках уходят разработчику по вашей кнопке «Отправить». Снимается удалением мода.");
+			}
+			catch { }
+		}
+		else
+		{
+			try { Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true).DeleteValue("GU-WOW-Watch", false); } catch { }
+			Say("Помощник поддержки не ставился: отчёты об ошибках будут открываться страницей в браузере.");
+		}
 		WriteMarker(marker);
 		Say("");
 		// Only the keys the player really has.
@@ -386,6 +669,8 @@ static class WowGU
 	static void Uninstall()
 	{
 		var marker = ReadMarker();
+		// The report watcher goes with the mod.
+		try { Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true).DeleteValue("GU-WOW-Watch", false); } catch { }
 		foreach (var f in new[] { @"reshade-shaders\Shaders\LegionGUbylevan.fx", @"reshade-shaders\Shaders\LegionGUNightsbylevan.fx", @"reshade-shaders\Textures\LegionGUMask.png", Preset })
 			if (File.Exists(G(f))) File.Delete(G(f));
 		if (Directory.Exists(G(@"Interface\AddOns\LegionGU"))) Directory.Delete(G(@"Interface\AddOns\LegionGU"), true);

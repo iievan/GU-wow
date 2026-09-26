@@ -160,8 +160,9 @@
 #define LEGIONGU_CTL_FACING 23   // the player's facing, 0..1 for a full turn counterclockwise from north
 #define LEGIONGU_CTL_MIST_HIGH 24 // how much of the low mist stays seen from above, 1.6.0
 #define LEGIONGU_CTL_RAY_DEF 25  // ray definition: 0 a soft glow, 1 separate wide beams
+#define LEGIONGU_CTL_MIST_FLOW 26 // the drift of the ground mist, 0 still, 1.6.8
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 55    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 57    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -170,7 +171,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 26; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 27; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -241,6 +242,13 @@ int LegionGUStyleValue()
 bool LegionGUExtra(uint bit)
 {
 	return LegionGUPanel() && (uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_EXTRA, 0)).x * 63.0 + 0.5) & bit) != 0u;
+}
+
+// The depth check view (/gu check in the game chat, extra bit 16): the effects draw the depth instead of the
+// picture, so a player sees in one look whether the depth works.
+bool LegionGUCheckView()
+{
+	return LegionGUPanel() && (uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_EXTRA, 0)).x * 63.0 + 0.5) & 16u) != 0u;
 }
 
 // The player's facing in radians, counterclockwise from north, quantised to a 64th of a turn; 0 without the panel.
@@ -1078,6 +1086,7 @@ namespace LegionGUNights
 	static const float SRC_RING2 = 4.5;
 	static const float STRIP_RUN = 4.5;
 	static const float STRIP_TALL = 2.5;
+	static const float CHAR_YD = 12.0;       // yards: nearer geometry is a character or gear, not a lamp (1.6.8)
 	static const float UI_SRC_FROM = 0.2;
 	static const float UI_SRC_FULL = 0.4;
 	// The UI at night: under the UI mask, what is brighter than UI_KEEP_FROM times the ambient (fully from
@@ -1275,10 +1284,12 @@ namespace LegionGUNights
 		return tau > 0.0 ? 1.0 - exp(-dt / tau) : 1.0;
 	}
 
-	// Last frame's duration in seconds, clamped like the original (0..0.5 s).
+	// Last frame's duration in seconds. The original clamps at 0.5, but when the game stutters it draws a few
+	// frames a second, each carries a huge dt, and every eased state leaps a visible step per frame (1.6.9).
+	// Clamped at 0.1 a transition through a stutter takes more wall time and stays smooth to the eye.
 	float FrameSeconds()
 	{
-		return clamp(FrameTime * 0.001, 0.0, 0.5);
+		return clamp(FrameTime * 0.001, 0.0, 0.1);
 	}
 
 	// 1 where the painted mask says "UI", 0 on the world.
@@ -2063,6 +2074,11 @@ namespace LegionGUNights
 		float u = DepthU(RawDepth(bestUV), EffectiveReversed(tex2Dfetch(FogCur, int2(1, 0)).w));
 		if (IsSky(u))
 			return float4(0.0, 0.0, 0.0, 0.0);
+		// Mobs, players and gear never glow (1.6.8): bright spots on geometry nearer than CHAR_YD are the game
+		// lighting a model, not a light of its own, unless the spot is a nearly clipped flame core. A campfire at
+		// your feet and a hand-held torch clip to white and keep their glow; lit armour and pale mobs do not.
+		if (Yards(u) < CHAR_YD && peak < LIGHT_WHITE.x)
+			return float4(0.0, 0.0, 0.0, 0.0);
 
 		float around = 0.0;
 		[unroll]
@@ -2407,6 +2423,12 @@ namespace LegionGUNights
 			float4 n8 = tex2Dfetch(FogCur, int2(8, 0));
 			float2 dm = (uv - n8.xy) * float2(ASPECT, 1.0);
 			float3 mist = MIST_COLOUR * (1.0 + MIST_MOON * n8.z * exp(-dot(dm, dm) / (2.0 * MIST_MOON_R * MIST_MOON_R)));
+			// The fires warm the night mist near them (1.6.8): the air glow field tints the moonlit veil, so a lit
+			// camp sits in a warm pocket of the cold night fog.
+			float4 fireAir = tex2Dlod(AirS, float4(uv, 0.0, 0.0));
+			float fireL = saturate(dot(fireAir.rgb, LUMA601) * 20.0);
+			if (fireL > 0.0)
+				mist = lerp(mist, mist * 2.2 * (fireAir.rgb / max(dot(fireAir.rgb, LUMA601), 1e-5)), 0.6 * fireL);
 			o += max(mist - o, 0.0) * (fm * km * depthState.x);
 		}
 		return o + air * (1.0 - saturate(o));
@@ -3275,7 +3297,7 @@ namespace LegionGUNights
 	{
 		int2 p = int2(pos.xy);
 		float4 c4 = tex2Dfetch(ColorPoint, p);
-		if (!LegionGUOn(1u) || LegionGUInStrip(pos.xy))
+		if (!LegionGUOn(1u) || LegionGUInStrip(pos.xy) || LegionGUCheckView())
 			return c4;
 		float3 c = c4.rgb;
 
@@ -3299,7 +3321,9 @@ namespace LegionGUNights
 				float ax = uv.x + LegionGUFacingRad() / (2.0 * atan(0.57735 * ASPECT));
 				float ly = log2(max(hzY, 1.0));
 				float2 wob = float2(sin(ly * 160.0 + ht * 5.0 + sin(ax * 37.0 + ht * 1.7) * 2.0), 0.5 * sin(ly * 120.0 - ht * 4.1 + ax * 23.0));
-				float2 off = wob * hz * HAZE_PX * LegionGUValue(LEGIONGU_CTL_HAZE, 50.0) * 0.02 * (float(BUFFER_HEIGHT) / 1080.0) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+				// The interface never wavers (1.6.9): the chat and the bars are drawn into the frame the haze bends,
+				// so the shift dies under the UI mask.
+				float2 off = wob * hz * HAZE_PX * LegionGUValue(LEGIONGU_CTL_HAZE, 50.0) * 0.02 * (float(BUFFER_HEIGHT) / 1080.0) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT) * (1.0 - saturate(UIMask(uv) * 8.0));
 				c = tex2Dlod(ColorLinear, float4(uv + off, 0.0, 0.0)).rgb;
 			}
 		}
@@ -3417,11 +3441,28 @@ namespace LegionGUNights
 		}
 
 		// A light vignette: the corners a little darker, the middle as it is.
-		float v = LegionGUValue(LEGIONGU_CTL_VIGNETTE, Vignette) * 0.01;
+		// The vignette closes a touch more at night (1.6.8): the eye narrows in the dark, and the night frame
+		// reads more cinematic. The player's slider stays in charge, this adds at most a fifth of it.
+		float v = LegionGUValue(LEGIONGU_CTL_VIGNETTE, Vignette) * 0.01 * (1.0 + 0.2 * tex2Dfetch(FogCur, int2(4, 0)).x);
 		if (v > 0.0)
 		{
 			float2 d = uv * 2.0 - 1.0;
 			c *= 1.0 - v * VIGNETTE_MAX * smoothstep(0.5, 2.0, dot(d, d));
+		}
+
+		// Stars twinkle (1.6.8): at night by the game clock, tiny bright points in the dark sky breathe a few
+		// percent with time. Only pixels that are sky by depth, dark around yet bright themselves, qualify: the
+		// moon is far above the threshold and stays steady.
+		float nightTw = LegionGUNight();
+		if (nightTw > 0.0)
+		{
+			float twU = DepthU(RawDepth(uv), EffectiveReversed(tex2Dfetch(FogCur, int2(1, 0)).w));
+			float lTw = dot(c, LUMA601);
+			if (IsSky(twU) && lTw > 0.09 && lTw < 0.55)
+			{
+				float tw = sin(GUTimer * 0.001 * (2.0 + 3.0 * frac(dot(pos.xy, float2(0.0711, 0.0937)))) + dot(pos.xy, float2(0.31, 0.17)));
+				c *= 1.0 + 0.10 * nightTw * tw * smoothstep(0.09, 0.2, lTw);
+			}
 		}
 
 		// Film grain (the slider): a new pattern every frame, strongest in the middle tones. The same hash also
@@ -3550,10 +3591,16 @@ namespace LegionGUNights
 		if (!PhotoOn() || LegionGUInStrip(pos.xy))
 			return c;
 		float4 b = tex2Dlod(DofBlur, float4(uv, 0.0, 0.0));
-		// The cinema frame (the addon's option): black bars to 2.39 : 1 on a narrower screen.
+		// The cinema frame (the addon's option): black bars to 2.39 : 1 on a narrower screen, with a soft inner
+		// edge of a few pixels instead of a hard cut (1.6.8).
 		float bar = 0.5 * saturate(1.0 - float(BUFFER_WIDTH) / float(BUFFER_HEIGHT) / 2.39);
-		if (LegionGUStyleValue() >= 8 && (uv.y < bar || uv.y > 1.0 - bar))
-			return float4(0.0, 0.0, 0.0, c.a);
+		if (LegionGUStyleValue() >= 8 && bar > 0.0)
+		{
+			float edge = 4.0 * BUFFER_RCP_HEIGHT;
+			float inBar = min(smoothstep(bar - edge, bar, uv.y), smoothstep(bar - edge, bar, 1.0 - uv.y));
+			float3 dofC = lerp(c.rgb, b.rgb, smoothstep(0.05, 0.3, b.a));
+			return float4(dofC * inBar, c.a);
+		}
 		return float4(lerp(c.rgb, b.rgb, smoothstep(0.05, 0.3, b.a)), c.a);
 	}
 

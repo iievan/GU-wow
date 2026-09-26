@@ -1,5 +1,79 @@
 # GU-WOW: история версий / Version history
 
+## 1.6.9-release «Живой огонь» / "Living Flame"
+
+### Русский
+
+**Новое**
+- Меню собрано заново, четыре страницы: «GU-WOW» — приветствие с подсказками, самолечением и сообщением об ошибке; «Основные» — атмосфера, ночь, картинка и пресеты; «Дополнительно» — стили, коды, свои пресеты, поведение и движение тумана; «Фоторежим» — только снимки.
+- Самолечение: команда /gu fix и кнопка на странице «Профили и фото» чинят сбои на месте — битые настройки, зависший предпросмотр, забытый вид проверки, слетевшую подложку чата — и называют, что именно починили. Если дело в сглаживании или устаревшей установке, команда прямо говорит, что сделать.
+- Марево не гнёт интерфейс: чат и панели не плывут жаровыми волнами в пустыне.
+- Страницы GU-WOW вписываются в стандартное окно настроек сами: окно не растягивается, ползунок масштаба меню не нужен и убран.
+- Окно описания в «Сообщить об ошибке» принимает клик и ввод.
+- Сообщение об ошибке одной кнопкой из игры: /gu report или кнопка на странице GU-WOW, название и описание, «Отправить» — и всё. Служебные данные (версия, настройки, логи, свежий вылет) прилагаются сами. Доставку ведёт тихий фоновый помощник без значка в трее: установщик спрашивает согласие («Не нужно» — отказ, мод работает полностью). После «Отправить» интерфейс перезагружается на пару секунд (окно отчёта предупреждает об этом заранее), и отчёт сразу уходит на GitHub; уведомление Windows говорит «доставлено» или «ошибка при отправке». Сам по себе помощник никуда ничего не шлёт и читает только файлы игры. Кнопка «Сообщить об ошибке» в установщике осталась как запасной путь.
+- Мокрая земля в дождь не рябит: мелкий песок, бегавший по всей земле при движении камеры, убран, земля просто темнеет и блестит.
+- Низовой туман не прыгает на вышках, на холмах и при полёте: на крыше башни и на вершине холма туман над долиной держится ровно при наклоне камеры, а взлёт и посадка плавно меняют его за полторы секунды.
+- Закат без вспышек: свечение солнца в тумане разгорается и гаснет плавно, за пару секунд, даже когда игра подтормаживает. Подтормаживание протаскивало половину перехода за один кадр, и яркость кадра прыгала ступенькой.
+- Дождь без белой пелены: свечение солнца в тумане глушится серым небом так же, как лучи. В дождь искатель солнца ведёт яркое облако, и его свечение заливало кадр жёлто-белым.
+
+### English
+
+**New**
+- The menu is rebuilt into four pages: GU-WOW — a welcome with the hints, the self-heal and the bug report; Main — the atmosphere, the night, the picture and the presets; Extras — styles, codes, your presets, behaviour and the fog motion; Photo mode — only the shots.
+- Self-heal: the /gu fix command and a button on the «Profiles and photo» page mend faults on the spot — broken settings, a stuck preview, a forgotten check view, a lost chat shade — and name what they fixed. When the cause is anti-aliasing or a stale install, the command says exactly what to do.
+- The heat haze does not bend the interface: the chat and the bars no longer wave in the desert.
+- The GU-WOW pages fit themselves into the standard options window: the window does not grow, and the menu scale slider is gone as unneeded.
+- The description box of the bug report takes the click and the typing.
+- A one-button bug report from the game: /gu report or the button on the GU-WOW page, a title and a description, Send — done. The service data (the version, the settings, the logs, the latest crash) is attached for you. A quiet background helper with no tray icon delivers it: the installer asks for consent first (No thanks opts out, the mod works in full). After Send the interface reloads for a couple of seconds (the report window warns about it first) and the report goes to GitHub at once; a Windows balloon says delivered or failed. On its own the helper sends nothing and reads only the game files. The installer button stays as the fallback.
+- Wet ground in the rain does not ripple: the fine sand that crawled over the ground with the camera is gone, the ground simply darkens and shines.
+- The low mist does not jump on towers, on hills and in flight: on a tower top or a hilltop the mist over the valley holds steady as the camera tilts, and take-off and landing change it smoothly over a second and a half.
+- Sunset without flashes: the sun's glow in the fog swells and dies smoothly, over a couple of seconds, even when the game stutters. A stutter used to drag half the transition through one frame, and the frame's brightness jumped in a step.
+- Rain without a white veil: the sun's glow in the fog is muted by a grey sky the same way the rays are. In the rain the sun finder follows a bright cloud, and its glow flooded the frame with yellow-white.
+
+## 1.6.8-release «Живой огонь» / "Living Flame"
+
+### Русский
+
+**Новое**
+- Звёзды мерцают: ночью яркие точки тёмного неба дышат, луна остаётся ровной.
+- Далёкие молнии в грозу: под тяжёлой облачностью днём небо и дальняя земля мягко вспыхивают пару раз в минуту.
+- Золотой час красит и дымку: на рассвете и закате освещённая солнцем сторона тумана золотится вместе с лучами.
+- Виньетка чуть глубже ночью: кадр в темноте собирается к центру, днём как настроено.
+- Кинорамка фоторежима с мягкой внутренней кромкой, без жёсткого среза.
+- Рассвет и закат золотые: около 6:30 и 19:30 по игровым часам лучи солнца и их свечение берут глубокий золотой цвет, к полудню возвращается тёплый белый.
+- Костры греют ночной туман: рядом с огнём холодная лунная дымка становится тёплым карманом света, лагерь ночью выглядит обжитым.
+- Ползунок «Движение тумана» на странице «Профили и фото»: низовой туман медленно плывёт и дышит, проход сквозь него живой. Движение стоит в мире, а не на экране. 0 выключает, как раньше.
+- Клавиша включения и выключения мода назначается в «Управлении» игры, раздел GU-WOW, рядом с фоторежимом и снимком.
+- Команда /gu check показывает проверку глубины прямо из чата, без окна ReShade: близкое светлое, небо чёрное, красная рамка = глубины нет. /gu help перечисляет команды, /gu news показывает новости версии ещё раз.
+- У рискованных ползунков предупреждение: с высоких значений плотности тумана, чёткости лучей, марева, резкости и зерна под ползунком появляется заметка о возможных артефактах.
+
+**Исправлено**
+- Персонажи, мобы и доспехи не светятся ночью сами по себе. Яркое пятно на геометрии ближе 12 ярдов считается подсветкой модели, а не источником света; ядро пламени и факел в руке ярче порога и светят как прежде.
+- Низовой туман не дёргается при повороте камеры: наклон камеры подаётся в оценку земли напрямую из слежения за кадром, сглаживанию остаётся только шум.
+- В меню видно предупреждение, когда включено сглаживание (MSAA): без глубины туман, лучи и ночь не работают, и теперь об этом сказано прямо на странице настроек.
+- Сломанные значения настроек лечатся при входе: число вне допустимого диапазона возвращается к значению по умолчанию, ползунки не клинит.
+
+### English
+
+**New**
+- Stars twinkle: at night the bright points of the dark sky breathe, the moon stays steady.
+- Distant lightning in a storm: under a heavy overcast by day the sky and the far land flash softly a couple of times a minute.
+- The golden hour paints the haze too: at sunrise and sunset the sunlit side of the fog turns gold with the rays.
+- The vignette sits a touch deeper at night: the frame gathers to the centre in the dark, the day keeps your value.
+- The photo cinema bars have a soft inner edge, no hard cut.
+- Sunrise and sunset are golden: around 6:30 and 19:30 by the game clock the sun rays and their glow take a deep gold, back to warm white by noon.
+- Fires warm the night mist around them: near a flame the cold moonlit veil becomes a warm pocket of light, a camp at night looks lived-in.
+- A fog motion slider on the «Profiles and photo» page: the ground mist slowly flows and breathes, walking through it feels alive. The motion stands in the world, not on the screen. 0 turns it off.
+- The mod toggle key is set in the game Key Bindings, GU-WOW section, next to photo mode and the screenshot.
+- /gu check shows the depth check right from the chat, no ReShade window: near is bright, the sky is black, a red border means no depth. /gu help lists the commands, /gu news shows the version news again.
+- Risky sliders warn: from high values of mist thickness, ray definition, heat haze, sharpness and grain a note under the slider says artifacts are possible.
+
+**Fixed**
+- Characters, mobs and gear do not glow at night by themselves. A bright spot on geometry nearer than 12 yards is the game lighting a model, not a light source; a flame core and a hand-held torch are brighter than the bar and glow as before.
+- The ground mist does not jerk on camera turns: the camera tilt feeds the ground estimate straight from the frame tracking, and the smoothing keeps only the noise.
+- The menu warns when anti-aliasing (MSAA) is on: without depth the fog, the rays and the night cannot work, and the settings page now says so.
+- Broken saved values heal on login: a number out of its range returns to the default, sliders cannot get stuck.
+
 ## 1.6.7-release «Живой огонь» / "Living Flame"
 
 ### Русский
