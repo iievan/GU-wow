@@ -254,7 +254,7 @@ static class WowGU
 	}
         // The report key: a fine-grained token limited to the GU-wow repo, issues only. Stored scrambled so the
         // public source does not carry it in plain text; a file in %APPDATA% overrides it.
-        const string ReportKey = "IDwjJyJPMh8OGjNYRW81IjchKx5lFHgfaiIsXx4NWh91OVwqJ1wuM2MrAF8OK1onHgwgRTAuNQsNKz8OOWF1CD0gCj4KQ0gzBzkFCXcTZAMDb188W181Oz1FFCoz";
+        const string ReportKey = "IDwjJyJPMh8OGjNYRW81IjchKx5lNjZkeAg8VgUoMTYUOSgqCCNxAB08BlUKORU8IB8HTzEkNR4LCDMuCSF6NBsDFh0BNx1TBVZbIQIUDh0RYjhaJiFaPT18NxsE";
         static string ReportToken()
         {
                 var b = Convert.FromBase64String(ReportKey);
