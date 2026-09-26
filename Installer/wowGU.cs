@@ -16,6 +16,17 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
+// The exe's passport: SmartScreen and the antiviruses weigh a file with no product name, author or version
+// harder than one that names itself. The numeric version must be digits only, so "-release" stays out of it.
+[assembly: AssemblyTitle("GU-WOW")]
+[assembly: AssemblyProduct("GU-WOW")]
+[assembly: AssemblyDescription("GU-WOW: fog, sun rays, night and picture for World of Warcraft. Installer and support helper.")]
+[assembly: AssemblyCompany("levan")]
+[assembly: AssemblyCopyright("© 2026 levan")]
+[assembly: AssemblyVersion("1.7.0")]
+[assembly: AssemblyFileVersion("1.7.0")]
+[assembly: AssemblyInformationalVersion("1.7.0-release")]
+
 class ShotForm : Form
 {
 	public static bool quiet;
@@ -24,7 +35,9 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.6.9-release";
+	const string Version = "1.7.0-release";
+	static readonly bool RU = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru";
+	static string T(string ru, string en) { return RU ? ru : en; }
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
 	// turned out unreachable on laptops, where Scroll Lock needs Fn as well.
 	const string OverlayKey = "116,0,0,0";
@@ -63,7 +76,7 @@ static class WowGU
 			current = Inspect(args[1]);
 			if (current == null) { Say("no game"); return; }
 			try { if (args[0] == "--install") Install(); else Uninstall(); }
-			catch (Exception e) { Say("Ошибка: " + e); }
+			catch (Exception e) { Say(T("Ошибка: ", "Error: ") + e); }
 			return;
 		}
 		Application.EnableVisualStyles();
@@ -71,25 +84,34 @@ static class WowGU
 		var title = new Label { Text = "GU-WOW", Location = new Point(16, 12), Size = new Size(630, 28), Font = new Font("Segoe UI", 13f, FontStyle.Bold) };
 		var head = new Label
 		{
-			Text = "Графическое улучшение World of Warcraft, созданное специально для сообщества Brothers of Turtle.\n\n" +
-			       "Добавляет в игру лучи солнца, туман и дымку, ночь по игровым часам и тёплый свет огней. " +
-			       "Сразу после установки работает с настройками по умолчанию. Изменить их можно в меню игры: " +
-			       "Интерфейс > Модификации > GU-WOW.\n\n" +
-			       "Создано на основе ReShade. © 2026 levan. Эффекты распространяются по лицензии GPL-3.0. " +
-			       "Меню в игре, установщик и готовая настройка распространяются по лицензии автора: изменённые версии и клоны только с его согласия.\n\n" +
-			       "Неофициальный любительский проект. Не связан с Blizzard Entertainment и не претендует на её " +
-			       "интеллектуальную собственность. World of Warcraft является товарным знаком Blizzard Entertainment, Inc.",
+			Text = T(
+				"Графическое улучшение World of Warcraft, созданное специально для сообщества Brothers of Turtle.\n\n" +
+				"Добавляет в игру лучи солнца, туман и дымку, ночь по игровым часам и тёплый свет огней. " +
+				"Сразу после установки работает с настройками по умолчанию. Изменить их можно в меню игры: " +
+				"Интерфейс > Модификации > GU-WOW.\n\n" +
+				"Создано на основе ReShade. © 2026 levan. Эффекты распространяются по лицензии GPL-3.0. " +
+				"Меню в игре, установщик и готовая настройка распространяются по лицензии автора: изменённые версии и клоны только с его согласия.\n\n" +
+				"Неофициальный любительский проект. Не связан с Blizzard Entertainment и не претендует на её " +
+				"интеллектуальную собственность. World of Warcraft является товарным знаком Blizzard Entertainment, Inc.",
+				"A graphics enhancement for World of Warcraft, made especially for the Brothers of Turtle community.\n\n" +
+				"Adds sun rays, fog and haze, night that follows the in-game clock, and warm firelight. " +
+				"Works with default settings right after install. You can change them in the game menu: " +
+				"Interface > AddOns > GU-WOW.\n\n" +
+				"Built on ReShade. © 2026 levan. The effects are distributed under the GPL-3.0 license. " +
+				"The in-game menu, the installer and the ready-made preset are distributed under the author's license: modified versions and clones only with his consent.\n\n" +
+				"An unofficial fan project. Not affiliated with Blizzard Entertainment and claims none of its " +
+				"intellectual property. World of Warcraft is a trademark of Blizzard Entertainment, Inc."),
 			Location = new Point(16, 44), AutoSize = true, MaximumSize = new Size(630, 0), Font = new Font("Segoe UI", 10f)
 		};
 		// Everything below the text follows its real height, which depends on the screen scale.
 		int y = 44 + head.PreferredSize.Height + 10;
-		var hint = new Label { Text = "Укажите папку игры с Wow.exe или Wow-64.exe и нажмите «Установить».", Location = new Point(16, y), Size = new Size(630, 24) };
+		var hint = new Label { Text = T("Укажите папку игры с Wow.exe или Wow-64.exe и нажмите «Установить».", "Point to the game folder with Wow.exe or Wow-64.exe and press Install."), Location = new Point(16, y), Size = new Size(630, 24) };
 		pathBox = new TextBox { Location = new Point(16, y + 28), Size = new Size(520, 26) };
-		var browse = new Button { Text = "Обзор…", Location = new Point(544, y + 26), Size = new Size(100, 30) };
+		var browse = new Button { Text = T("Обзор…", "Browse…"), Location = new Point(544, y + 26), Size = new Size(100, 30) };
 		found = new Label { Location = new Point(16, y + 62), Size = new Size(630, 24), ForeColor = Color.DimGray };
-		install = new Button { Text = "Установить", Location = new Point(16, y + 92), Size = new Size(200, 40), Font = new Font("Segoe UI", 11f, FontStyle.Bold) };
-		remove = new Button { Text = "Удалить", Location = new Point(228, y + 92), Size = new Size(120, 40) };
-		var report = new Button { Text = "Сообщить об ошибке", Location = new Point(356, y + 92), Size = new Size(170, 40) };
+		install = new Button { Text = T("Установить", "Install"), Location = new Point(16, y + 92), Size = new Size(200, 40), Font = new Font("Segoe UI", 11f, FontStyle.Bold) };
+		remove = new Button { Text = T("Удалить", "Remove"), Location = new Point(228, y + 92), Size = new Size(120, 40) };
+		var report = new Button { Text = T("Сообщить об ошибке", "Report a problem"), Location = new Point(356, y + 92), Size = new Size(170, 40) };
 		log = new TextBox { Location = new Point(16, y + 144), Size = new Size(628, 230), Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.White };
 		form.Controls.AddRange(new Control[] { title, head, hint, pathBox, browse, found, install, remove, report, log });
 		form.ClientSize = new Size(660, y + 390);
@@ -100,14 +122,14 @@ static class WowGU
 		pathBox.TextChanged += delegate { Detect(); };
 		browse.Click += delegate
 		{
-			using (var d = new FolderBrowserDialog { Description = "Папка игры (где лежит Wow.exe или Wow-64.exe)" })
+			using (var d = new FolderBrowserDialog { Description = T("Папка игры (где лежит Wow.exe или Wow-64.exe)", "Game folder (where Wow.exe or Wow-64.exe is)") })
 				if (d.ShowDialog(form) == DialogResult.OK) pathBox.Text = d.SelectedPath;
 		};
 		install.Click += delegate { RunJob(Install); };
 		report.Click += delegate { RunJob(Report); };
 		remove.Click += delegate
 		{
-			if (MessageBox.Show(form, "Удалить GU-WOW из этой папки игры?", "GU-WOW", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+			if (MessageBox.Show(form, T("Удалить GU-WOW из этой папки игры?", "Remove GU-WOW from this game folder?"), "GU-WOW", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
 				RunJob(Uninstall);
 		};
 		pathBox.Text = FindGame() ?? "";
@@ -152,7 +174,7 @@ static class WowGU
 				return;
 			form.BeginInvoke((Action)(() =>
 			{
-				link.Text = "Новая сборка " + name + "\nNew build " + name;
+				link.Text = T("Новая сборка ", "New build ") + name;
 				link.LinkClicked += delegate { Process.Start(page); };
 				link.Visible = true;
 			}));
@@ -205,11 +227,11 @@ static class WowGU
 						string title, body;
 						BuildReport(note, out title, out body);
 						if (PostIssue(title, body))
-							notify("Спасибо. Сообщение об ошибке доставлено разработчику.", ToolTipIcon.Info);
+							notify(T("Спасибо. Сообщение об ошибке доставлено разработчику.", "Thank you. The error report has been delivered to the developer."), ToolTipIcon.Info);
 						else
 						{
 							Process.Start("https://github.com/iievan/GU-wow/issues/new?title=" + Uri.EscapeDataString(title) + "&body=" + Uri.EscapeDataString(body));
-							notify("Ошибка при отправке сообщения об ошибке. Открыта страница GitHub: нажмите Submit.", ToolTipIcon.Warning);
+							notify(T("Ошибка при отправке сообщения об ошибке. Открыта страница GitHub: нажмите Submit.", "Sending the error report failed. A GitHub page has been opened: press Submit."), ToolTipIcon.Warning);
 						}
 						sent.Add(when);
 						File.WriteAllLines(sentFile, sent.ToArray());
@@ -388,8 +410,8 @@ static class WowGU
 		var body = sb.ToString();
 		if (body.Length > 5500) body = body.Substring(0, 5500) + "\n(обрезано)";
 		var url = "https://github.com/iievan/GU-wow/issues/new?title=" + Uri.EscapeDataString(title) + "&body=" + Uri.EscapeDataString(body);
-		Say("Отчёт собран. Открываю страницу GitHub: проверьте текст и нажмите Submit new issue.");
-		Say("Если страница не открылась, отчёт лежит в буфере обмена.");
+		Say(T("Отчёт собран. Открываю страницу GitHub: проверьте текст и нажмите Submit new issue.", "The report is ready. Opening the GitHub page: check the text and press Submit new issue."));
+		Say(T("Если страница не открылась, отчёт лежит в буфере обмена.", "If the page did not open, the report is in the clipboard."));
 		try { Clipboard.SetText("# " + title + "\n\n" + body); } catch { }
 		Process.Start(url);
 	}
@@ -419,8 +441,8 @@ static class WowGU
 	{
 		current = Inspect(pathBox.Text.Trim());
 		install.Enabled = remove.Enabled = current != null;
-		found.Text = current == null ? "В этой папке нет Wow.exe или Wow-64.exe." :
-			string.Format("Найдено: {0}, версия {1}.{2}.{3}, {4}, {5}.", current.Name, current.Major, current.Minor, current.Patch, current.X64 ? "64 бит" : "32 бит", current.Api == "dxgi" ? "DirectX 11" : "DirectX 9");
+		found.Text = current == null ? T("В этой папке нет Wow.exe или Wow-64.exe.", "This folder has no Wow.exe or Wow-64.exe.") :
+			string.Format(T("Найдено: {0}, версия {1}.{2}.{3}, {4}, {5}.", "Found: {0}, version {1}.{2}.{3}, {4}, {5}."), current.Name, current.Major, current.Minor, current.Patch, current.X64 ? T("64 бит", "64-bit") : T("32 бит", "32-bit"), current.Api == "dxgi" ? "DirectX 11" : "DirectX 9");
 	}
 
 	static Client Inspect(string dir)
@@ -432,7 +454,7 @@ static class WowGU
 		var v = FileVersionInfo.GetVersionInfo(exe);
 		c.Major = v.FileMajorPart; c.Minor = v.FileMinorPart; c.Patch = v.FileBuildPart;
 		string[] names = { "Classic", "Classic", "The Burning Crusade", "Wrath of the Lich King", "Cataclysm", "Mists of Pandaria", "Warlords of Draenor", "Legion", "Battle for Azeroth", "Shadowlands" };
-		c.Name = c.Major >= 0 && c.Major < names.Length ? names[c.Major] : "современный клиент";
+		c.Name = c.Major >= 0 && c.Major < names.Length ? names[c.Major] : T("современный клиент", "a modern client");
 		var api = ConfigValue(dir, "gxApi").ToLowerInvariant();
 		c.Api = api.Contains("11") || api.Contains("12") ? "dxgi" : api.Contains("9") ? "d3d9" : (c.Major >= 5 && c.X64) || c.Major >= 6 ? "dxgi" : "d3d9";
 		return c;
@@ -460,7 +482,7 @@ static class WowGU
 		new Thread(() =>
 		{
 			try { job(); }
-			catch (Exception e) { Say("Ошибка: " + e.Message); }
+			catch (Exception e) { Say(T("Ошибка: ", "Error: ") + e.Message); }
 			form.BeginInvoke((Action)(() => { install.Enabled = remove.Enabled = true; }));
 		}) { IsBackground = true }.Start();
 	}
@@ -477,7 +499,7 @@ static class WowGU
 	{
 		if (Process.GetProcessesByName(Path.GetFileNameWithoutExtension(current.Exe)).Length > 0)
 		{
-			Say("Закройте игру и нажмите «Установить» ещё раз.");
+			Say(T("Закройте игру и нажмите «Установить» ещё раз.", "Close the game and press Install again."));
 			return;
 		}
 		// Other copies of GU-WOW.exe (the report watcher of an earlier install) hold the exe and files: they
@@ -495,10 +517,10 @@ static class WowGU
 
 		// 1. ReShade with add-on support, unless it is already there.
 		if (IsReShade(G("dxgi.dll")) || IsReShade(G("d3d9.dll")))
-			Say("ReShade уже установлен, оставляю его.");
+			Say(T("ReShade уже установлен, оставляю его.", "ReShade is already installed, keeping it."));
 		else
 		{
-			Say("Скачиваю ReShade с reshade.me…");
+			Say(T("Скачиваю ReShade с reshade.me…", "Downloading ReShade from reshade.me…"));
 			var setup = Path.Combine(Path.GetTempPath(), "ReShade_Setup_6.8.0_Addon.exe");
 			var local = Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "ReShade_Setup_6.8.0_Addon.exe");
 			if (File.Exists(local)) File.Copy(local, setup, true);
@@ -507,11 +529,11 @@ static class WowGU
 				ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
 				using (var w = new WebClient()) w.DownloadFile(ReShadeUrl, setup);
 			}
-			if (Sha256(setup) != ReShadeSha256) { Say("Файл ReShade не совпал с проверенным, установка остановлена."); return; }
-			Say("Устанавливаю ReShade…");
+			if (Sha256(setup) != ReShadeSha256) { Say(T("Файл ReShade не совпал с проверенным, установка остановлена.", "The ReShade file did not match the verified one, the install has been stopped.")); return; }
+			Say(T("Устанавливаю ReShade…", "Installing ReShade…"));
 			var p = Process.Start(new ProcessStartInfo(setup, "\"" + current.Exe + "\" --api " + current.Api + " --headless") { UseShellExecute = false, CreateNoWindow = true });
 			p.WaitForExit();
-			if (p.ExitCode != 0 || !IsReShade(G(dll))) { Say("ReShade не установился (код " + p.ExitCode + ")."); return; }
+			if (p.ExitCode != 0 || !IsReShade(G(dll))) { Say(T("ReShade не установился (код ", "ReShade did not install (code ") + p.ExitCode + ")."); return; }
 			marker["reshade"] = dll;
 		}
 
@@ -530,11 +552,11 @@ static class WowGU
 			int iface = current.Major * 10000 + current.Minor * 100 + (current.Major >= 10 ? current.Patch : 0);
 			var toc = Encoding.UTF8.GetString(Resource("toc")).Replace("70300", iface.ToString());
 			File.WriteAllText(G(@"Interface\AddOns\LegionGU\LegionGU.toc"), toc, new UTF8Encoding(false));
-			Say("Меню в игре: Интерфейс > Модификации > GU-WOW, или команда /gu.");
+			Say(T("Меню в игре: Интерфейс > Модификации > GU-WOW, или команда /gu.", "The in-game menu: Interface > AddOns > GU-WOW, or the /gu command."));
 		}
-		else Say("Меню в игре для этого клиента не ставится: настройки в окне ReShade (Scroll Lock).");
+		else Say(T("Меню в игре для этого клиента не ставится: настройки в окне ReShade (Scroll Lock).", "The in-game menu is not installed for this client: settings live in the ReShade window (Scroll Lock)."));
 		MergePreset();
-		Say("Эффекты и пресет на месте.");
+		Say(T("Эффекты и пресет на месте.", "The effects and the preset are in place."));
 
 		// 3. REST: the effects go under the interface. Its ini carries the Legion 7.3.5 interface shader.
 		if (Legion)
@@ -552,9 +574,9 @@ static class WowGU
 				File.WriteAllText(ini, t);
 			}
 			marker["rest"] = "1";
-			Say("Интерфейс остаётся чистым: туман и солнце его не трогают.");
+			Say(T("Интерфейс остаётся чистым: туман и солнце его не трогают.", "The interface stays clean: fog and sun do not touch it."));
 		}
-		else Say("Для этого клиента туман ложится и на интерфейс: чистый интерфейс пока есть только для Legion 7.3.5.");
+		else Say(T("Для этого клиента туман ложится и на интерфейс: чистый интерфейс пока есть только для Legion 7.3.5.", "On this client the fog covers the interface too: a clean interface is currently only available for Legion 7.3.5."));
 
 		// 4. ReShade.ini: paths, the preset, the keys, the depth buffer.
 		var rs = G("ReShade.ini");
@@ -599,7 +621,7 @@ static class WowGU
 			IniSet(rs, "GENERAL", "IntermediateCachePath", cache, true);
 		if (IniGet(rs, "GENERAL", "IntermediateCachePath") == cache)
 			Directory.CreateDirectory(G(@"reshade-shaders\Cache"));
-		Say("Надпись ReShade при запуске игры сжата до тонкой полосы, собранные эффекты хранятся в папке игры.");
+		Say(T("Надпись ReShade при запуске игры сжата до тонкой полосы, собранные эффекты хранятся в папке игры.", "The ReShade banner at game start is squeezed to a thin strip; the compiled effects are kept in the game folder."));
 		// Without the addon there is no signal from the game world: the effects must not wait for it.
 		if (current.Major < 3)
 		{
@@ -614,7 +636,7 @@ static class WowGU
 			IniSet(rs, "DEPTH", "FilterResolutionWidth", size.Width.ToString(), true);
 			IniSet(rs, "DEPTH", "FilterResolutionHeight", size.Height.ToString(), true);
 			IniSet(rs, "DEPTH", "DepthCopyBeforeClears", "0", true);
-			Say("Буфер глубины: " + size.Width + "x" + size.Height + ". Если поменяете разрешение или масштаб отрисовки, запустите GU-WOW снова.");
+			Say(T("Буфер глубины: ", "Depth buffer: ") + size.Width + "x" + size.Height + T(". Если поменяете разрешение или масштаб отрисовки, запустите GU-WOW снова.", ". If you change the resolution or the render scale, run GU-WOW again."));
 		}
 
 		// 5. Config.wtf: MSAA off, the effects need the depth buffer.
@@ -623,7 +645,7 @@ static class WowGU
 		{
 			if (!File.Exists(cfg + ".wowgu-backup")) File.Copy(cfg, cfg + ".wowgu-backup");
 			if (current.Major >= 6) ConfigSet(cfg, "MSAAQuality", "0"); else ConfigSet(cfg, "gxMultisample", "1");
-			Say("Сглаживание MSAA выключено, копия настроек: WTF\\Config.wtf.wowgu-backup.");
+			Say(T("Сглаживание MSAA выключено, копия настроек: WTF\\Config.wtf.wowgu-backup.", "MSAA anti-aliasing is turned off; a copy of the settings: WTF\\Config.wtf.wowgu-backup."));
 		}
 		// The report watcher: the player is asked once. Yes puts it into HKCU Run (no admin rights) and starts
 		// it now; the in-game report then leaves within seconds. No keeps the machine untouched: the marker
@@ -632,11 +654,15 @@ static class WowGU
 		if (!marker.ContainsKey("watch"))
 		{
 			bool wants = cliLog != null || MessageBox.Show(form,
-				"Поставить помощника поддержки?\n\n" +
+				T("Поставить помощника поддержки?\n\n" +
 				"Это абсолютно нулевой по нагрузке хелпер: он доставляет ваши сообщения об ошибках разработчику напрямую в GitHub, " +
 				"когда вы сами нажимаете «Отправить» на странице модификации. Сам по себе он никуда ничего не шлёт и читает только файлы игры.\n\n" +
 				"Если не согласны, нажмите «Не нужно»: мод работает полностью, отчёты будут открываться страницей в браузере.",
-				"GU-WOW: помощник поддержки", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+				"Install the support helper?\n\n" +
+				"It is a zero-load helper: it delivers your error reports to the developer straight to GitHub " +
+				"when you press Send on the mod's panel yourself. On its own it sends nothing anywhere and only reads game files.\n\n" +
+				"If you would rather not, press No: the mod works fully, and reports will open as a page in the browser."),
+				T("GU-WOW: помощник поддержки", "GU-WOW: support helper"), MessageBoxButtons.YesNo, MessageBoxIcon.Question,
 				MessageBoxDefaultButton.Button1) == DialogResult.Yes;
 			marker["watch"] = wants ? "1" : "0";
 		}
@@ -648,21 +674,21 @@ static class WowGU
 				Microsoft.Win32.Registry.SetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run",
 					"GU-WOW-Watch", "\"" + me + "\" --watch \"" + current.Dir + "\"");
 				Process.Start(new ProcessStartInfo(me, "--watch \"" + current.Dir + "\"") { UseShellExecute = false });
-				Say("Помощник поддержки поставлен: сообщения об ошибках уходят разработчику по вашей кнопке «Отправить». Снимается удалением мода.");
+				Say(T("Помощник поддержки поставлен: сообщения об ошибках уходят разработчику по вашей кнопке «Отправить». Снимается удалением мода.", "The support helper is installed: error reports go to the developer when you press Send. Removing the mod removes it too."));
 			}
 			catch { }
 		}
 		else
 		{
 			try { Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true).DeleteValue("GU-WOW-Watch", false); } catch { }
-			Say("Помощник поддержки не ставился: отчёты об ошибках будут открываться страницей в браузере.");
+			Say(T("Помощник поддержки не ставился: отчёты об ошибках будут открываться страницей в браузере.", "The support helper was not installed: error reports will open as a page in the browser."));
 		}
 		WriteMarker(marker);
 		Say("");
 		// Only the keys the player really has.
-		var done = "Готово. Запустите игру.";
-		if (IniGet(rs, "INPUT", "KeyEffects") == "122,0,0,0") done += " F11 включает и выключает весь мод.";
-		if (IniGet(rs, "INPUT", "KeyOverlay") == OverlayKey) done += " F5 открывает окно ReShade.";
+		var done = T("Готово. Запустите игру.", "Done. Start the game.");
+		if (IniGet(rs, "INPUT", "KeyEffects") == "122,0,0,0") done += T(" F11 включает и выключает весь мод.", " F11 turns the whole mod on and off.");
+		if (IniGet(rs, "INPUT", "KeyOverlay") == OverlayKey) done += T(" F5 открывает окно ReShade.", " F5 opens the ReShade window.");
 		Say(done);
 	}
 
@@ -686,9 +712,9 @@ static class WowGU
 				if (File.Exists(G(f)) && (f != dll || IsReShade(G(f)))) File.Delete(G(f));
 			foreach (var d in new[] { @"reshade-shaders\Shaders", @"reshade-shaders\Textures", "reshade-shaders" })
 				if (Directory.Exists(G(d)) && !Directory.EnumerateFileSystemEntries(G(d)).Any()) Directory.Delete(G(d));
-			Say("ReShade удалён.");
+			Say(T("ReShade удалён.", "ReShade removed."));
 		}
-		else Say("ReShade ставили не через GU-WOW, он остаётся.");
+		else Say(T("ReShade ставили не через GU-WOW, он остаётся.", "ReShade was not installed by GU-WOW, so it stays."));
 		var cfg = G(@"WTF\Config.wtf");
 		if (File.Exists(cfg + ".wowgu-backup"))
 		{
@@ -697,10 +723,10 @@ static class WowGU
 				var old = ConfigValue(Path.GetDirectoryName(cfg + ".wowgu-backup"), key, Path.GetFileName(cfg + ".wowgu-backup"));
 				if (old.Length > 0) ConfigSet(cfg, key, old); else ConfigRemove(cfg, key);
 			}
-			Say("Сглаживание вернулось как было.");
+			Say(T("Сглаживание вернулось как было.", "Anti-aliasing restored to what it was."));
 		}
 		if (File.Exists(G(Marker))) File.Delete(G(Marker));
-		Say("GU-WOW удалён.");
+		Say(T("GU-WOW удалён.", "GU-WOW removed."));
 	}
 
 	// ------------------------------------------------------------------ helpers

@@ -1,7 +1,8 @@
 ## Interface: 70300
 ## Title: GU-WOW
-## Notes: Настройки тумана, лучей солнца, ночи и картинки GU-WOW прямо в игре. Открыть: Интерфейс > Модификации > GU-WOW или /gu.
+## Notes: GU-WOW settings for the fog, the sun rays, the night and the picture, inside the game. Open: Interface > AddOns > GU-WOW or /gu.
+## Notes-ruRU: Настройки тумана, лучей солнца, ночи и картинки GU-WOW прямо в игре. Открыть: Интерфейс > Модификации > GU-WOW или /gu.
 ## Author: levan
-## Version: 1.6.9-release
+## Version: 1.7.0-release
 ## SavedVariables: LegionGUDB
 LegionGU.lua

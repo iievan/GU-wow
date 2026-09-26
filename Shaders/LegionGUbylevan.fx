@@ -178,8 +178,12 @@
 #define LEGIONGU_CTL_MIST_HIGH 24 // how much of the low mist stays seen from above, 1.6.0
 #define LEGIONGU_CTL_RAY_DEF 25  // ray definition: 0 a soft glow, 1 separate wide beams
 #define LEGIONGU_CTL_MIST_FLOW 26 // the drift of the ground mist, 0 still, 1.6.8
+#define LEGIONGU_CTL_BRIGHT 27   // brightness, 50 the game's own picture, 1.7.0
+#define LEGIONGU_CTL_CONTRAST 28 // contrast, 50 neutral
+#define LEGIONGU_CTL_SAT 29      // colour saturation, 50 neutral
+#define LEGIONGU_CTL_WARMTH 30   // white balance, 50 neutral, lower cold, higher warm
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 57    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 65    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -188,7 +192,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 27; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 31; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -935,10 +939,11 @@ namespace LegionGU
 	                                        // share of the travel rides the frame motion already, so what is left is
 	                                        // a genuine jump — a re-found sun, or a lost one pushed beyond the edge —
 	                                        // and at 0.05 s that snap dragged the frame-wide glow in one frame (1.6.9)
-	static const float SUN_GLIDE_STR = 2.0; // seconds for its strength and sun-or-pinned share: the glow spans the
-	                                        // whole fogged frame at sunset, so it must swell and die like light
-	                                        // through clouds; at 0.6 s a tilt that showed or hid the sun stepped
-	                                        // the frame's brightness in two visible jumps (1.6.9)
+	static const float SUN_GLIDE_STR = 0.6; // seconds for the strength and the sun-or-pinned share to rise: the sun
+	                                        // flickers behind trees, and a slow rise kept the glow at half force
+	                                        // through a whole ride (1.7.0)
+	static const float SUN_GLIDE_OUT = 2.0; // and to fall: losing the sun dims the frame-wide glow like light
+	                                        // through clouds, not in a step
 	static const float3 COOL_TINT = float3(0.93, 1.0, 1.10);
 	static const uint STAMP_MOD = 8388608u;
 	static const float STAMP_LAG = 2.0;
@@ -1721,7 +1726,10 @@ namespace LegionGU
 			float4 target = float4(sun, live ? share : prev4.z, live ? 1.0 : 0.0);
 			if (!seeded)
 				return target;
-			return float4(lerp(prev4.xy + mv4, target.xy, Rate(dt, SUN_GLIDE_POS)), lerp(prev4.zw, target.zw, Rate(dt, SUN_GLIDE_STR)));
+			// The strength rises at SUN_GLIDE_STR and falls at SUN_GLIDE_OUT: finding the sun lights the glow in
+			// well under a second, losing it lets the frame-wide light die out slowly.
+			float tauStr = max(target.z, target.w) > max(prev4.z, prev4.w) ? SUN_GLIDE_STR : SUN_GLIDE_OUT;
+			return float4(lerp(prev4.xy + mv4, target.xy, Rate(dt, SUN_GLIDE_POS)), lerp(prev4.zw, target.zw, Rate(dt, tauStr)));
 		}
 
 		float4 depthState = DepthDecide(ScanDepth(), prev1, seeded, dt);
@@ -2824,10 +2832,13 @@ namespace LegionGU
 		// The light is in the air: as much as there is air in front of the pixel.
 		float air = lerp(AIR_NO_DEPTH, tex2Dlod(RaysAir, float4(uv, 0.0, 0.0)).x, depthLive);
 		gain *= air * AIR_GAIN;
-		// The low sun is golden: around sunrise and sunset the rays and their glow take the dawn colour.
+		// The low sun is golden: around sunrise and sunset the rays and their glow take the dawn colour. The gold
+		// is matched to the day colour's luminance (1.7.0): the plain hue swap made the rays a sixth dimmer for
+		// the two golden hours, and the loss read as "the rays got weaker".
 		float hourNow = LegionGUHour();
 		float lowSun = LegionGUState(1u) ? max(saturate(1.0 - abs(hourNow - 6.5) * 0.5), saturate(1.0 - abs(hourNow - 19.5) * 0.5)) : 0.0;
-		float3 dayColour = lerp(RaysColour, DAWN_COLOUR, lowSun);
+		float3 dawnEq = DAWN_COLOUR * (dot(RaysColour, LUMA601) / dot(DAWN_COLOUR, LUMA601));
+		float3 dayColour = lerp(RaysColour, dawnEq, lowSun);
 		float3 add = rays * lerp(dayColour, MOON_COLOUR, nightNow) * gain;
 		float3 o = c.rgb + add * (1.0 - saturate(c.rgb));
 		if (DebugView == DBG_SUN)
@@ -2848,14 +2859,14 @@ namespace LegionGU
 	// channel is black or white, one bit, so a cell carries 3 bits, red the high one. Cell 0 is black and cell 1
 	// white: each channel's threshold lies halfway between them, so no brightening or tint in the game can flip a
 	// bit (the first build used four levels, and the game lifted 1/3 to 0.6..0.75). Cell 2 is the signature,
-	// magenta. Each setting 0..63 takes two cells, high bits first, cells 3 to 36; cells 37 and 38 are the sum of
+	// magenta. Each setting 0..63 takes two cells, high bits first, cells 3 to 62; the last two cells are the sum of
 	// the settings modulo 64. Once read, the strip is covered with the row below it.
 	// ---------------------------------------------------------------------------------------------------
 
 	static const float BRIDGE_GAP = 0.3;    // smallest step between black and white in each channel
 	static const float BRIDGE_HOLD = 2.0;   // seconds the last values stay after the strip is gone
 
-	texture2D BridgePrevTex { Width = 27; Height = 1; Format = RGBA32F; };
+	texture2D BridgePrevTex { Width = 31; Height = 1; Format = RGBA32F; };
 	sampler2D BridgePrev { Texture = BridgePrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 	float3 BridgeCell(int i)
@@ -2904,7 +2915,7 @@ namespace LegionGU
 			bool live = seen || (prev0.x > 0.5 && since <= BRIDGE_HOLD);
 			return float4(live ? 1.0 : 0.0, since, seen ? 1.0 : 0.0, 1.0);
 		}
-		if (seen && texel <= 26)
+		if (seen && texel <= 30)
 			return float4(BridgeValue(1 + 2 * texel, th) / 63.0, 0.0, 0.0, 1.0);
 		return tex2Dfetch(BridgePrev, int2(texel, 0));
 	}

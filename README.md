@@ -5,13 +5,13 @@
 Графическое улучшение World of Warcraft. Основные работы проводятся на версии Legion 7.3.5. 
 Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
-Текущая сборка: **1.6.9-release «Живой огонь»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **1.7.0-release «Живой огонь»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.6.9-release
+## Что входит в сборку 1.7.0-release
 
 Всё настраивается в игре: Интерфейс > Модификации > GU-WOW, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -36,6 +36,7 @@
 | Картинка | Цветовые стили | «Тёплый», «Холодный», «Плёнка», «Сочный», а с 1.5.4 ещё «Закат», «Сказка» и «Нуар». Меняют характер цвета, как фильтр фотоаппарата | 1.5 |
 | Картинка | Кино-HDR | Тени глубже, яркое не выгорает в белое, цвет чуть плотнее, как на киноплёнке. Ползунок силы на главной странице меню | 1.5.4 |
 | Картинка | Плёночное зерно | Лёгкое зерно плёнки, ползунок на главной странице меню | 1.5.4 |
+| Картинка | Яркость и цвет | Яркость, контрастность, сочность цвета и тепло картинки — сам WoW так не умеет. Пресеты: «Стандарт WoW», пять готовых и слот «Мой». 50 у ползунка = картинка игры | 1.7.0 |
 | Фото | Фоторежим | Интерфейс прячется, персонаж в фокусе, фон размыт. Не работает в бою | 1.4 |
 | Фото | Сила размытия и боке | Ползунок силы размытия фона. По умолчанию размытие втрое мягче, чем в 1.5.3. Боке превращает огни на размытом фоне в мягкие кружки | 1.5.4 |
 | Фото | Облёт, имена, кинорамка | В фоторежиме: медленный облёт камеры вокруг персонажа, скрытие имён над головами, кинорамка. На экранах 21:9 кинорамки почти не видно | 1.5 |
@@ -60,7 +61,7 @@
 ## Установка
 
 1. Скачайте архив последней сборки на странице [Releases](https://github.com/iievan/GU-wow/releases/latest) и распакуйте его.
-2. Закройте игру и запустите `GU-WOW.exe`. Если Windows покажет «Система Windows защитила ваш компьютер», нажмите «Подробнее» и «Выполнить в любом случае».
+2. Закройте игру и запустите `GU-WOW.exe`. Если Windows покажет «Система Windows защитила ваш компьютер», нажмите «Подробнее» и «Выполнить в любом случае»: предупреждение значит только то, что установщик не подписан платным сертификатом. Его исходный код открыт и лежит в этом репозитории (`Installer/wowGU.cs`), собрать его можно самому одной командой.
 3. Проверьте папку игры в верхней строке и нажмите «Установить». Нужен интернет: ReShade скачивается с [reshade.me](https://reshade.me).
 4. Запустите игру. Первый запуск дольше обычного: эффекты собираются от 10 до 20 секунд.
 
@@ -119,13 +120,13 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 A graphical enhancement for World of Warcraft. The main development work is being carried out for Legion 7.3.5.
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
-Current build: **1.6.9-release "Moonlit Path"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **1.7.0-release "Living Flame"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.6.9-release
+## What is in build 1.7.0-release
 
 Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -150,6 +151,7 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 | Picture | Colour styles | Warm, Cold, Film, Vivid, and since 1.5.4 Sunset, Fairy tale and Noir. They change the mood of the colours, like a camera filter | 1.5 |
 | Picture | Cinema HDR | Deeper shadows, bright areas no longer burn to white, a little denser colour, like film. A strength slider on the main menu page | 1.5.4 |
 | Picture | Film grain | A light film grain, a slider on the main menu page | 1.5.4 |
+| Picture | Brightness and colour | Brightness, contrast, colour richness and picture warmth — WoW itself cannot do this. Presets: WoW standard, five ready looks and a My slot. 50 on a slider = the game's own picture | 1.7.0 |
 | Photo | Photo mode | The interface hides, your character stays in focus, the background is blurred. Not available in combat | 1.4 |
 | Photo | Blur strength and bokeh | A slider for the background blur. By default the blur is three times softer than in 1.5.3. Bokeh turns lights in the blur into soft discs | 1.5.4 |
 | Photo | Orbit, names, cinema bars | In photo mode: a slow camera orbit around your character, names above heads hidden, cinema bars. On 21:9 screens the bars barely show | 1.5 |
@@ -174,7 +176,7 @@ Details of every build: [CHANGELOG.md](CHANGELOG.md).
 ## Installation
 
 1. Download the latest archive from [Releases](https://github.com/iievan/GU-wow/releases/latest) and unpack it.
-2. Close the game and run `GU-WOW.exe`. If Windows says "Windows protected your PC", click "More info" and "Run anyway".
+2. Close the game and run `GU-WOW.exe`. If Windows says "Windows protected your PC", click "More info" and "Run anyway": the warning only means the installer is not signed with a paid certificate. Its source code is open in this repository (`Installer/wowGU.cs`), and you can build it yourself with one command.
 3. Check the game folder in the top line and press "Установить" (Install). An internet connection is needed: ReShade is downloaded from [reshade.me](https://reshade.me).
 4. Start the game. The first start takes longer: the effects compile for 10 to 20 seconds.
 

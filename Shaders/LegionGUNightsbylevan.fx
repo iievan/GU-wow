@@ -161,8 +161,12 @@
 #define LEGIONGU_CTL_MIST_HIGH 24 // how much of the low mist stays seen from above, 1.6.0
 #define LEGIONGU_CTL_RAY_DEF 25  // ray definition: 0 a soft glow, 1 separate wide beams
 #define LEGIONGU_CTL_MIST_FLOW 26 // the drift of the ground mist, 0 still, 1.6.8
+#define LEGIONGU_CTL_BRIGHT 27   // brightness, 50 the game's own picture, 1.7.0
+#define LEGIONGU_CTL_CONTRAST 28 // contrast, 50 neutral
+#define LEGIONGU_CTL_SAT 29      // colour saturation, 50 neutral
+#define LEGIONGU_CTL_WARMTH 30   // white balance, 50 neutral, lower cold, higher warm
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 57    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 65    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -171,7 +175,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 27; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 31; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -3293,6 +3297,14 @@ namespace LegionGUNights
 		return tex2Dfetch(PicEyeCur, int2(0, 0));
 	}
 
+	// A brightness-and-colour dial (1.7.0): the strip's step is 100/63, so 50 arrives as 50.79; anything within
+	// one step of 50 is the neutral by intent and snaps to exactly 50, and the block can skip byte-for-byte.
+	float PicDial(int ctl)
+	{
+		float v = LegionGUValue(ctl, 50.0);
+		return abs(v - 50.0) <= 100.0 / 63.0 ? 50.0 : v;
+	}
+
 	float4 PicApplyPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		int2 p = int2(pos.xy);
@@ -3438,6 +3450,30 @@ namespace LegionGUNights
 			// The strength slider: 50 is the look of 1.5.4, 100 twice as much.
 			float3 hdr = saturate(lerp(float3(tl, tl, tl), c * (tl / hl), 1.08));
 			c = saturate(lerp(c, hdr, LegionGUValue(LEGIONGU_CTL_HDR, 50.0) * 0.02));
+		}
+
+		// Brightness and colour (1.7.0): the game has no brightness control of its own. Four dials, 50 is the
+		// game's own picture and skips the block entirely. The strip quantises to steps of 100/63, so a slider
+		// at 50 arrives as 50.79: values within one step of 50 snap back to the exact neutral. Brightness is
+		// exposure (a gain), so whites clip only past the top; contrast pivots around middle grey; warmth is a
+		// luma-neutral tint, so the frame's brightness does not swim with the temperature.
+		float pbBright = PicDial(LEGIONGU_CTL_BRIGHT);
+		float pbContrast = PicDial(LEGIONGU_CTL_CONTRAST);
+		float pbSat = PicDial(LEGIONGU_CTL_SAT);
+		float pbWarm = PicDial(LEGIONGU_CTL_WARMTH);
+		if (abs(pbBright - 50.0) + abs(pbContrast - 50.0) + abs(pbSat - 50.0) + abs(pbWarm - 50.0) > 0.5)
+		{
+			c *= exp2((pbBright - 50.0) * 0.02 * 0.7);
+			float ck = exp2((pbContrast - 50.0) * 0.02 * 0.8);
+			c = (c - 0.5) * ck + 0.5;
+			float pl = dot(saturate(c), LUMA601);
+			c = lerp(float3(pl, pl, pl), c, pbSat * 0.02);
+			// The tint walks from exact 1 at 50 toward the warm or the cold end, so brightness alone never tints.
+			float wp = pbWarm * 0.02 - 1.0;
+			float3 tint = wp >= 0.0 ? lerp(float3(1.0, 1.0, 1.0), float3(1.06, 1.0, 0.90), wp)
+			                        : lerp(float3(1.0, 1.0, 1.0), float3(0.92, 1.0, 1.10), -wp);
+			c = saturate(c) * (tint / dot(tint, LUMA601));
+			c = saturate(c);
 		}
 
 		// A light vignette: the corners a little darker, the middle as it is.

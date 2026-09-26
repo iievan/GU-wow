@@ -1,5 +1,29 @@
 # GU-WOW: история версий / Version history
 
+## 1.7.0-release «Живой огонь» / "Living Flame"
+
+### Русский
+
+**Новое**
+- Яркость и цвет в самой игре: на странице «Основные» появились «Яркость», «Контрастность», «Сочность цвета» и «Тепло картинки» — сам WoW так не умеет. 50 у любого ползунка = картинка игры без изменений, кадр при этом не трогается вовсе.
+- Пресеты картинки рядом с ползунками: «Стандарт WoW», пять готовых («Живые краски», «Кино», «Мягкий вечер», «Север», «Полдень Азерота») и слот «Мой» — кнопка «+» сохраняет ваши значения, «-» удаляет. Пресеты листаются с предпросмотром, как атмосферные.
+- Код настроек теперь несёт и яркость с цветом (GUW6). Старые коды и пресеты работают: недостающие значения берутся нейтральными.
+
+**Исправлено**
+- Золотые лучи рассвета и заката держат силу дневных: подгонка золота по яркости. Смена цвета на золото делала лучи на шестую часть тусклее ровно в золотые часы.
+- Свечение солнца в тумане разгорается быстро, а гаснет медленно: солнце, мигающее за деревьями, держит свет ровным, а потеря солнца отпускает его плавно, как свет сквозь облака.
+
+### English
+
+**New**
+- Brightness and colour inside the game: the Main page now has Brightness, Contrast, Colour richness and Picture warmth — WoW itself cannot do this. 50 on any slider = the game's own picture, and the frame is then left untouched entirely.
+- Picture presets next to the sliders: WoW standard, five ready looks (Living colours, Cinema, Soft evening, North, Azeroth noon) and a My slot — «+» saves your values, «-» deletes them. The presets page through with a preview, like the atmosphere ones.
+- The share code now carries the brightness and colour too (GUW6). Old codes and presets keep working: the missing values come out neutral.
+
+**Fixed**
+- The golden rays of sunrise and sunset keep the daytime strength: the gold is matched by luminance. The plain hue swap made the rays a sixth dimmer exactly in the golden hours.
+- The sun's glow in the fog lights up fast and dies out slowly: a sun flickering behind trees keeps the light steady, and losing the sun lets it go softly, like light through clouds.
+
 ## 1.6.9-release «Живой огонь» / "Living Flame"
 
 ### Русский
