@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.6.6-release"
+local VERSION = "1.6.7-release"
 local CELL = 4
 local CELLS = 55
 
@@ -554,8 +554,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.6.6.\n\nОгонь по-настоящему светит: свет на земле и персонаже вдвое сильнее, ореолы ярче. Лучи солнца в полтора раза тоньше и спокойнее, тени в щелях глубже и чище, ночные переходы без полос. Всё это стоит около миллисекунды на кадр.\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.6.6.\n\nFire truly shines: the light on the ground and the character is doubled, the halos are brighter. The sun shafts are half again finer and calmer, the contact shadows are deeper and cleaner, the night gradients show no bands. All of it costs about a millisecond a frame.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.6.7.\n\nВыход из таверны плавный: ночь, туман и вечерний свет набирают силу за пару секунд на пороге, вход в дом гасит их быстро. Резкого скачка на двери нет.\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.6.7.\n\nLeaving a tavern is smooth: the night, the fog and the evening light gain strength over a couple of seconds at the doorstep, and entering a house dims them fast. No hard snap at the door.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,

@@ -981,9 +981,10 @@ namespace LegionGU
 	// Texel 2: the key, the colour of the land around the player, and its confidence (see FogHazeColour).
 	// Texel 3: how open the view is, the horizon confidence eased like the colour (see FogAmount).
 	// Texel 4: the sun for the in-scatter. Texel 5: the weather (see WEATHER_SKY_TAPS). Texel 6: the ground plane
-	// for the low mist (see GroundPlane).
-	texture2D FogCurTex { Width = 7; Height = 1; Format = RGBA32F; };
-	texture2D FogPrevTex { Width = 7; Height = 1; Format = RGBA32F; };
+	// for the low mist (see GroundPlane). Texel 7: the indoor share, the game's bit eased over INSIDE_IN and
+	// INSIDE_OUT seconds, so walking out of a tavern fades the effects in instead of snapping them.
+	texture2D FogCurTex { Width = 8; Height = 1; Format = RGBA32F; };
+	texture2D FogPrevTex { Width = 8; Height = 1; Format = RGBA32F; };
 	sampler2D FogCur { Texture = FogCurTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 	sampler2D FogPrev { Texture = FogPrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
@@ -1454,6 +1455,11 @@ namespace LegionGU
 	static const float GROUND_BIG = 0.45;       // a move of the horizon this large counts as a real tilt
 	static const float GROUND_K_TIME = 0.5;     // seconds to follow the camera height
 	static const float GROUND_LOSE_TIME = 6.0;  // seconds to forget the plane when the ground is not seen
+	// The indoor share: at a door the game's bit flips in one frame, and every effect that read it snapped with
+	// it. Walking in settles in INSIDE_IN seconds, walking out brings the sky, the mist and the night back over
+	// INSIDE_OUT, like eyes at a doorway.
+	static const float INSIDE_IN = 0.6;
+	static const float INSIDE_OUT = 2.2;
 
 	// Texel 6: x = hy, y = K, z = confidence, w = the speed of hy (see the spring below). Grass, bushes, a pet or a
 	// trunk always stand in front of the ground, never behind it, so the farthest tap of a row is the ground
@@ -1695,6 +1701,15 @@ namespace LegionGU
 
 		if (texel == 6)
 			return GroundPlane(reversed, depthState, tex2Dfetch(FogPrev, int2(6, 0)), seeded, dt);
+
+		if (texel == 7)
+		{
+			float now = LegionGUState(2u) ? 1.0 : 0.0;
+			float prev7 = seeded ? tex2Dfetch(FogPrev, int2(7, 0)).x : now;
+			float e = lerp(prev7, now, Rate(dt, now > prev7 ? INSIDE_IN : INSIDE_OUT));
+			e = e > 0.999 ? 1.0 : (e < 0.001 ? 0.0 : e);
+			return float4(e, 0.0, 0.0, 1.0);
+		}
 
 		// The frame's average; the far land weighted by distance and by the square of its brightness, so the
 		// farthest and brightest land wins (farN counts it without the weights, for the confidence); the mean
@@ -1990,9 +2005,9 @@ namespace LegionGU
 		// however high the camera stands. In flight the game's word scales it the same way.
 		float high = LegionGUValue(LEGIONGU_CTL_MIST_HIGH, MistHighAmount) * 0.01;
 		m.w *= lerp(1.0 - smoothstep(MIST_HIGH.x, MIST_HIGH.y, 1.0 / max(ground.y, 1e-4)), 1.0, high);
-		// The game knows better: no low mist indoors, and in flight only as much as «Туман с высоты» keeps.
-		if (LegionGUState(2u))
-			m.w = 0.0;
+		// The game knows better: no low mist indoors (eased at the door, texel 7), and in flight only as much as
+		// «Туман с высоты» keeps.
+		m.w *= 1.0 - tex2Dfetch(FogCur, int2(7, 0)).x;
 		if (LegionGUState(4u))
 			m.w *= high;
 		if (amount > 0.0 && m.w > 0.0 && ground.z > 0.0 && depthState.y > 0.5 && depthState.x > 0.0)

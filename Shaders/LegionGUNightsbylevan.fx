@@ -1163,6 +1163,9 @@ namespace LegionGUNights
 	static const float MIST_MOON = 0.8;
 	static const float MIST_NIGHT_SHARE = 0.5;   // the moonlit mist at half: at full it laid a milky veil over the night
 	static const float MIST_MOON_R = 0.35;
+	// The indoor share easing at a door (see FogCurTex texel 9): in fast, out slow, like eyes at a doorway.
+	static const float INSIDE_IN = 0.6;
+	static const float INSIDE_OUT = 2.2;
 
 	// ---------------------------------------------------------------------------------------------------
 	// Textures and samplers
@@ -1180,9 +1183,10 @@ namespace LegionGUNights
 	// Texel 0: estimated engine fog colour, seeded flag. Texel 1: depth state (see DepthDecide).
 	// Texel 2: the key, the colour of the land around the player, and its confidence (see FogHazeColour).
 	// Texel 3: how open the view is, the horizon confidence eased like the colour (see FogAmount).
-	// Texels 4 to 8: the night state (see NightStateTexel).
-	texture2D FogCurTex { Width = 9; Height = 1; Format = RGBA32F; };
-	texture2D FogPrevTex { Width = 9; Height = 1; Format = RGBA32F; };
+	// Texels 4 to 8: the night state (see NightStateTexel). Texel 9: the indoor share, the game's bit eased at
+	// the door (INSIDE_IN and INSIDE_OUT), so leaving a tavern fades the night in instead of snapping it.
+	texture2D FogCurTex { Width = 10; Height = 1; Format = RGBA32F; };
+	texture2D FogPrevTex { Width = 10; Height = 1; Format = RGBA32F; };
 	sampler2D FogCur { Texture = FogCurTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 	sampler2D FogPrev { Texture = FogPrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
@@ -1757,15 +1761,13 @@ namespace LegionGUNights
 			float sNight = LegionGUValue(LEGIONGU_CTL_NIGHT, NightDarkness) * 0.01 * n * live;
 			float deep = LegionGUValue(LEGIONGU_CTL_NIGHT_DEPTH, NightDepth) * 0.01 * n * live;
 			// Indoors the room itself gets no night; the night outside rides in texel 7 for what is seen through doors and
-			// windows (see NightApply).
+			// windows (see NightApply). The indoor share is eased at the door (texel 9), so the night fades in on the
+			// way out of a tavern instead of snapping on the doorstep.
 			float sOut = sNight;
 			float deepOut = deep;
-			bool inside = LegionGUState(2u);
-			if (inside)
-			{
-				sNight = 0.0;
-				deep = 0.0;
-			}
+			float insideE = tex2Dfetch(FogPrev, int2(9, 0)).x;
+			sNight *= 1.0 - insideE;
+			deep *= 1.0 - insideE;
 			// the cave: seconds without sky, and the factor eased toward 1 after CAVE_HOLD of them (see CAVE_HOLD)
 			float4 prev7 = tex2Dfetch(FogPrev, int2(7, 0));
 			float noSky = (present && ga.y < NIGHT_SKY_LO) ? prev7.x + dt : 0.0;
@@ -1775,7 +1777,7 @@ namespace LegionGUNights
 				return float4(min(noSky, 100.0), cave, sOut, deepOut);
 			float sCave = LegionGUValue(LEGIONGU_CTL_CAVE, CaveDarkness) * 0.01 * cave * (1.0 - smoothstep(CAVE_AMB_DARK, CAVE_AMB_LIGHT, max(a, AMBIENT_MIN))) * live;
 			float s = max(sNight, sCave);
-			float g = LegionGUValue(LEGIONGU_CTL_GLOW, LightGlow) * 0.01 * LightsDarkness(inside ? 0.0 : n, d, max(a, AMBIENT_MIN)) * live / (1.0 + LightTotalPow(lights / LIGHT_TOTAL_REF));
+			float g = LegionGUValue(LEGIONGU_CTL_GLOW, LightGlow) * 0.01 * LightsDarkness(n * (1.0 - insideE), d, max(a, AMBIENT_MIN)) * live / (1.0 + LightTotalPow(lights / LIGHT_TOTAL_REF));
 			g *= 1.0 + DEEP_GLOW * deep;
 			float m = max(exp2(s * log2(NIGHT_M100) + deep * log2(NIGHT_DEEP)), min(1.0, NIGHT_FLOOR * (1.0 - deep) / max(a, AMBIENT_MIN)));
 			return float4(a, s, g, m);
@@ -1824,6 +1826,14 @@ namespace LegionGUNights
 		float4 depthState = DepthDecide(ScanDepth(), prev1, seeded, dt);
 		if (texel == 1)
 			return depthState;
+		if (texel == 9)
+		{
+			float now = LegionGUState(2u) ? 1.0 : 0.0;
+			float prev9 = seeded ? tex2Dfetch(FogPrev, int2(9, 0)).x : now;
+			float e = lerp(prev9, now, Rate(dt, now > prev9 ? INSIDE_IN : INSIDE_OUT));
+			e = e > 0.999 ? 1.0 : (e < 0.001 ? 0.0 : e);
+			return float4(e, 0.0, 0.0, 1.0);
+		}
 		if (texel >= 4)
 			return NightStateTexel(texel, depthState, dt);
 
@@ -3346,9 +3356,11 @@ namespace LegionGUNights
 				float h = LegionGUHour();
 				float nightT = saturate(1.0 - smoothstep(4.5, 6.0, h) + smoothstep(20.0, 21.5, h));
 				float duskT = saturate(smoothstep(17.5, 19.0, h) - smoothstep(20.5, 22.0, h)) + saturate(smoothstep(4.5, 5.5, h) - smoothstep(6.5, 8.0, h));
-				bool indoors = LegionGUState(2u);
-				night = indoors ? 0.0 : nightT;
-				warm = indoors ? 0.0 : max(saturate(duskT), 0.5 * warm) * (1.0 - night);
+				// The indoor share is eased at the door (texel 9): the evening gold and the night cool fade over the
+				// doorstep with the rest.
+				float outdoorsE = 1.0 - tex2Dfetch(FogCur, int2(9, 0)).x;
+				night = nightT * outdoorsE;
+				warm = max(saturate(duskT), 0.5 * warm) * (1.0 - night) * outdoorsE;
 			}
 			float l = dot(c, LUMA601);
 			float3 grey = float3(l, l, l);

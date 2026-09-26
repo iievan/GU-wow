@@ -1,5 +1,17 @@
 # GU-WOW: история версий / Version history
 
+## 1.6.7-release «Живой огонь» / "Living Flame"
+
+### Русский
+
+**Исправлено**
+- Выход из помещения плавный. Игра сообщает «в доме или на улице» одним переключателем, и ночь, низовой туман и вечерний свет прыгали на пороге за один кадр. Теперь признак помещения размазан во времени: выход набирает силу эффектов за пару секунд, как глаза привыкают на пороге, вход гасит их быстрее. Вид на улицу из окна и двери не тронут.
+
+### English
+
+**Fixed**
+- Leaving a building is smooth. The game reports «indoors or outside» as a single switch, and the night, the ground mist and the evening light jumped at the doorstep within one frame. The indoor flag is now eased in time: walking out gains the effects over a couple of seconds, the way eyes settle at a doorway, walking in dims them faster. The view of the street through a window or a door is untouched.
+
 ## 1.6.6-release «Живой огонь» / "Living Flame"
 
 ### Русский
