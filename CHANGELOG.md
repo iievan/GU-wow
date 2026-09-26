@@ -1,5 +1,57 @@
 # GU-WOW: история версий / Version history
 
+## public-release-beta-1.0 «Живой огонь» / "Living Flame"
+
+Первая публичная сборка. Внутри — всё из линеек 1.6 и 1.7 плюс новое ниже.
+
+### Русский
+
+**Новое**
+- К отчёту об ошибке прикладывается снимок экрана: наведите камеру на баг, нажмите «Приложить снимок» в окне /gu report, затем «Отправить» — разработчик получит картинку вместе с описанием и служебными данными.
+- У лучей солнца свои ручки и пресеты на странице «Лучи»: сила, чёткость, «Лучи в открытом небе» (в поле и на снегу лучи по умолчанию вдвое заметнее), «Длина лучей», «Свечение солнца в тумане»; пресеты «Стандарт GU», «Утро в лесу», «Снопы света», «Яркий полдень», «Тихая дымка» и слот «Мой».
+- Яркость и цвет в самой игре, страница «Картинка»: яркость, контрастность, сочность цвета и тепло картинки с пресетами и слотом «Мой». 50 у любого ползунка = картинка игры.
+- Ползунок «Туман у ног»: дымка по щиколотку прямо под персонажем, без чистого круга — для болот и низин.
+- Меню разложено по страницам: «Основные», «Атмосфера», «Лучи», «Ночь», «Картинка», «Дополнительно», «Фоторежим». Шрифт полного размера, ничего не ужимается.
+- Установщик говорит по-русски и по-английски по языку Windows; меню в игре, как и раньше, русское на русском клиенте и английское на любом другом.
+
+**Исправлено**
+- «Движение тумана» ограничено безопасной силой: выше неё дымка шла волнами, теперь ползунок выше 40 силы не добавляет.
+- Настройки по умолчанию обновлены на авторские: гуще низовой туман, туман у ног включён, спокойное зерно, ярче огни и лучи, чуть светлее и контрастнее картинка.
+
+### English
+
+**New**
+- The bug report carries a screenshot: aim the camera at the bug, press Attach a shot in the /gu report window, then Send — the developer gets the picture with the description and the service data.
+- The sun rays have their own dials and presets on the Rays page: strength, definition, Rays in the open (over fields and snow the rays are twice as bold by default), Ray length, Sun glow in the fog; the presets GU standard, Forest morning, Light shafts, Bright noon, Quiet haze and a My slot.
+- Brightness and colour inside the game, the Picture page: brightness, contrast, colour richness and picture warmth with presets and a My slot. 50 on any slider = the game's own picture.
+- A Mist at the feet slider: ankle-deep haze right under the character, with no clear circle — for swamps and hollows.
+- The menu is laid out into pages: Main, Atmosphere, Rays, Night, Picture, Extras, Photo mode. Full-size text, nothing is squeezed.
+- The installer speaks Russian and English by the Windows language; the in-game menu, as before, is Russian on a Russian client and English on any other.
+
+**Fixed**
+- The fog motion is capped at a safe strength: above it the haze rolled in waves, and the slider past 40 adds no more.
+- The defaults are refreshed to the author's picks: thicker ground mist, the mist at the feet on, calm grain, brighter lights and rays, a slightly lighter and crisper picture.
+
+## 1.7.1-release «Живой огонь» / "Living Flame"
+
+### Русский
+
+**Новое**
+- У лучей солнца свои ручки на странице «Основные»: «Лучи в открытом небе», «Длина лучей» и «Свечение солнца в тумане» — рядом с «Силой лучей» и «Чёткостью». В поле и на снегу лучи по умолчанию вдвое заметнее: раньше на открытом месте их резала зашитая константа, ручки не было.
+- Пресеты лучей рядом с ползунками: «Стандарт GU», «Утро в лесу», «Снопы света», «Яркий полдень», «Тихая дымка» и слот «Мой» — «+» сохраняет ваши значения, «-» удаляет. Листаются с предпросмотром.
+- Ползунок «Туман у ног»: дымка по щиколотку прямо под персонажем, без чистого круга — для болот и низин. 0 выключает, обычный низовой туман по-прежнему начинается поодаль.
+- Настройки по умолчанию обновлены на авторские: спокойнее туман и зерно, ярче огни и лучи, чуть светлее и контрастнее картинка. Кнопка «Настройки автора» возвращает их одним нажатием.
+- Код настроек несёт и ручки лучей с туманом у ног (GUW8). Старые коды и пресеты работают: недостающие значения берутся из настроек по умолчанию.
+
+### English
+
+**New**
+- The sun rays got their own dials on the Main page: Rays in the open, Ray length and Sun glow in the fog — next to Ray strength and Ray definition. Over fields and snow the rays are twice as bold by default: in the open they used to be cut by a built-in constant with no dial.
+- Rays presets next to the sliders: GU standard, Forest morning, Light shafts, Bright noon, Quiet haze and a My slot — «+» saves your values, «-» deletes them. They page through with a preview.
+- A Mist at the feet slider: ankle-deep haze right under the character, with no clear circle — for swamps and hollows. 0 turns it off, the usual ground mist still starts farther out.
+- The defaults are refreshed to the author's picks: calmer fog and grain, brighter lights and rays, a slightly lighter and crisper picture. The Author's settings button brings them back in one press.
+- The share code carries the rays' dials and the mist at the feet too (GUW8). Old codes and presets keep working: the missing values come out as the defaults.
+
 ## 1.7.0-release «Живой огонь» / "Living Flame"
 
 ### Русский

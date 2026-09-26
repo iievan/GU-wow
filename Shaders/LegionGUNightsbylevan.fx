@@ -165,8 +165,12 @@
 #define LEGIONGU_CTL_CONTRAST 28 // contrast, 50 neutral
 #define LEGIONGU_CTL_SAT 29      // colour saturation, 50 neutral
 #define LEGIONGU_CTL_WARMTH 30   // white balance, 50 neutral, lower cold, higher warm
+#define LEGIONGU_CTL_RAYS_OPEN 31 // rays in the open, percent of the full strength; the old fixed cut was 22, 1.7.1
+#define LEGIONGU_CTL_RAYS_REACH 32 // ray length, 50 neutral
+#define LEGIONGU_CTL_SUN_GLOW 33 // the sun's glow in the fog, 50 neutral, 0 off, 100 double
+#define LEGIONGU_CTL_MIST_NEAR 34 // the mist at the feet, ankle-deep, 0 off, 1.7.1
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 65    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 73    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -175,7 +179,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 31; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 35; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture

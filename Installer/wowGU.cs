@@ -23,9 +23,9 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("GU-WOW: fog, sun rays, night and picture for World of Warcraft. Installer and support helper.")]
 [assembly: AssemblyCompany("levan")]
 [assembly: AssemblyCopyright("© 2026 levan")]
-[assembly: AssemblyVersion("1.7.0")]
-[assembly: AssemblyFileVersion("1.7.0")]
-[assembly: AssemblyInformationalVersion("1.7.0-release")]
+[assembly: AssemblyVersion("1.8.0")]
+[assembly: AssemblyFileVersion("1.8.0")]
+[assembly: AssemblyInformationalVersion("public-release-beta-1.0")]
 
 class ShotForm : Form
 {
@@ -35,7 +35,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.7.0-release";
+	const string Version = "public-release-beta-1.0";
 	static readonly bool RU = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru";
 	static string T(string ru, string en) { return RU ? ru : en; }
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
@@ -226,6 +226,15 @@ static class WowGU
 						if (when.Length == 0 || sent.Contains(when)) continue;
 						string title, body;
 						BuildReport(note, out title, out body);
+						// The screenshot (beta-1.0): the game saved a JPEG at the remembered moment; it goes into
+						// the repo under reports/ and the issue shows it inline. Without it the report still goes.
+						var shotWhen = Regex.Match(note, @"\[""shot""\]\s*=\s*""([^""]*)""").Groups[1].Value;
+						if (shotWhen.Length > 0)
+						{
+							var url = UploadShot(shotWhen);
+							body += url != null ? "\n## Снимок\n![screenshot](" + url + ")\n"
+							                    : "\n(снимок был сделан, но загрузить его не удалось)\n";
+						}
 						if (PostIssue(title, body))
 							notify(T("Спасибо. Сообщение об ошибке доставлено разработчику.", "Thank you. The error report has been delivered to the developer."), ToolTipIcon.Info);
 						else
@@ -273,6 +282,39 @@ static class WowGU
 			}
 		}
 		catch { return false; }
+	}
+
+	// The report's screenshot: the newest JPEG in the game's Screenshots folder taken within a couple of minutes
+	// of the remembered moment. It goes into the repo as reports/<stamp>.jpg through the contents API (the issues
+	// API cannot attach files); the raw URL then shows inline in the issue. Capped at 3 MB.
+	static string UploadShot(string shotWhen)
+	{
+		try
+		{
+			DateTime at;
+			if (!DateTime.TryParseExact(shotWhen, "yyyy-MM-dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None, out at)) return null;
+			var dir = Path.Combine(current.Dir, "Screenshots");
+			if (!Directory.Exists(dir)) return null;
+			var shot = new DirectoryInfo(dir).GetFiles("*.jpg")
+				.Where(f => Math.Abs((f.LastWriteTime - at).TotalSeconds) < 150)
+				.OrderByDescending(f => f.LastWriteTime).FirstOrDefault();
+			if (shot == null || shot.Length > 3 * 1024 * 1024) return null;
+			var tokenFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"GU-WOW\github_token.txt");
+			var token = File.Exists(tokenFile) ? File.ReadAllText(tokenFile).Trim() : ReportToken();
+			if (token.Length < 10) return null;
+			var name = "reports/" + at.ToString("yyyyMMdd-HHmmss") + ".jpg";
+			using (var w = new WebClient())
+			{
+				w.Headers.Add("User-Agent", "GU-WOW-report");
+				w.Headers.Add("Authorization", "token " + token);
+				w.Headers.Add("Accept", "application/vnd.github+json");
+				w.Encoding = Encoding.UTF8;
+				var json = "{\"message\":\"report screenshot\",\"content\":\"" + Convert.ToBase64String(File.ReadAllBytes(shot.FullName)) + "\"}";
+				w.UploadString("https://api.github.com/repos/iievan/GU-wow/contents/" + name, "PUT", json);
+			}
+			return "https://raw.githubusercontent.com/iievan/GU-wow/main/" + name;
+		}
+		catch { return null; }
 	}
 
 	static string Js(string v)

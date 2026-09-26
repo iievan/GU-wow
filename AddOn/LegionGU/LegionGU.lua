@@ -1,13 +1,13 @@
 -- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
--- The settings travel to the shader as a strip of 65 cells, 4 by 4 pixels, in the top left corner of the screen.
+-- The settings travel to the shader as a strip of 73 cells, 4 by 4 pixels, in the top left corner of the screen.
 -- The effect LegionGUBridge (LegionGUbylevan.fx) reads the strip after the interface is drawn and covers it
 -- again, so it is not seen. Each colour channel is black or white, one bit. Cell 0 is black, cell 1 white, cell 2
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.7.0-release"
+local VERSION = "public-release-beta-1.0"
 local CELL = 4
-local CELLS = 65
+local CELLS = 73
 
 -- Russian on a Russian client, English elsewhere.
 local RU = GetLocale() == "ruRU"
@@ -15,22 +15,26 @@ local function T(ru, en)
 	return RU and ru or en
 end
 
--- The author's own settings, the preset «Default», tuned in game on 2026-09-25.
+-- The author's own settings, the preset «Default», tuned in game on 2026-09-26 (the owner's pick of beta-1.0).
 local DEFAULTS = {
 	master = true, fog = true, weather = true, wet = true, rays = true, night = true, eye = true,
 	zones = true, autoQuality = false, targetFps = 45, orbit = false, hideNames = true, cinema = true, style = 0,
 	chatBack = true,
-	fogThickness = 20, fogDistance = 100, mist = 58, mistDensity = 70, raysStrength = 100,
-	nightDarkness = 95, nightDepth = 70, lightGlow = 95, caveDarkness = 75,
-	sharpness = 40, grade = 95, vignette = 55, ao = 50,
+	fogThickness = 35, fogDistance = 100, mist = 70, mistDensity = 50, raysStrength = 100,
+	nightDarkness = 80, nightDepth = 70, lightGlow = 100, caveDarkness = 75,
+	sharpness = 25, grade = 80, vignette = 55, ao = 90,
 	-- Heat haze and cinema HDR: 0 off, 50 the look of 1.5.4.
-	hazeStrength = 50, hdrStrength = 50, grain = 55, bokeh = false, photoBlur = 50,
+	hazeStrength = 30, hdrStrength = 15, grain = 10, bokeh = false, photoBlur = 50,
 	-- 1.6.0: how much of the low mist stays seen from a height, and how defined the ray shafts are.
-	mistHigh = 50, rayDefinition = 25,
-	-- 1.6.7: the drift of the mist.
-	mistFlow = 25,
+	mistHigh = 60, rayDefinition = 55,
+	-- 1.6.7: the drift of the mist; the shader caps it at 40 (beta-1.0).
+	mistFlow = 30,
 	-- 1.7.0: brightness and colour, 50 is the game's own picture.
-	bright = 50, contrast = 50, satur = 50, warmth = 50,
+	bright = 60, contrast = 55, satur = 50, warmth = 50,
+	-- 1.7.1: the rays' own dials. In the open the old fixed cut was 22; 45 makes a field twice as sunlit.
+	raysOpen = 45, raysReach = 50, sunGlow = 50,
+	-- 1.7.1: the mist at the feet, ankle-deep in swamps. 0 keeps it off.
+	mistNear = 70,
 }
 -- The order of the values in the strip, the same as LEGIONGU_CTL_* in the shaders (after the flags).
 local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDarkness", "lightGlow",
@@ -49,15 +53,23 @@ local CODE_KEYS5 = { "grain", "photoBlur", "hazeStrength", "hdrStrength", "mistH
 -- GUW6 (1.7.0) carries the brightness-and-colour dials too; an older code leaves them at the defaults.
 local CODE_KEYS6 = { "grain", "photoBlur", "hazeStrength", "hdrStrength", "mistHigh", "rayDefinition", "mistFlow",
 	"bright", "contrast", "satur", "warmth" }
+-- GUW7 (1.7.1) carries the rays' dials too; GUW8 the mist at the feet.
+local CODE_KEYS7 = { "grain", "photoBlur", "hazeStrength", "hdrStrength", "mistHigh", "rayDefinition", "mistFlow",
+	"bright", "contrast", "satur", "warmth", "raysOpen", "raysReach", "sunGlow" }
+local CODE_KEYS8 = { "grain", "photoBlur", "hazeStrength", "hdrStrength", "mistHigh", "rayDefinition", "mistFlow",
+	"bright", "contrast", "satur", "warmth", "raysOpen", "raysReach", "sunGlow", "mistNear" }
 local CODE_FLAGS2 = { "heatHaze", "cinemaHdr", "bokeh" }
 -- The look: what a style, a ready profile or a friend's code may change. The zones and the cinema bars are the
 -- player's habits, not the look, so a preview leaves them alone.
 local LOOK = { fog = true, rays = true, night = true, weather = true, wet = true, eye = true,
 	hazeStrength = true, hdrStrength = true, grain = true, mistHigh = true, rayDefinition = true, mistFlow = true,
-	bright = true, contrast = true, satur = true, warmth = true }
--- The brightness-and-colour dials (1.7.0). They are part of the look (a code and a user preset carry them), but
--- the ready atmosphere presets leave them alone: «Golden Sunset» is about the air, not the player's screen.
-local PIC = { bright = true, contrast = true, satur = true, warmth = true }
+	bright = true, contrast = true, satur = true, warmth = true,
+	raysOpen = true, raysReach = true, sunGlow = true, mistNear = true }
+-- The personal tuning dials: the picture (1.7.0) and the rays (1.7.1). They are part of the look (a code and a
+-- user preset carry them), but the ready atmosphere presets leave them alone: «Golden Sunset» is about the air,
+-- not the player's screen or their rays taste.
+local TUNE = { bright = true, contrast = true, satur = true, warmth = true,
+	raysOpen = true, raysReach = true, sunGlow = true }
 for _, k in ipairs(CODE_KEYS) do
 	LOOK[k] = true
 end
@@ -90,7 +102,7 @@ local BASE_PRESETS = {
 for _, p in ipairs(BASE_PRESETS) do
 	local full = {}
 	for k in pairs(LOOK) do
-		if not PIC[k] then
+		if not TUNE[k] then
 			full[k] = DEFAULTS[k]
 		end
 	end
@@ -352,7 +364,8 @@ local function Paint()
 	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + (DB.cinema and 8 or 0),
 		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches, Code(haze), Code(hdr), facing,
 		Code(V("mistHigh") or 0), Code(V("rayDefinition") or 0), Code(V("mistFlow") or 0),
-		Code(V("bright") or 50), Code(V("contrast") or 50), Code(V("satur") or 50), Code(V("warmth") or 50) }
+		Code(V("bright") or 50), Code(V("contrast") or 50), Code(V("satur") or 50), Code(V("warmth") or 50),
+		Code(V("raysOpen") or 45), Code(V("raysReach") or 50), Code(V("sunGlow") or 50), Code(V("mistNear") or 0) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v
@@ -516,16 +529,16 @@ local function MakeCode()
 		end
 	end
 	parts[#parts + 1] = tostring(f)
-	for _, k in ipairs(CODE_KEYS6) do
+	for _, k in ipairs(CODE_KEYS8) do
 		parts[#parts + 1] = tostring(math.floor((DB[k] or 0) + 0.5))
 	end
 	parts[#parts + 1] = tostring(DB.bokeh and 4 or 0)
-	return "GUW6:" .. table.concat(parts, ".")
+	return "GUW8:" .. table.concat(parts, ".")
 end
 
 -- The values a code carries, or nil when the line is not a GU-WOW code.
 local function ParseCode(code)
-	local ver, body = string.match(code or "", "GUW([123456]):([%d%.]+)")
+	local ver, body = string.match(code or "", "GUW([12345678]):([%d%.]+)")
 	if not body then
 		return nil
 	end
@@ -534,8 +547,8 @@ local function ParseCode(code)
 		nums[#nums + 1] = tonumber(n)
 	end
 	local n1 = #CODE_KEYS + 1
-	local keys2 = ver == "6" and CODE_KEYS6
-		or (ver == "5" and CODE_KEYS5 or (ver == "4" and CODE_KEYS4 or (ver == "3" and CODE_KEYS3 or CODE_KEYS2)))
+	local keys2 = ver == "8" and CODE_KEYS8 or (ver == "7" and CODE_KEYS7 or (ver == "6" and CODE_KEYS6
+		or (ver == "5" and CODE_KEYS5 or (ver == "4" and CODE_KEYS4 or (ver == "3" and CODE_KEYS3 or CODE_KEYS2)))))
 	if #nums ~= (ver == "1" and n1 or n1 + #keys2 + 1) then
 		return nil
 	end
@@ -592,8 +605,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.7.0.\n\nЯркость и цвет в самой игре: на странице «Основные» появились «Яркость», «Контрастность», «Сочность цвета» и «Тепло картинки» — сам WoW так не умеет. Рядом пресеты картинки: «Стандарт WoW», пять готовых и слот «Мой» под ваши значения. 50 у любого ползунка = картинка игры без изменений.\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.7.0.\n\nBrightness and colour inside the game: the Main page now has Brightness, Contrast, Colour richness and Picture warmth — WoW itself cannot do this. Next to them the picture presets: WoW standard, five ready ones and a My slot for your own values. 50 on any slider = the game's own picture.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён: публичная бета 1.0.\n\nК отчёту об ошибке теперь прикладывается снимок экрана: наведите камеру на баг, нажмите «Приложить снимок» в окне /gu report — и картинка уйдёт вместе с отчётом. У лучей свои ручки и пресеты на странице «Лучи», яркость и цвет — на «Картинке», туман у ног — на «Атмосфере». Настройки по умолчанию обновлены на авторские.\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated: public beta 1.0.\n\nThe bug report now carries a screenshot: aim the camera at the bug, press Attach a shot in the /gu report window — and the picture goes with the report. The rays have their own dials and presets on the Rays page, brightness and colour live on Picture, the mist at the feet on Atmosphere. The defaults are refreshed to the author's picks.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -841,8 +854,8 @@ homeText:SetPoint("TOPLEFT", 16, -52)
 homeText:SetWidth(600)
 homeText:SetJustifyH("LEFT")
 homeText:SetSpacing(4)
-homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Основные» — атмосфера, ночь, картинка и готовые пресеты.\n«Дополнительно» — стили, коды, свои пресеты и поведение.\n«Фоторежим» — снимки и всё, что нужно только для них.\n\nПодсказки:\nF11 включает и выключает весь мод. Своя клавиша: Меню → Управление → GU-WOW.\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
-	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMain — the atmosphere, the night, the picture and the ready presets.\nExtras — styles, codes, your presets and behaviour.\nPhoto mode — screenshots and what only they need.\n\nHints:\nF11 toggles the whole mod. Your own key: Menu → Key Bindings → GU-WOW.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode.\nChat commands: /gu menu · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
+homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Основные» — включатель мода и готовые пресеты.\n«Атмосфера» — туман, погода, мокрая земля, тени и марево.\n«Лучи» — лучи солнца и свечение в тумане, со своими пресетами.\n«Ночь» — темнота, свет огней и подземелья.\n«Картинка» — резкость, цвет, яркость и плёночные эффекты, со своими пресетами.\n«Дополнительно» — стили, коды, свои пресеты и поведение.\n«Фоторежим» — снимки и всё, что нужно только для них.\n\nПодсказки:\nF11 включает и выключает весь мод. Своя клавиша: Меню → Управление → GU-WOW.\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
+	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMain — the mod switch and the ready presets.\nAtmosphere — fog, weather, wet ground, shadows and heat haze.\nRays — the sun rays and the glow in the fog, with their own presets.\nNight — darkness, firelight and dungeons.\nPicture — sharpness, colour, brightness and the film effects, with their own presets.\nExtras — styles, codes, your presets and behaviour.\nPhoto mode — screenshots and what only they need.\n\nHints:\nF11 toggles the whole mod. Your own key: Menu → Key Bindings → GU-WOW.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode.\nChat commands: /gu menu · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
 
 local panel = CreateFrame("Frame", "LegionGUPanel", UIParent)
 panel.name = T("Основные", "Main")
@@ -857,6 +870,32 @@ sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 sub:SetText(T("Всё, что видно в игре. Меняется сразу. Пресет листается стрелками, «Применить» на полоске вверху экрана оставляет его.",
 	"Everything seen in the game. Changes apply at once. The arrows walk the presets, «Apply» on the top bar keeps one."))
 
+-- The settings live on their own pages since 1.7.1: one page per theme keeps the text at full size. The old
+-- single page grew past the window, and the fit-to-window scale made the font tiny.
+local function NewPage(frameName, ru, en, subRu, subEn)
+	local f = CreateFrame("Frame", frameName, UIParent)
+	f.name = T(ru, en)
+	f.parent = home.name
+	f:Hide()
+	local t = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	t:SetPoint("TOPLEFT", 16, -16)
+	t:SetText("GU-WOW: " .. f.name)
+	if subRu then
+		local s = f:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		s:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -6)
+		s:SetText(T(subRu, subEn))
+	end
+	return f
+end
+local panelAtmo = NewPage("LegionGUPanelAtmo", "Атмосфера", "Atmosphere",
+	"Туман, низовой туман, погода, мокрая земля, тени и марево.", "Fog, ground mist, weather, wet ground, shadows and heat haze.")
+local panelRays = NewPage("LegionGUPanelRays", "Лучи", "Rays",
+	"Лучи солнца и свечение солнца в тумане.", "The sun rays and the sun's glow in the fog.")
+local panelNight = NewPage("LegionGUPanelNight", "Ночь", "Night",
+	"Ночь по игровым часам, свет огней и темнота подземелий.", "Night by the game clock, firelight and dungeon darkness.")
+local panelPic = NewPage("LegionGUPanelPic", "Картинка", "Picture",
+	"Резкость, цвет, яркость и плёночные эффекты.", "Sharpness, colour, brightness and the film effects.")
+
 -- The GU-WOW pages are laid out about 745 by 585 points and the Blizzard options window is smaller. The pages
 -- scale themselves into the window on show (1.6.9): the window itself never changes size and no manual font
 -- slider is needed — the fit follows the player's own window and UI scale.
@@ -866,7 +905,7 @@ local function FitPages()
 	if not c then
 		return
 	end
-	local sc = math.min(1, c:GetWidth() / 748, c:GetHeight() / 712)
+	local sc = math.min(1, c:GetWidth() / 748, c:GetHeight() / 588)
 	if sc < 0.5 then
 		sc = 0.5
 	end
@@ -1012,130 +1051,160 @@ widgets.base = { Refresh = function()
 	baseLabel:SetText(name or T("Свои настройки", "Custom"))
 end }
 
-Header(panel, T("Атмосфера", "Atmosphere"), L, -94)
-Check(panel, "fog", T("Туман", "Fog"), L, -108)
-Slider(panel, "fogThickness", T("Густота тумана", "Fog density"), L + 6, -144)
-Slider(panel, "fogDistance", T("Дальность тумана", "Fog distance"), L + 6, -182)
-Slider(panel, "mist", T("Низовой туман", "Ground mist"), L + 6, -220)
-Slider(panel, "mistDensity", T("Плотность низового тумана", "Ground mist thickness"), L + 6, -258, nil, nil, 86)
-Slider(panel, "mistHigh", T("Туман с высоты: с гор и в полёте", "Mist from a height: hills and flight"), L + 6, -296)
-Check(panel, "weather", T("Погодное настроение", "Weather mood"), L, -318)
-Check(panel, "wet", T("Мокрая земля в дождь", "Wet ground in rain"), L, -341)
-Check(panel, "rays", T("Лучи солнца", "Sun rays"), L, -364)
-Slider(panel, "raysStrength", T("Сила лучей", "Ray strength"), L + 6, -400)
-Slider(panel, "rayDefinition", T("Чёткость лучей: от свечения до снопов", "Ray definition: a glow or shafts"), L + 6, -438, nil, nil, 71)
-Slider(panel, "ao", T("Тени в щелях", "Contact shadows"), L + 6, -476)
-Slider(panel, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), L + 6, -514, nil, nil, 71)
+Header(panelAtmo, T("Туман", "Fog"), L, -60)
+Check(panelAtmo, "fog", T("Туман", "Fog"), L, -74)
+Slider(panelAtmo, "fogThickness", T("Густота тумана", "Fog density"), L + 6, -110)
+Slider(panelAtmo, "fogDistance", T("Дальность тумана", "Fog distance"), L + 6, -152)
+Slider(panelAtmo, "mist", T("Низовой туман", "Ground mist"), L + 6, -194)
+Slider(panelAtmo, "mistDensity", T("Плотность низового тумана", "Ground mist thickness"), L + 6, -236, nil, nil, 86)
+Slider(panelAtmo, "mistHigh", T("Туман с высоты: с гор и в полёте", "Mist from a height: hills and flight"), L + 6, -278)
+-- The mist at the feet (1.7.1): ankle-deep, with no clear circle around the player. Swamps ask for it.
+Slider(panelAtmo, "mistNear", T("Туман у ног: по щиколотку", "Mist at the feet: ankle-deep"), L + 6, -320, nil, nil, 71,
+	T("Стелется прямо под персонажем, без чистого круга. 0 выключает — как раньше", "Lies right under the character, no clear circle. 0 turns it off — as before"))
+Header(panelAtmo, T("Погода и земля", "Weather and ground"), R, -60)
+Check(panelAtmo, "weather", T("Погодное настроение", "Weather mood"), R, -74)
+Check(panelAtmo, "wet", T("Мокрая земля в дождь", "Wet ground in rain"), R, -98)
+Slider(panelAtmo, "ao", T("Тени в щелях", "Contact shadows"), R + 6, -140)
+Slider(panelAtmo, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), R + 6, -182, nil, nil, 71)
 
-Header(panel, T("Ночь", "Night"), R, -94)
-Check(panel, "night", T("Ночь и огни", "Night and lights"), R, -110)
-Slider(panel, "nightDarkness", T("Темнота ночи", "Night darkness"), R + 6, -150)
-Slider(panel, "nightDepth", T("Глубина ночи", "Night depth"), R + 6, -192, nil, nil, nil,
+Check(panelRays, "rays", T("Лучи солнца", "Sun rays"), L, -60)
+Slider(panelRays, "raysStrength", T("Сила лучей", "Ray strength"), L + 6, -100)
+Slider(panelRays, "rayDefinition", T("Чёткость лучей: от свечения до снопов", "Ray definition: a glow or shafts"), L + 6, -142, nil, nil, 71)
+-- The rays' own dials (1.7.1): the open-sky strength, the length and the sun's glow in the fog.
+Slider(panelRays, "raysOpen", T("Лучи в открытом небе", "Rays in the open"), L + 6, -184, nil, nil, 71,
+	T("Сила лучей в поле и на снегу, где нет крон. 22 — как в 1.7.0, выше — заметнее", "Ray strength over fields and snow, with no canopy. 22 is the 1.7.0 look, higher is bolder"))
+Slider(panelRays, "raysReach", T("Длина лучей (50 — как было)", "Ray length (50 — as before)"), R + 6, -100, nil, nil, 81)
+Slider(panelRays, "sunGlow", T("Свечение солнца в тумане (50 — как было)", "Sun glow in the fog (50 — as before)"), R + 6, -142, nil, nil, 76)
+
+Header(panelNight, T("Ночь", "Night"), L, -60)
+Check(panelNight, "night", T("Ночь и огни", "Night and lights"), L, -76)
+Slider(panelNight, "nightDarkness", T("Темнота ночи", "Night darkness"), L + 6, -116)
+Slider(panelNight, "nightDepth", T("Глубина ночи", "Night depth"), L + 6, -158, nil, nil, nil,
 	T("Дополнительная тьма поверх «Темноты ночи»: 0 обычная ночь, 100 глухая", "Extra darkness over the night darkness: 0 a plain night, 100 pitch dark"))
-Slider(panel, "lightGlow", T("Свет огней", "Light glow"), R + 6, -234)
-Slider(panel, "caveDarkness", T("Темнота подземелий", "Dungeon darkness"), R + 6, -276)
+Slider(panelNight, "lightGlow", T("Свет огней", "Light glow"), R + 6, -116)
+Slider(panelNight, "caveDarkness", T("Темнота подземелий", "Dungeon darkness"), R + 6, -158)
 
-Header(panel, T("Картинка", "Picture"), R, -306)
-Check(panel, "eye", T("Привыкание глаз", "Eye adaptation"), R, -322)
-Slider(panel, "sharpness", T("Резкость", "Sharpness"), R + 6, -360, nil, nil, 61)
-Slider(panel, "grade", T("Цвет по времени суток", "Time of day colour"), R + 6, -400, nil, nil, nil,
+Header(panelPic, T("Картинка", "Picture"), L, -60)
+Check(panelPic, "eye", T("Привыкание глаз", "Eye adaptation"), L, -76)
+Slider(panelPic, "sharpness", T("Резкость", "Sharpness"), L + 6, -116, nil, nil, 61)
+Slider(panelPic, "grade", T("Цвет по времени суток", "Time of day colour"), L + 6, -158, nil, nil, nil,
 	T("Золото вечера и утра, холод ночи: сила окраски по игровым часам", "The gold of the evening and the cool of the night, by the game clock"))
-Slider(panel, "vignette", T("Виньетка", "Vignette"), R + 6, -440)
-Slider(panel, "hdrStrength", T("Кино-HDR: глубже тени, мягче блики", "Cinema HDR: deeper shadows, softer highlights"), R + 6, -480)
-Slider(panel, "grain", T("Плёночное зерно", "Film grain"), R + 6, -520, nil, nil, 71)
+Slider(panelPic, "vignette", T("Виньетка", "Vignette"), L + 6, -200)
+Slider(panelPic, "hdrStrength", T("Кино-HDR: глубже тени, мягче блики", "Cinema HDR: deeper shadows, softer highlights"), R + 6, -116)
+Slider(panelPic, "grain", T("Плёночное зерно", "Film grain"), R + 6, -158, nil, nil, 71)
 
--- Brightness and colour (1.7.0): the game has no brightness control of its own, so GU-WOW carries one. 50 on
--- every dial is the game's own picture. The presets: the game's standard, five authored looks and one slot of
--- the player's own («Мой»), saved and deleted with the same «+» and «-» hands as the atmosphere presets.
-local PIC_KEYS = { "bright", "contrast", "satur", "warmth" }
-local PIC_PRESETS = {
-	{ T("Стандарт WoW", "WoW standard"), { bright = 50, contrast = 50, satur = 50, warmth = 50 } },
-	{ T("Живые краски", "Living colours"), { bright = 52, contrast = 58, satur = 62, warmth = 52 } },
-	{ T("Кино", "Cinema"), { bright = 50, contrast = 62, satur = 45, warmth = 54 } },
-	{ T("Мягкий вечер", "Soft evening"), { bright = 55, contrast = 44, satur = 50, warmth = 56 } },
-	{ T("Север", "North"), { bright = 50, contrast = 54, satur = 42, warmth = 40 } },
-	{ T("Полдень Азерота", "Azeroth noon"), { bright = 54, contrast = 52, satur = 56, warmth = 50 } },
-}
-local MY_PIC = T("Мой", "My own")
-Header(panel, T("Яркость и цвет", "Brightness and colour"), L, -560)
-Slider(panel, "bright", T("Яркость (50 — как в игре)", "Brightness (50 — the game's own)"), L + 6, -608)
-Slider(panel, "satur", T("Сочность цвета", "Colour richness"), L + 6, -646)
-Slider(panel, "contrast", T("Контрастность", "Contrast"), R + 6, -608)
-Slider(panel, "warmth", T("Тепло картинки: холоднее или теплее", "Picture warmth: colder or warmer"), R + 6, -646)
--- The carousel: the ready looks and, when saved, the player's own one at the end.
-local picIndex = 1
-local function PicList()
-	local list = {}
-	for _, p in ipairs(PIC_PRESETS) do
-		list[#list + 1] = p
+-- A preset carousel (1.7.1): the ready looks and, when saved, the player's own one («Мой») at the end. «<» and
+-- «>» page with a preview, «+» saves the on-screen values into the own slot, «-» deletes it. One factory serves
+-- the picture and the rays; opts: keys, presets, slot (the DB field), what (for the speech), x, y, widget.
+local function Carousel(opts)
+	local index = 1
+	local function List()
+		local list = {}
+		for _, p in ipairs(opts.presets) do
+			list[#list + 1] = p
+		end
+		if DB and DB[opts.slot] then
+			list[#list + 1] = { T("Мой", "My own"), DB[opts.slot] }
+		end
+		return list
 	end
-	if DB and DB.lookMy then
-		list[#list + 1] = { MY_PIC, DB.lookMy }
-	end
-	return list
-end
-local function MatchingPic()
-	for i, p in ipairs(PicList()) do
-		local same = true
-		for _, k in ipairs(PIC_KEYS) do
-			if V(k) ~= p[2][k] then
-				same = false
-				break
+	local function Matching()
+		for i, p in ipairs(List()) do
+			local same = true
+			for _, k in ipairs(opts.keys) do
+				if V(k) ~= p[2][k] then
+					same = false
+					break
+				end
+			end
+			if same then
+				return i, p[1]
 			end
 		end
-		if same then
-			return i, p[1]
+	end
+	local label = (opts.parent or panel):CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	label:SetPoint("TOPLEFT", opts.x + 28, opts.y - 5)
+	label:SetWidth(160)
+	label:SetHeight(12)
+	label:SetJustifyH("CENTER")
+	local function Show(d)
+		local list = List()
+		index = (index - 1 + d) % #list + 1
+		Preview(list[index][2], list[index][1])
+	end
+	Tip(Button(opts.parent or panel, "<", opts.x, opts.y, 24, function() Show(-1) end), T("Предыдущий пресет: ", "Previous preset: ") .. opts.what)
+	Tip(Button(opts.parent or panel, ">", opts.x + 192, opts.y, 24, function() Show(1) end), T("Следующий пресет: ", "Next preset: ") .. opts.what)
+	Tip(Button(opts.parent or panel, "+", opts.x + 220, opts.y, 24, function()
+		local save = function()
+			local my = {}
+			for _, k in ipairs(opts.keys) do
+				my[k] = V(k)
+			end
+			DB[opts.slot] = my
+			Refresh()
+			Say(opts.what .. T(" с экрана сохранены в пресет «Мой».", " from the screen are saved as «My own»."))
 		end
-	end
-end
-Header(panel, T("Пресет картинки", "Picture preset"), R, -560)
-local picLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-picLabel:SetPoint("TOPLEFT", R + 34, -581)
-picLabel:SetWidth(160)
-picLabel:SetHeight(12)
-picLabel:SetJustifyH("CENTER")
-local function ShowPic(d)
-	local list = PicList()
-	picIndex = (picIndex - 1 + d) % #list + 1
-	Preview(list[picIndex][2], list[picIndex][1])
-end
-Tip(Button(panel, "<", R + 6, -576, 24, function() ShowPic(-1) end), T("Предыдущий пресет картинки", "Previous picture preset"))
-Tip(Button(panel, ">", R + 198, -576, 24, function() ShowPic(1) end), T("Следующий пресет картинки", "Next picture preset"))
-Tip(Button(panel, "+", R + 226, -576, 24, function()
-	local save = function()
-		local my = {}
-		for _, k in ipairs(PIC_KEYS) do
-			my[k] = V(k)
+		if DB[opts.slot] then
+			Confirm(T("Заменить пресет «Мой» настройками с экрана?", "Replace «My own» with the on-screen settings?"), save)
+		else
+			save()
 		end
-		DB.lookMy = my
-		Refresh()
-		Say(T("яркость и цвет с экрана сохранены в пресет «Мой».", "the on-screen brightness and colour are saved as «My own»."))
-	end
-	if DB.lookMy then
-		Confirm(T("Заменить пресет «Мой» настройками с экрана?", "Replace «My own» with the on-screen settings?"), save)
-	else
-		save()
-	end
-end), T("Сохранить яркость и цвет с экрана в пресет «Мой»", "Save the on-screen brightness and colour as «My own»"))
-Tip(Button(panel, "-", R + 254, -576, 24, function()
-	if not DB.lookMy then
-		Say(T("пресет «Мой» не сохранён, удалять нечего.", "«My own» is not saved, nothing to delete."))
-		return
-	end
-	Confirm(T("Удалить пресет «Мой»?", "Delete «My own»?"), function()
-		DB.lookMy = nil
-		picIndex = 1
-		Refresh()
-		Say(T("пресет «Мой» удалён.", "«My own» is deleted."))
-	end)
-end), T("Удалить пресет «Мой». Готовые не удаляются", "Delete «My own». The ready ones stay"))
-widgets.picBase = { Refresh = function()
-	local i, name = MatchingPic()
-	if i then
-		picIndex = i
-	end
-	picLabel:SetText(name or T("Свои настройки", "Custom"))
-end }
+	end), T("Сохранить настройки с экрана в пресет «Мой»", "Save the on-screen settings as «My own»"))
+	Tip(Button(opts.parent or panel, "-", opts.x + 248, opts.y, 24, function()
+		if not DB[opts.slot] then
+			Say(T("пресет «Мой» не сохранён, удалять нечего.", "«My own» is not saved, nothing to delete."))
+			return
+		end
+		Confirm(T("Удалить пресет «Мой»?", "Delete «My own»?"), function()
+			DB[opts.slot] = nil
+			index = 1
+			Refresh()
+			Say(T("пресет «Мой» удалён.", "«My own» is deleted."))
+		end)
+	end), T("Удалить пресет «Мой». Готовые не удаляются", "Delete «My own». The ready ones stay"))
+	widgets[opts.widget] = { Refresh = function()
+		local i, name = Matching()
+		if i then
+			index = i
+		end
+		label:SetText(name or T("Свои настройки", "Custom"))
+	end }
+end
+
+-- Brightness and colour (1.7.0): the game has no brightness control of its own, so GU-WOW carries one. 50 on
+-- every dial is the game's own picture.
+Header(panelPic, T("Яркость и цвет", "Brightness and colour"), L, -240)
+Slider(panelPic, "bright", T("Яркость (50 — как в игре)", "Brightness (50 — the game's own)"), L + 6, -280, nil, nil, 76)
+Slider(panelPic, "satur", T("Сочность цвета", "Colour richness"), L + 6, -322, nil, nil, 81)
+Slider(panelPic, "contrast", T("Контрастность", "Contrast"), R + 6, -280, nil, nil, 76)
+Slider(panelPic, "warmth", T("Тепло картинки: холоднее или теплее", "Picture warmth: colder or warmer"), R + 6, -322)
+Header(panelRays, T("Пресет лучей", "Rays preset"), L, -230)
+Carousel({
+	keys = { "raysStrength", "rayDefinition", "raysOpen", "raysReach", "sunGlow" },
+	presets = {
+		{ T("Стандарт GU", "GU standard"), { raysStrength = 100, rayDefinition = 55, raysOpen = 45, raysReach = 50, sunGlow = 50 } },
+		{ T("Утро в лесу", "Forest morning"), { raysStrength = 80, rayDefinition = 10, raysOpen = 30, raysReach = 60, sunGlow = 75 } },
+		{ T("Снопы света", "Light shafts"), { raysStrength = 100, rayDefinition = 90, raysOpen = 45, raysReach = 80, sunGlow = 50 } },
+		{ T("Яркий полдень", "Bright noon"), { raysStrength = 100, rayDefinition = 40, raysOpen = 80, raysReach = 50, sunGlow = 60 } },
+		{ T("Тихая дымка", "Quiet haze"), { raysStrength = 60, rayDefinition = 15, raysOpen = 25, raysReach = 40, sunGlow = 35 } },
+	},
+	slot = "raysMy", what = T("настройки лучей", "the rays settings"),
+	parent = panelRays, x = L + 6, y = -246, widget = "raysBase",
+})
+Header(panelPic, T("Пресет картинки", "Picture preset"), L, -370)
+Carousel({
+	keys = { "bright", "contrast", "satur", "warmth" },
+	presets = {
+		{ T("Стандарт WoW", "WoW standard"), { bright = 50, contrast = 50, satur = 50, warmth = 50 } },
+		{ T("Живые краски", "Living colours"), { bright = 52, contrast = 58, satur = 62, warmth = 52 } },
+		{ T("Кино", "Cinema"), { bright = 50, contrast = 62, satur = 45, warmth = 54 } },
+		{ T("Мягкий вечер", "Soft evening"), { bright = 55, contrast = 44, satur = 50, warmth = 56 } },
+		{ T("Север", "North"), { bright = 50, contrast = 54, satur = 42, warmth = 40 } },
+		{ T("Полдень Азерота", "Azeroth noon"), { bright = 54, contrast = 52, satur = 56, warmth = 50 } },
+	},
+	slot = "lookMy", what = T("яркость и цвет", "the brightness and colour"),
+	parent = panelPic, x = L + 6, y = -386, widget = "picBase",
+})
 
 -- The lesson of 1.6.2: with MSAA on the effects see no depth and quietly stop. Say it in the menu.
 local msaaWarn = home:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
@@ -1304,7 +1373,40 @@ local function OpenReport()
 	note:SetJustifyH("LEFT")
 	note:SetText(T("Служебные данные (версия, настройки, логи) прилагаются автоматически.",
 		"The service data (version, settings, logs) is attached for you."))
-	Button(fr, T("Отправить", "Send"), 60, -298, 150, function()
+	-- The screenshot (beta-1.0): the player frames the shot, the window hides for a second, the game takes a
+	-- JPEG, and the helper attaches it to the issue. The moment is remembered so the helper picks the right file.
+	local shotAt
+	local shotNote = fr:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+	shotNote:SetPoint("BOTTOMLEFT", 16, 36)
+	shotNote:SetWidth(408)
+	shotNote:SetJustifyH("LEFT")
+	shotNote:SetTextColor(0.4, 1.0, 0.4)
+	shotNote:Hide()
+	Button(fr, T("Приложить снимок", "Attach a shot"), 16, -298, 136, function()
+		local fmt = GetCVar and GetCVar("screenshotFormat")
+		local q = GetCVar and GetCVar("screenshotQuality")
+		if SetCVar then
+			SetCVar("screenshotFormat", "jpeg")
+			SetCVar("screenshotQuality", "9")
+		end
+		fr:Hide()
+		After(0.25, function()
+			Screenshot()
+		end)
+		After(1.2, function()
+			if SetCVar then
+				SetCVar("screenshotFormat", fmt or "jpeg")
+				if q then
+					SetCVar("screenshotQuality", q)
+				end
+			end
+			shotAt = date("%Y-%m-%d %H:%M:%S")
+			shotNote:SetText(T("Снимок сделан и приложится к отчёту.", "The shot is taken and goes with the report."))
+			shotNote:Show()
+			fr:Show()
+		end)
+	end)
+	Button(fr, T("Отправить", "Send"), 158, -298, 140, function()
 		titleBox:ClearFocus()
 		textBox:ClearFocus()
 		local build, _, _, iface = GetBuildInfo()
@@ -1315,6 +1417,7 @@ local function OpenReport()
 			code = MakeCode(), fps = math.floor(GetFramerate() or 0),
 			msaa = GetCVar and (GetCVar("MSAAQuality") or GetCVar("gxMultisample")) or "?",
 			win = GetCVar and GetCVar("gxWindow") or "?", build = tostring(build) .. "/" .. tostring(iface),
+			shot = shotAt,
 		}
 		fr:Hide()
 		-- The game writes saved variables to disk only on logout or a UI reload, and the support helper reads
@@ -1322,7 +1425,7 @@ local function OpenReport()
 		-- The reload runs inside the click itself: the game ignores it from a timer, outside a key or mouse press.
 		ReloadUI()
 	end)
-	Button(fr, T("Закрыть", "Close"), 240, -298, 130, function()
+	Button(fr, T("Закрыть", "Close"), 304, -298, 116, function()
 		fr:Hide()
 	end)
 	fr:Show()
@@ -1566,6 +1669,17 @@ end)
 page:SetScript("OnHide", ShrinkOptions)
 page.refresh = Refresh
 guPages[1], guPages[2], guPages[3], guPages[4] = home, panel, page, pagePhoto
+guPages[5], guPages[6], guPages[7], guPages[8] = panelAtmo, panelRays, panelNight, panelPic
+for _, f in ipairs({ panelAtmo, panelRays, panelNight, panelPic }) do
+	f:SetScript("OnShow", function()
+		GrowOptions()
+		Refresh()
+	end)
+	f:SetScript("OnHide", ShrinkOptions)
+	f.refresh = Refresh
+	f.okay = function() end
+	f.cancel = function() end
+end
 home:SetScript("OnShow", function()
 	GrowOptions()
 	Refresh()
@@ -1576,6 +1690,10 @@ local category
 if InterfaceOptions_AddCategory then
 	InterfaceOptions_AddCategory(home)
 	InterfaceOptions_AddCategory(panel)
+	InterfaceOptions_AddCategory(panelAtmo)
+	InterfaceOptions_AddCategory(panelRays)
+	InterfaceOptions_AddCategory(panelNight)
+	InterfaceOptions_AddCategory(panelPic)
 	InterfaceOptions_AddCategory(page)
 	InterfaceOptions_AddCategory(pagePhoto)
 elseif Settings and Settings.RegisterCanvasLayoutCategory then
@@ -1770,13 +1888,17 @@ events:SetScript("OnEvent", function(self, event, arg1)
 		end
 		-- The three slots of 1.5.0 become the first presets, so nothing saved in them is lost.
 		DB.presets = DB.presets or {}
-		-- The player's own picture preset (1.7.0): a broken save is dropped, not clamped, it is one button to remake.
-		if DB.lookMy then
-			for _, k in ipairs({ "bright", "contrast", "satur", "warmth" }) do
-				local v = DB.lookMy[k]
-				if type(v) ~= "number" or v < 0 or v > 100 then
-					DB.lookMy = nil
-					break
+		-- The player's own preset slots (1.7.0, 1.7.1): a broken save is dropped, not clamped, it is one button to remake.
+		local SLOT_KEYS = { lookMy = { "bright", "contrast", "satur", "warmth" },
+			raysMy = { "raysStrength", "rayDefinition", "raysOpen", "raysReach", "sunGlow" } }
+		for slot, keys in pairs(SLOT_KEYS) do
+			if DB[slot] then
+				for _, k in ipairs(keys) do
+					local v = DB[slot][k]
+					if type(v) ~= "number" or v < 0 or v > 100 then
+						DB[slot] = nil
+						break
+					end
 				end
 			end
 		end

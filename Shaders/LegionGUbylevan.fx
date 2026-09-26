@@ -182,8 +182,12 @@
 #define LEGIONGU_CTL_CONTRAST 28 // contrast, 50 neutral
 #define LEGIONGU_CTL_SAT 29      // colour saturation, 50 neutral
 #define LEGIONGU_CTL_WARMTH 30   // white balance, 50 neutral, lower cold, higher warm
+#define LEGIONGU_CTL_RAYS_OPEN 31 // rays in the open, percent of the full strength; the old fixed cut was 22, 1.7.1
+#define LEGIONGU_CTL_RAYS_REACH 32 // ray length, 50 neutral
+#define LEGIONGU_CTL_SUN_GLOW 33 // the sun's glow in the fog, 50 neutral, 0 off, 100 double
+#define LEGIONGU_CTL_MIST_NEAR 34 // the mist at the feet, ankle-deep, 0 off, 1.7.1
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 65    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 73    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -192,7 +196,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 31; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 35; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -1002,8 +1006,10 @@ namespace LegionGU
 	// Texel 4: the sun for the in-scatter. Texel 5: the weather (see WEATHER_SKY_TAPS). Texel 6: the ground plane
 	// for the low mist (see GroundPlane). Texel 7: the indoor share, the game's bit eased over INSIDE_IN and
 	// INSIDE_OUT seconds, so walking out of a tavern fades the effects in instead of snapping them.
-	texture2D FogCurTex { Width = 8; Height = 1; Format = RGBA32F; };
-	texture2D FogPrevTex { Width = 8; Height = 1; Format = RGBA32F; };
+	// Texel 8: the facing, eased (1.7.1). The strip carries it in 64 steps updated a few times a second, and the
+	// mist's drift pattern is anchored to it: raw, every step moved the mist in visible chunks on a camera turn.
+	texture2D FogCurTex { Width = 9; Height = 1; Format = RGBA32F; };
+	texture2D FogPrevTex { Width = 9; Height = 1; Format = RGBA32F; };
 	sampler2D FogCur { Texture = FogCurTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 	sampler2D FogPrev { Texture = FogPrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
@@ -1404,7 +1410,9 @@ namespace LegionGU
 		// The grey sky takes the glow away like it takes the rays (see RaysCompositePS): in the rain the finder
 		// follows a bright cloud, and its glow flooded half the frame with yellow through the downpour.
 		float grey = 1.0 - 0.8 * saturate(tex2Dfetch(FogCur, int2(5, 0)).y);
-		return (SunInFogAt(uv, tex2Dfetch(FogCur, int2(4, 0)))) * grey * (1.0 - LegionGUNight());
+		// The player's dial (1.7.1): 50 the built-in look, 0 no glow at all, 100 twice the glow.
+		float dial = LegionGUValue(LEGIONGU_CTL_SUN_GLOW, 50.0) * 0.02;
+		return (SunInFogAt(uv, tex2Dfetch(FogCur, int2(4, 0)))) * grey * dial * (1.0 - LegionGUNight());
 	}
 
 	// The colour of the haze layer. The distance fog keeps the fog colour, so the distance dissolves into it.
@@ -1759,6 +1767,17 @@ namespace LegionGU
 			return float4(e, f, 0.0, 1.0);
 		}
 
+		if (texel == 8)
+		{
+			// The facing, eased as a unit vector so the wrap at north is no jump (1.7.1). The strip's 64 steps
+			// land a few times a second; raw, each step shifted the mist drift sideways in a visible chunk.
+			float raw = LegionGUFacingRad();
+			float2 now8 = float2(cos(raw), sin(raw));
+			float2 v8 = seeded ? lerp(tex2Dfetch(FogPrev, int2(8, 0)).xy, now8, Rate(dt, 0.4)) : now8;
+			float l8 = length(v8);
+			return float4(l8 > 1e-4 ? v8 / l8 : now8, 0.0, 1.0);
+		}
+
 		// The frame's average; the far land weighted by distance and by the square of its brightness, so the
 		// farthest and brightest land wins (farN counts it without the weights, for the confidence); the mean
 		// brightness of the sky without the sun.
@@ -2008,7 +2027,9 @@ namespace LegionGU
 	// camera rides through it. Two waves at different speeds read as flow without any texture.
 	float MistFlow(float ax, float ly)
 	{
-		float flow = LegionGUValue(LEGIONGU_CTL_MIST_FLOW, 0.0) * 0.01;
+		// Capped at 40 whatever the slider says (beta-1.0): above that the breathing turned into waves rolling
+		// over the ground, and the owner pinned the artefact to exactly this dial.
+		float flow = min(LegionGUValue(LEGIONGU_CTL_MIST_FLOW, 0.0), 40.0) * 0.01;
 		if (flow <= 0.0)
 			return 1.0;
 		float t = GUTimerFog * 0.001;
@@ -2017,7 +2038,7 @@ namespace LegionGU
 		return 1.0 + flow * 0.45 * w * 0.625;
 	}
 
-	float MistAt(float2 uv, float reversed, float4 ground, float4 m)
+	float MistAt(float2 uv, float reversed, float4 ground, float4 m, float flowScale)
 	{
 		float u = DepthU(RawDepth(uv), reversed);
 		float sky = SkyShare(u);
@@ -2033,8 +2054,13 @@ namespace LegionGU
 		float a = MIST_EYE / m.x;
 		float b = max(qp / m.x, -MIST_DEEP);
 		float density = abs(b - a) > 1e-3 ? (exp(-a) - exp(-b)) / (b - a) : exp(-a);
-		float ax = uv.x + LegionGUFacingRad() / (2.0 * atan(0.57735 * ASPECT));
-		float tau = m.z * max(z - m.y, 0.0) * density * MistFlow(ax, log2(max(z, 1.0)));
+		// The drift is anchored to the eased facing (texel 8), not the raw strip value: the strip's 64 steps land
+		// a few times a second, and raw, every step tore the mist into visible chunks on a camera turn (1.7.1).
+		// flowScale mutes the drift: the dense band at the feet turned the breathing rings into fat waves that
+		// stood on the screen while the character ran, so it takes the pattern barely at all.
+		float2 f8 = tex2Dfetch(FogCur, int2(8, 0)).xy;
+		float ax = uv.x + atan2(f8.y, f8.x) / (2.0 * atan(0.57735 * ASPECT));
+		float tau = m.z * max(z - m.y, 0.0) * density * lerp(1.0, MistFlow(ax, log2(max(z, 1.0))), flowScale);
 		return m.w * (1.0 - exp(-tau)) * (1.0 - sky) * ground.z;
 	}
 
@@ -2088,8 +2114,24 @@ namespace LegionGU
 		{
 			float reversed = EffectiveReversed(depthState.w);
 			float2 o = 0.45 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
-			mist = 0.5 * (MistAt(uv - o, reversed, ground, m) + MistAt(uv + o, reversed, ground, m));
+			mist = 0.5 * (MistAt(uv - o, reversed, ground, m, 1.0) + MistAt(uv + o, reversed, ground, m, 1.0));
 			mist *= depthState.x * (1.0 - smoothstep(0.6, 0.95, view.y)) * (1.0 - UIMask(uv));
+		}
+		// The mist at the feet (1.7.1): a second, ankle-deep band with no clear circle around the player — the
+		// main mist starts 6 to 25 yards out, which is why a swamp never lapped at the boots. The eye stands
+		// above such a low band, and the height falloff ate three quarters of it (the first cut read as nothing
+		// at 100): the density makes up for exp(-MIST_EYE / height) up front, so the dial's percent is what the
+		// player actually sees at the ground. The drift pattern rides at half strength: enough to live, too
+		// little to roll waves.
+		float nearAmt = LegionGUValue(LEGIONGU_CTL_MIST_NEAR, 0.0) * 0.01;
+		if (nearAmt > 0.0 && ground.z > 0.0 && depthState.y > 0.5 && depthState.x > 0.0)
+		{
+			float nearH = MIST_HEIGHT * 0.45;
+			float4 mn = float4(nearH, 0.0, MIST_DENSITY * 6.0 * nearAmt * exp(MIST_EYE / nearH), lerp(0.3, 0.65, nearAmt) * (1.0 - inside.x));
+			float reversed = EffectiveReversed(depthState.w);
+			float2 o = 0.45 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+			float near = 0.5 * (MistAt(uv - o, reversed, ground, mn, 0.5) + MistAt(uv + o, reversed, ground, mn, 0.5));
+			mist = max(mist, near * depthState.x * (1.0 - smoothstep(0.6, 0.95, view.y)) * (1.0 - UIMask(uv)));
 		}
 		if (a.x + a.y <= 0.0 && mist <= 0.0 && weather <= 0.0)
 			return c;
@@ -2170,6 +2212,9 @@ namespace LegionGU
 		s.lengthFrac = RaysLength;
 		if (dh > 1e-4 && RaysMaxLength / dh < s.lengthFrac)
 			s.lengthFrac = RaysMaxLength / dh;
+		// The player's length dial (1.7.1): 50 the built-in look, 0 half, 100 half again as long. The blur
+		// clamps its own share at 0.98, so a long dial cannot smear past the sun.
+		s.lengthFrac *= lerp(0.5, 1.5, LegionGUValue(LEGIONGU_CTL_RAYS_REACH, 50.0) * 0.01);
 		return s;
 	}
 
@@ -2823,9 +2868,11 @@ namespace LegionGU
 			float since = tex2Dfetch(RaysCur, int2(6, 0)).x;
 			gain *= depthLive * saturate((DEPTH_HOLD_TIME + DEPTH_FADE_TIME - since) / DEPTH_FADE_TIME);
 		}
-		// Open view: a mild glow only. Under leaves: the full shafts.
+		// Open view: a mild glow only. Under leaves: the full shafts. The open strength is the player's dial
+		// (1.7.1): the fixed RAYS_OPEN_GAIN cut the rays to a fifth over every field and snowfield, and that
+		// read as "the rays are gone"; the dial's percent is the strength in the open, 22 the old look.
 		float canopy = saturate((tex2Dfetch(RaysCur, int2(7, 0)).x - CANOPY_LO) / (CANOPY_HI - CANOPY_LO));
-		gain *= lerp(RAYS_OPEN_GAIN, 1.0, canopy);
+		gain *= lerp(LegionGUValue(LEGIONGU_CTL_RAYS_OPEN, 100.0 * RAYS_OPEN_GAIN) * 0.01, 1.0, canopy);
 		// Under a grey overcast the sun stands behind the clouds: what the finder follows there is a bright
 		// cloud, and its shafts beat through the rain. The grey sky takes up to four fifths of the rays away.
 		gain *= 1.0 - 0.8 * saturate(tex2Dfetch(FogCur, int2(5, 0)).y);
@@ -2866,7 +2913,7 @@ namespace LegionGU
 	static const float BRIDGE_GAP = 0.3;    // smallest step between black and white in each channel
 	static const float BRIDGE_HOLD = 2.0;   // seconds the last values stay after the strip is gone
 
-	texture2D BridgePrevTex { Width = 31; Height = 1; Format = RGBA32F; };
+	texture2D BridgePrevTex { Width = 35; Height = 1; Format = RGBA32F; };
 	sampler2D BridgePrev { Texture = BridgePrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 	float3 BridgeCell(int i)
@@ -2915,7 +2962,7 @@ namespace LegionGU
 			bool live = seen || (prev0.x > 0.5 && since <= BRIDGE_HOLD);
 			return float4(live ? 1.0 : 0.0, since, seen ? 1.0 : 0.0, 1.0);
 		}
-		if (seen && texel <= 30)
+		if (seen && texel <= 34)
 			return float4(BridgeValue(1 + 2 * texel, th) / 63.0, 0.0, 0.0, 1.0);
 		return tex2Dfetch(BridgePrev, int2(texel, 0));
 	}

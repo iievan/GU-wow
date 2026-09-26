@@ -5,13 +5,13 @@
 Графическое улучшение World of Warcraft. Основные работы проводятся на версии Legion 7.3.5. 
 Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
-Текущая сборка: **1.7.0-release «Живой огонь»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **public-release-beta-1.0 «Живой огонь»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.7.0-release
+## Что входит в сборку public-release-beta-1.0
 
 Всё настраивается в игре: Интерфейс > Модификации > GU-WOW, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -20,7 +20,7 @@
 | Атмосфера | Туман | Воздушная дымка вдали. Ползунки «Густота тумана» и «Дальность тумана» | до 1.3 |
 | Атмосфера | Низовой туман | Туман стелется по земле. Ползунки «Низовой туман» и «Плотность низового тумана» | 1.3 |
 | Атмосфера | Туман с высоты | Стелющийся туман виден с горы, с обрыва и в полёте: внизу лежат одеяла тумана. Ползунок, 0 даёт чистый воздух сверху | 1.6.0 |
-| Атмосфера | Лучи солнца | Лучи сквозь кроны и туман. Ползунки «Сила лучей» и «Чёткость лучей»: от мягкого свечения до отдельных снопов | до 1.3 |
+| Атмосфера | Лучи солнца | Лучи сквозь кроны и туман. Ползунки «Сила лучей», «Чёткость лучей», «Лучи в открытом небе», «Длина лучей» и «Свечение солнца в тумане». Пресеты лучей: «Стандарт GU», четыре характера и слот «Мой» | до 1.3, ручки 1.7.1 |
 | Атмосфера | Слежение за кадром | Эффекты знают, куда уехала картинка при повороте камеры: солнце не теряется, цвет тумана не плывёт, огни не отстают | 1.6.0 |
 | Атмосфера | Погодное настроение | В пасмурную погоду и в дождь дымка гуще, цвет холоднее, контраст мягче. Работает, только когда включён туман | 1.3 |
 | Атмосфера | Тени в щелях | Мягкие тени под камнями, травой и у стен, предметы садятся на землю | 1.4 |
@@ -120,13 +120,13 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 A graphical enhancement for World of Warcraft. The main development work is being carried out for Legion 7.3.5.
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
-Current build: **1.7.0-release "Living Flame"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **public-release-beta-1.0 "Living Flame"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.7.0-release
+## What is in build public-release-beta-1.0
 
 Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -135,7 +135,7 @@ Everything is set up in the game: Interface > AddOns > GU-WOW, the minimap butto
 | Atmosphere | Fog | Haze in the distance. Sliders "Fog density" and "Fog distance" | before 1.3 |
 | Atmosphere | Ground mist | Mist that lies on the ground. Sliders "Ground mist" and "Ground mist thickness" | 1.3 |
 | Atmosphere | Mist from a height | The ground mist shows from a hill, a cliff and in flight: blankets of mist lie below. A slider, 0 gives clear air from above | 1.6.0 |
-| Atmosphere | Sun rays | Rays through the trees and the fog. Sliders "Ray strength" and "Ray definition": from a soft glow to separate shafts | before 1.3 |
+| Atmosphere | Sun rays | Rays through the trees and the fog. Sliders "Ray strength", "Ray definition", "Rays in the open", "Ray length" and "Sun glow in the fog". Rays presets: GU standard, four moods and a My slot | before 1.3, dials 1.7.1 |
 | Atmosphere | Frame tracking | The effects know where the picture went as the camera turns: the sun is not lost, the fog colour does not swim, the lights do not trail | 1.6.0 |
 | Atmosphere | Weather mood | In overcast weather and rain the haze gets thicker, the colours cooler and the contrast softer. Works only with the fog on | 1.3 |
 | Atmosphere | Contact shadows | Soft shadows under stones, grass and near walls, objects sit on the ground | 1.4 |
