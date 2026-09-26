@@ -1,5 +1,5 @@
 -- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
--- The settings travel to the shader as a strip of 73 cells, 4 by 4 pixels, in the top left corner of the screen.
+-- The settings travel to the shader as a strip of 81 cells, 4 by 4 pixels, in the top left corner of the screen.
 -- The effect LegionGUBridge (LegionGUbylevan.fx) reads the strip after the interface is drawn and covers it
 -- again, so it is not seen. Each colour channel is black or white, one bit. Cell 0 is black, cell 1 white, cell 2
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
@@ -7,7 +7,7 @@
 
 local VERSION = "public-release-beta-1.0"
 local CELL = 4
-local CELLS = 73
+local CELLS = 81
 
 -- Russian on a Russian client, English elsewhere.
 local RU = GetLocale() == "ruRU"
@@ -339,6 +339,25 @@ local function Code(v)
 	return math.floor(v * 63 / 100 + 0.5)
 end
 
+-- The chat window in screen shares, 0..63 each, for the heat haze to leave alone (beta-1.0). The player moves
+-- and resizes the chat, so the painted mask cannot know it; zeros when the frame is not there.
+local function ChatRect()
+	local f = ChatFrame1
+	if not f or not f.GetLeft or not f:GetLeft() then
+		return 0, 0, 0, 0
+	end
+	local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
+	if not sw or sw <= 0 or not sh or sh <= 0 then
+		return 0, 0, 0, 0
+	end
+	local pad = 24
+	local l = math.max(0, (f:GetLeft() - pad) / sw)
+	local r = math.min(1, (f:GetRight() + pad) / sw)
+	local t = math.max(0, 1 - (f:GetTop() + pad) / sh)
+	local b = math.min(1, 1 - (f:GetBottom() - pad) / sh)
+	return math.floor(l * 63 + 0.5), math.floor(t * 63 + 0.5), math.floor(r * 63 + 0.5), math.floor(b * 63 + 0.5)
+end
+
 local function Paint()
 	if not DB then
 		return
@@ -361,11 +380,13 @@ local function Paint()
 	local haze, hdr = V("hazeStrength") or 0, V("hdrStrength") or 0
 	local switches = (haze > 0 and 1 or 0) + (hot and 2 or 0) + (hdr > 0 and 4 or 0) + (DB.bokeh and 8 or 0)
 		+ (checkView and 16 or 0)
+	local chatL, chatT, chatR, chatB = ChatRect()
 	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + (DB.cinema and 8 or 0),
 		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches, Code(haze), Code(hdr), facing,
 		Code(V("mistHigh") or 0), Code(V("rayDefinition") or 0), Code(V("mistFlow") or 0),
 		Code(V("bright") or 50), Code(V("contrast") or 50), Code(V("satur") or 50), Code(V("warmth") or 50),
-		Code(V("raysOpen") or 45), Code(V("raysReach") or 50), Code(V("sunGlow") or 50), Code(V("mistNear") or 0) }
+		Code(V("raysOpen") or 45), Code(V("raysReach") or 50), Code(V("sunGlow") or 50), Code(V("mistNear") or 0),
+		chatL, chatT, chatR, chatB }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v

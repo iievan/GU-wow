@@ -169,8 +169,12 @@
 #define LEGIONGU_CTL_RAYS_REACH 32 // ray length, 50 neutral
 #define LEGIONGU_CTL_SUN_GLOW 33 // the sun's glow in the fog, 50 neutral, 0 off, 100 double
 #define LEGIONGU_CTL_MIST_NEAR 34 // the mist at the feet, ankle-deep, 0 off, 1.7.1
+#define LEGIONGU_CTL_CHAT_L 35   // the chat window in uv, for the heat haze to leave alone (beta-1.0)
+#define LEGIONGU_CTL_CHAT_T 36
+#define LEGIONGU_CTL_CHAT_R 37
+#define LEGIONGU_CTL_CHAT_B 38
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 73    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 81    // black, white, the signature, two cells per setting, two for the checksum
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -179,7 +183,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 35; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 41; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -3338,8 +3342,15 @@ namespace LegionGUNights
 				float ly = log2(max(hzY, 1.0));
 				float2 wob = float2(sin(ly * 160.0 + ht * 5.0 + sin(ax * 37.0 + ht * 1.7) * 2.0), 0.5 * sin(ly * 120.0 - ht * 4.1 + ax * 23.0));
 				// The interface never wavers (1.6.9): the chat and the bars are drawn into the frame the haze bends,
-				// so the shift dies under the UI mask.
-				float2 off = wob * hz * HAZE_PX * LegionGUValue(LEGIONGU_CTL_HAZE, 50.0) * 0.02 * (float(BUFFER_HEIGHT) / 1080.0) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT) * (1.0 - saturate(UIMask(uv) * 8.0));
+				// so the shift dies under the UI mask. The chat is not in the painted mask — the player moves and
+				// resizes it — so the addon tells its live rectangle (CTL 35..38, beta-1.0) and the haze dies there
+				// too, with a few pixels of margin for the drag edge.
+				float keep = 1.0 - saturate(UIMask(uv) * 8.0);
+				float4 chat = float4(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_L, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_T, 0)).x,
+				                     tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_R, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_B, 0)).x);
+				if (chat.z > chat.x && uv.x >= chat.x - 0.004 && uv.x <= chat.z + 0.004 && uv.y >= chat.y - 0.004 && uv.y <= chat.w + 0.004)
+					keep = 0.0;
+				float2 off = wob * hz * HAZE_PX * LegionGUValue(LEGIONGU_CTL_HAZE, 50.0) * 0.02 * (float(BUFFER_HEIGHT) / 1080.0) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT) * keep;
 				c = tex2Dlod(ColorLinear, float4(uv + off, 0.0, 0.0)).rgb;
 			}
 		}
@@ -3507,10 +3518,12 @@ namespace LegionGUNights
 
 		// Film grain (the slider): a new pattern every frame, strongest in the middle tones. The same hash also
 		// dithers the finished frame by one grey level: the night and the fog draw smooth gradients, and without
-		// it 8-bit output banded them (the quality build of 1.6.6).
-		uint gh = uint(p.x) * 1973u + uint(p.y) * 9277u + FrameCount * 26699u;
-		gh = (gh ^ (gh >> 13u)) * 1274126177u;
-		gh ^= gh >> 16u;
+		// it 8-bit output banded them (the quality build of 1.6.6). The hash is PCG (beta-1.0): the first, homegrown
+		// one left neighbours along a row correlated, and the dither showed as one-pixel TV-like lines on a dark sky.
+		uint gh = uint(p.x) + uint(p.y) * 65521u + FrameCount * 26699u;
+		gh = gh * 747796405u + 2891336453u;
+		gh = ((gh >> ((gh >> 28u) + 4u)) ^ gh) * 277803737u;
+		gh = (gh >> 22u) ^ gh;
 		float gn = float(gh & 65535u) / 65535.0 - 0.5;
 		float grain = LegionGUValue(LEGIONGU_CTL_GRAIN, FilmGrain) * 0.01;
 		if (grain > 0.0)
