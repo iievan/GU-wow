@@ -80,15 +80,15 @@ static class WowGU
 			return;
 		}
 		Application.EnableVisualStyles();
-		form = new ShotForm { Text = "GU-WOW " + Version, ClientSize = new Size(660, 620), Font = new Font("Segoe UI", 10f), FormBorderStyle = FormBorderStyle.FixedSingle, MaximizeBox = false, StartPosition = FormStartPosition.CenterScreen };
-		var title = new Label { Text = "GU-WOW", Location = new Point(16, 12), Size = new Size(630, 28), Font = new Font("Segoe UI", 13f, FontStyle.Bold) };
+		form = new ShotForm { Text = "GUWOW! " + Version, ClientSize = new Size(660, 620), Font = new Font("Segoe UI", 10f), FormBorderStyle = FormBorderStyle.FixedSingle, MaximizeBox = false, StartPosition = FormStartPosition.CenterScreen };
+		var title = new Label { Text = "GUWOW!", Location = new Point(16, 12), Size = new Size(630, 28), Font = new Font("Segoe UI", 13f, FontStyle.Bold) };
 		var head = new Label
 		{
 			Text = T(
 				"Графическое улучшение World of Warcraft, созданное специально для сообщества Brothers of Turtle.\n\n" +
 				"Добавляет в игру лучи солнца, туман и дымку, ночь по игровым часам и тёплый свет огней. " +
 				"Сразу после установки работает с настройками по умолчанию. Изменить их можно в меню игры: " +
-				"Интерфейс > Модификации > GU-WOW.\n\n" +
+				"Интерфейс > Модификации > GUWOW!.\n\n" +
 				"Создано на основе ReShade. © 2026 levan. Эффекты распространяются по лицензии GPL-3.0. " +
 				"Меню в игре, установщик и готовая настройка распространяются по лицензии автора: изменённые версии и клоны только с его согласия.\n\n" +
 				"Неофициальный любительский проект. Не связан с Blizzard Entertainment и не претендует на её " +
@@ -96,7 +96,7 @@ static class WowGU
 				"A graphics enhancement for World of Warcraft, made especially for the Brothers of Turtle community.\n\n" +
 				"Adds sun rays, fog and haze, night that follows the in-game clock, and warm firelight. " +
 				"Works with default settings right after install. You can change them in the game menu: " +
-				"Interface > AddOns > GU-WOW.\n\n" +
+				"Interface > AddOns > GUWOW!.\n\n" +
 				"Built on ReShade. © 2026 levan. The effects are distributed under the GPL-3.0 license. " +
 				"The in-game menu, the installer and the ready-made preset are distributed under the author's license: modified versions and clones only with his consent.\n\n" +
 				"An unofficial fan project. Not affiliated with Blizzard Entertainment and claims none of its " +
@@ -129,7 +129,7 @@ static class WowGU
 		report.Click += delegate { RunJob(Report); };
 		remove.Click += delegate
 		{
-			if (MessageBox.Show(form, T("Удалить GU-WOW из этой папки игры?", "Remove GU-WOW from this game folder?"), "GU-WOW", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+			if (MessageBox.Show(form, T("Удалить GUWOW! из этой папки игры?", "Remove GUWOW! from this game folder?"), "GUWOW!", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
 				RunJob(Uninstall);
 		};
 		pathBox.Text = FindGame() ?? "";
@@ -199,13 +199,13 @@ static class WowGU
 			Directory.CreateDirectory(appData);
 			var sentFile = Path.Combine(appData, "sent.txt");
 			// No icon in the tray: it shows only for the moment of a Windows balloon, which needs one, and hides again.
-			var tray = new NotifyIcon { Icon = System.Drawing.SystemIcons.Information, Visible = false, Text = "GU-WOW" };
+			var tray = new NotifyIcon { Icon = System.Drawing.SystemIcons.Information, Visible = false, Text = "GUWOW!" };
 			var hide = new System.Windows.Forms.Timer { Interval = 12000 };
 			hide.Tick += delegate { hide.Stop(); tray.Visible = false; };
 			Action<string, ToolTipIcon> notify = (text, icon) =>
 			{
 				tray.Visible = true;
-				tray.ShowBalloonTip(8000, "GU-WOW", text, icon);
+				tray.ShowBalloonTip(8000, "GUWOW!", text, icon);
 				hide.Stop();
 				hide.Start();
 			};
@@ -594,7 +594,7 @@ static class WowGU
 			int iface = current.Major * 10000 + current.Minor * 100 + (current.Major >= 10 ? current.Patch : 0);
 			var toc = Encoding.UTF8.GetString(Resource("toc")).Replace("70300", iface.ToString());
 			File.WriteAllText(G(@"Interface\AddOns\LegionGU\LegionGU.toc"), toc, new UTF8Encoding(false));
-			Say(T("Меню в игре: Интерфейс > Модификации > GU-WOW, или команда /gu.", "The in-game menu: Interface > AddOns > GU-WOW, or the /gu command."));
+			Say(T("Меню в игре: Интерфейс > Модификации > GUWOW!, или команда /gu.", "The in-game menu: Interface > AddOns > GUWOW!, or the /gu command."));
 		}
 		else Say(T("Меню в игре для этого клиента не ставится: настройки в окне ReShade (Scroll Lock).", "The in-game menu is not installed for this client: settings live in the ReShade window (Scroll Lock)."));
 		MergePreset();
@@ -704,7 +704,7 @@ static class WowGU
 				"It is a zero-load helper: it delivers your error reports to the developer straight to GitHub " +
 				"when you press Send on the mod's panel yourself. On its own it sends nothing anywhere and only reads game files.\n\n" +
 				"If you would rather not, press No: the mod works fully, and reports will open as a page in the browser."),
-				T("GU-WOW: помощник поддержки", "GU-WOW: support helper"), MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+				T("GUWOW!: помощник поддержки", "GUWOW!: support helper"), MessageBoxButtons.YesNo, MessageBoxIcon.Question,
 				MessageBoxDefaultButton.Button1) == DialogResult.Yes;
 			marker["watch"] = wants ? "1" : "0";
 		}

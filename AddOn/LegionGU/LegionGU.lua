@@ -426,7 +426,7 @@ local function Photo(on)
 		return
 	end
 	if on and InCombatLockdown() then
-		print("|cffffd200GU-WOW:|r " .. T("фоторежим недоступен в бою.", "photo mode is not available in combat."))
+		print("|cffffd200GUWOW!:|r " .. T("фоторежим недоступен в бою.", "photo mode is not available in combat."))
 		return
 	end
 	photo = on
@@ -462,7 +462,7 @@ function GUWOW_ToggleMod()
 	DB.master = not DB.master
 	Refresh()
 	Paint()
-	print("|cffffd200GU-WOW:|r " .. (DB.master and T("включён", "on") or T("выключен", "off")))
+	print("|cffffd200GUWOW!:|r " .. (DB.master and T("включён", "on") or T("выключен", "off")))
 end
 
 -- A clean shot: the interface and the strip hide for a moment (the shader keeps the last settings), the game takes
@@ -508,8 +508,8 @@ UIParent:HookScript("OnShow", function()
 	end
 end)
 
-BINDING_HEADER_GUWOW = "GU-WOW"
-BINDING_NAME_GUWOW_TOGGLE = T("Включить или выключить GU-WOW", "Turn GU-WOW on or off")
+BINDING_HEADER_GUWOW = "GUWOW!"
+BINDING_NAME_GUWOW_TOGGLE = T("Включить или выключить GUWOW!", "Turn GUWOW! on or off")
 BINDING_NAME_GUWOW_PHOTO = T("Фоторежим (прячет интерфейс, размывает фон)", "Photo mode (hides the interface, blurs the background)")
 BINDING_NAME_GUWOW_SHOT = T("Чистый снимок экрана", "Clean screenshot")
 
@@ -599,14 +599,14 @@ local function Refresh()
 end
 
 local function Say(text)
-	print("|cffffd200GU-WOW:|r " .. text)
+	print("|cffffd200GUWOW!:|r " .. text)
 end
 
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён: публичная бета 1.0.\n\nК отчёту об ошибке теперь прикладывается снимок экрана: наведите камеру на баг, нажмите «Приложить снимок» в окне /gu report — и картинка уйдёт вместе с отчётом. У лучей свои ручки и пресеты на странице «Лучи», яркость и цвет — на «Картинке», туман у ног — на «Атмосфере». Настройки по умолчанию обновлены на авторские.\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated: public beta 1.0.\n\nThe bug report now carries a screenshot: aim the camera at the bug, press Attach a shot in the /gu report window — and the picture goes with the report. The rays have their own dials and presets on the Rays page, brightness and colour live on Picture, the mist at the feet on Atmosphere. The defaults are refreshed to the author's picks.\n\nMenu: /gu or the minimap button."),
+	text = T("GUWOW! обновлён: публичная бета 1.0.\n\nК отчёту об ошибке теперь прикладывается снимок экрана: наведите камеру на баг, нажмите «Приложить снимок» в окне /gu report — и картинка уйдёт вместе с отчётом. У лучей свои ручки и пресеты на странице «Лучи», яркость и цвет — на «Картинке», туман у ног — на «Атмосфере». Настройки по умолчанию обновлены на авторские.\n\nМеню: /gu или кнопка у миникарты.",
+		"GUWOW! is updated: public beta 1.0.\n\nThe bug report now carries a screenshot: aim the camera at the bug, press Attach a shot in the /gu report window — and the picture goes with the report. The rays have their own dials and presets on the Rays page, brightness and colour live on Picture, the mist at the feet on Atmosphere. The defaults are refreshed to the author's picks.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -844,18 +844,18 @@ end)
 -- The welcome page (1.6.9): what GU-WOW is, the hints and the bug report. The settings live on the three
 -- child pages: «Основные», «Дополнительно», «Фоторежим».
 local home = CreateFrame("Frame", "LegionGUHome", UIParent)
-home.name = "GU-WOW"
+home.name = "GUWOW!"
 home:Hide()
 local homeTitle = home:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 homeTitle:SetPoint("TOPLEFT", 16, -16)
-homeTitle:SetText("GU-WOW " .. VERSION)
+homeTitle:SetText("GUWOW! " .. VERSION)
 local homeText = home:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 homeText:SetPoint("TOPLEFT", 16, -52)
 homeText:SetWidth(600)
 homeText:SetJustifyH("LEFT")
 homeText:SetSpacing(4)
-homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Основные» — включатель мода и готовые пресеты.\n«Атмосфера» — туман, погода, мокрая земля, тени и марево.\n«Лучи» — лучи солнца и свечение в тумане, со своими пресетами.\n«Ночь» — темнота, свет огней и подземелья.\n«Картинка» — резкость, цвет, яркость и плёночные эффекты, со своими пресетами.\n«Дополнительно» — стили, коды, свои пресеты и поведение.\n«Фоторежим» — снимки и всё, что нужно только для них.\n\nПодсказки:\nF11 включает и выключает весь мод. Своя клавиша: Меню → Управление → GU-WOW.\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
-	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMain — the mod switch and the ready presets.\nAtmosphere — fog, weather, wet ground, shadows and heat haze.\nRays — the sun rays and the glow in the fog, with their own presets.\nNight — darkness, firelight and dungeons.\nPicture — sharpness, colour, brightness and the film effects, with their own presets.\nExtras — styles, codes, your presets and behaviour.\nPhoto mode — screenshots and what only they need.\n\nHints:\nF11 toggles the whole mod. Your own key: Menu → Key Bindings → GU-WOW.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode.\nChat commands: /gu menu · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
+homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Основные» — включатель мода и готовые пресеты.\n«Атмосфера» — туман, погода, мокрая земля, тени и марево.\n«Лучи» — лучи солнца и свечение в тумане, со своими пресетами.\n«Ночь» — темнота, свет огней и подземелья.\n«Картинка» — резкость, цвет, яркость и плёночные эффекты, со своими пресетами.\n«Дополнительно» — стили, коды, свои пресеты и поведение.\n«Фоторежим» — снимки и всё, что нужно только для них.\n\nПодсказки:\nF11 включает и выключает весь мод. Своя клавиша: Меню → Управление → GUWOW!.\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
+	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMain — the mod switch and the ready presets.\nAtmosphere — fog, weather, wet ground, shadows and heat haze.\nRays — the sun rays and the glow in the fog, with their own presets.\nNight — darkness, firelight and dungeons.\nPicture — sharpness, colour, brightness and the film effects, with their own presets.\nExtras — styles, codes, your presets and behaviour.\nPhoto mode — screenshots and what only they need.\n\nHints:\nF11 toggles the whole mod. Your own key: Menu → Key Bindings → GUWOW!.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode.\nChat commands: /gu menu · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
 
 local panel = CreateFrame("Frame", "LegionGUPanel", UIParent)
 panel.name = T("Основные", "Main")
@@ -864,7 +864,7 @@ panel:Hide()
 
 local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("GU-WOW: " .. panel.name)
+title:SetText("GUWOW!: " .. panel.name)
 local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 sub:SetText(T("Всё, что видно в игре. Меняется сразу. Пресет листается стрелками, «Применить» на полоске вверху экрана оставляет его.",
@@ -879,7 +879,7 @@ local function NewPage(frameName, ru, en, subRu, subEn)
 	f:Hide()
 	local t = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	t:SetPoint("TOPLEFT", 16, -16)
-	t:SetText("GU-WOW: " .. f.name)
+	t:SetText("GUWOW!: " .. f.name)
 	if subRu then
 		local s = f:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 		s:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -6)
@@ -920,7 +920,7 @@ local function ShrinkOptions()
 end
 
 local L, R = 16, 470
-Check(panel, "master", T("Включить GU-WOW", "Enable GU-WOW"), L, -60)
+Check(panel, "master", T("Включить GUWOW!", "Enable GUWOW!"), L, -60)
 
 -- The presets: the arrows walk through the ready ones and the player's own and show each at once as a preview.
 -- «Apply» on the bar at the top of the screen makes it the player's own, the sliders tune it before that. The name
@@ -1320,7 +1320,7 @@ local function OpenReport()
 	if back.SetColorTexture then back:SetColorTexture(0, 0, 0, 0.85) else back:SetTexture(0, 0, 0, 0.85) end
 	local head = fr:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	head:SetPoint("TOP", 0, -12)
-	head:SetText(T("Сообщение об ошибке GU-WOW", "GU-WOW bug report"))
+	head:SetText(T("Сообщение об ошибке GUWOW!", "GUWOW! bug report"))
 	local l1 = fr:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	l1:SetPoint("TOPLEFT", 16, -44)
 	l1:SetText(T("Название ошибки:", "Title:"))
@@ -1365,8 +1365,8 @@ local function OpenReport()
 	warn:SetPoint("BOTTOMLEFT", 16, 86)
 	warn:SetWidth(408)
 	warn:SetJustifyH("LEFT")
-	warn:SetText(T("Для отправки GU-WOW снимет вашу конфигурацию и ошибки интерфейса и перезагрузит игровой интерфейс. Это займёт пару секунд, и вы вернётесь в игру.",
-		"To send the report, GU-WOW takes your setup and interface errors and reloads the game interface. It takes a couple of seconds, and you are back in the game."))
+	warn:SetText(T("Для отправки GUWOW! снимет вашу конфигурацию и ошибки интерфейса и перезагрузит игровой интерфейс. Это займёт пару секунд, и вы вернётесь в игру.",
+		"To send the report, GUWOW! takes your setup and interface errors and reloads the game interface. It takes a couple of seconds, and you are back in the game."))
 	local note = fr:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	note:SetPoint("BOTTOMLEFT", warn, "TOPLEFT", 0, 6)
 	note:SetWidth(408)
@@ -1443,7 +1443,7 @@ page.parent = home.name
 page:Hide()
 local title2 = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title2:SetPoint("TOPLEFT", 16, -16)
-title2:SetText("GU-WOW: " .. page.name)
+title2:SetText("GUWOW!: " .. page.name)
 
 local sub2 = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub2:SetPoint("TOPLEFT", title2, "BOTTOMLEFT", 0, -6)
@@ -1491,7 +1491,7 @@ Button(page, T("Попробовать код", "Try the code"), 162, -162, 140,
 	if t then
 		Preview(t, T("код настройки", "settings code"))
 	else
-		Say(T("это не код GU-WOW.", "this is not a GU-WOW code."))
+		Say(T("это не код GUWOW!.", "this is not a GUWOW! code."))
 	end
 end)
 
@@ -1620,7 +1620,7 @@ pagePhoto.parent = home.name
 pagePhoto:Hide()
 local title3 = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title3:SetPoint("TOPLEFT", 16, -16)
-title3:SetText("GU-WOW: " .. pagePhoto.name)
+title3:SetText("GUWOW!: " .. pagePhoto.name)
 local sub3 = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub3:SetPoint("TOPLEFT", title3, "BOTTOMLEFT", 0, -6)
 sub3:SetText(T("Интерфейс прячется, персонаж в фокусе, фон размыт. Выход: Esc, Enter или сама клавиша фоторежима.",
@@ -1795,7 +1795,7 @@ mm:SetScript("OnClick", function(self, button)
 end)
 mm:SetScript("OnEnter", function(self)
 	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-	GameTooltip:AddLine("GU-WOW " .. VERSION)
+	GameTooltip:AddLine("GUWOW! " .. VERSION)
 	GameTooltip:AddLine(T("Левая кнопка: меню", "Left click: menu"), 1, 1, 1)
 	GameTooltip:AddLine(T("Правая кнопка: включить или выключить", "Right click: on or off"), 1, 1, 1)
 	GameTooltip:AddLine(T("Shift + левая или средняя: фоторежим", "Shift + left or middle click: photo mode"), 1, 1, 1)
