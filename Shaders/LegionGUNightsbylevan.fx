@@ -2028,6 +2028,14 @@ namespace LegionGUNights
 		float lp = dot(prev.rgb, LUMA601);
 		float yards = max(ln > 1e-5 ? exp2(now.a / ln) : 0.0, lp > 1e-5 ? exp2(prev.a / lp) : 0.0);
 		float tau = lerp(LIGHT_HOLD_NEAR, LIGHT_HOLD_FAR, smoothstep(LIGHT_HOLD_YD.x, LIGHT_HOLD_YD.y, yards));
+		// While the camera turns, the hold nearly dies (beta-1.0): the shift compensation is exact only to a pixel
+		// or two, and the quarter-second ease smeared every window into a comet tail behind the turn. The raw
+		// shift is read before the confidence weighting: a dark night scene matches poorly, the confidence drops,
+		// and it is exactly then that the trails showed.
+		float4 mo = tex2Dfetch(LegionGUMotionS, int2(0, 0));
+		float moAge = float((FrameCount % 8388608u + 8388608u - uint(mo.w + 0.5) % 8388608u) % 8388608u);
+		float turning = moAge <= 2.0 ? saturate(length(mo.xy) * 50.0) : 1.0;
+		tau *= 1.0 - 0.9 * turning;
 		return lerp(prev, now, Rate(FrameSeconds(), ln > lp ? 0.5 * tau : tau));
 	}
 
