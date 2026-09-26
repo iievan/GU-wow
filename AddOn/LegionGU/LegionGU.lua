@@ -15,26 +15,26 @@ local function T(ru, en)
 	return RU and ru or en
 end
 
--- The author's own settings, the preset «Default», tuned in game on 2026-09-26 (the owner's pick of beta-1.0).
+-- The standard settings, the preset «Default»: the owner's picks, taken from the live game on 2026-09-26 evening.
 local DEFAULTS = {
 	master = true, fog = true, weather = true, wet = true, rays = true, night = true, eye = true,
 	zones = true, autoQuality = false, targetFps = 45, orbit = false, hideNames = true, cinema = true, style = 0,
 	chatBack = true,
-	fogThickness = 35, fogDistance = 100, mist = 70, mistDensity = 50, raysStrength = 100,
+	fogThickness = 10, fogDistance = 100, mist = 70, mistDensity = 45, raysStrength = 100,
 	nightDarkness = 80, nightDepth = 70, lightGlow = 100, caveDarkness = 75,
 	sharpness = 25, grade = 80, vignette = 55, ao = 90,
 	-- Heat haze and cinema HDR: 0 off, 50 the look of 1.5.4.
 	hazeStrength = 30, hdrStrength = 15, grain = 10, bokeh = false, photoBlur = 50,
 	-- 1.6.0: how much of the low mist stays seen from a height, and how defined the ray shafts are.
-	mistHigh = 60, rayDefinition = 55,
+	mistHigh = 40, rayDefinition = 55,
 	-- 1.6.7: the drift of the mist; the shader caps it at 40 (beta-1.0).
-	mistFlow = 30,
+	mistFlow = 10,
 	-- 1.7.0: brightness and colour, 50 is the game's own picture.
 	bright = 60, contrast = 55, satur = 50, warmth = 50,
 	-- 1.7.1: the rays' own dials. In the open the old fixed cut was 22; 45 makes a field twice as sunlit.
 	raysOpen = 45, raysReach = 50, sunGlow = 50,
 	-- 1.7.1: the mist at the feet, ankle-deep in swamps. 0 keeps it off.
-	mistNear = 70,
+	mistNear = 25,
 }
 -- The order of the values in the strip, the same as LEGIONGU_CTL_* in the shaders (after the flags).
 local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDarkness", "lightGlow",
