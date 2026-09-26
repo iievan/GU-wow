@@ -2343,7 +2343,16 @@ namespace LegionGUNights
 	{
 		float ambient = max(nt.x, AMBIENT_MIN);
 		float v = max(max(c.r, c.g), c.b);
+		// The chat is not in the painted mask — the player moves and resizes it — so its live rectangle
+		// (CTL 35..38, see the heat haze) protects the text at night too. Only the text: the whole rectangle as
+		// UI left the world behind the chat's clear back bright (a box of daylight), and a bar four times the
+		// mask's cleared just the yellow icons and sank the plain white lines. Twice the mask's bar splits it:
+		// letters ride well above it, the land and the horizon behind the clear back stay below.
 		float keepUI = 1.0 - UIMask(uv) * smoothstep(UI_KEEP_FROM, UI_KEEP_FULL, v / ambient);
+		float4 chat = float4(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_L, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_T, 0)).x,
+		                     tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_R, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_B, 0)).x);
+		if (chat.z > chat.x && uv.x >= chat.x && uv.x <= chat.z && uv.y >= chat.y && uv.y <= chat.w)
+			keepUI = min(keepUI, 1.0 - smoothstep(2.0 * UI_KEEP_FROM, 2.0 * UI_KEEP_FULL, v / ambient));
 		float s = nt.y * keepUI;
 		float m = lerp(1.0, nt.w, keepUI);
 		float u = DepthU(RawDepth(uv), EffectiveReversed(depthState.w));
