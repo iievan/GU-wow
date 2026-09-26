@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "1.6.5-release"
+local VERSION = "1.6.6-release"
 local CELL = 4
 local CELLS = 55
 
@@ -554,8 +554,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GU-WOW обновлён до 1.6.5.\n\nОгни снова светят, тусклые лампы в домах тоже. Красные имена врагов не считаются огнями. Подложка под чатом держится после входа.\n\nМеню: /gu или кнопка у миникарты.",
-		"GU-WOW is updated to 1.6.5.\n\nThe fires glow again, dim indoor lamps too. Red enemy names do not count as fires. The chat shade holds after login.\n\nMenu: /gu or the minimap button."),
+	text = T("GU-WOW обновлён до 1.6.6.\n\nОгонь по-настоящему светит: свет на земле и персонаже вдвое сильнее, ореолы ярче. Лучи солнца в полтора раза тоньше и спокойнее, тени в щелях глубже и чище, ночные переходы без полос. Всё это стоит около миллисекунды на кадр.\n\nМеню: /gu или кнопка у миникарты.",
+		"GU-WOW is updated to 1.6.6.\n\nFire truly shines: the light on the ground and the character is doubled, the halos are brighter. The sun shafts are half again finer and calmer, the contact shadows are deeper and cleaner, the night gradients show no bands. All of it costs about a millisecond a frame.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,

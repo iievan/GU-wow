@@ -1,5 +1,29 @@
 # GU-WOW: история версий / Version history
 
+## 1.6.6-release «Живой огонь» / "Living Flame"
+
+### Русский
+
+**Улучшено**
+- Огонь по-настоящему светит. Свет костра на земле и на персонаже усилен вдвое, ореол в воздухе поднят, лужа света достигает полной силы уже у среднего огня, дальние факелы видны с большего расстояния. Двери фильтра огней открыты шире: ядро пламени и тёплый свет проходят без прежних порогов, а белые крылья и бледную шерсть держит отдельная отсечка.
+- Лучи солнца в полтора раза тоньше: буфер света вырос со 180 до 270 строк, снопы чётче и меньше дрожат на краях.
+- Свет огней точнее: поле света выросло в полтора раза, ореолы и лужи света сидят плотнее на своих лампах, мелкие огни находятся с большего расстояния.
+- Тени в щелях глубже и чище: 24 пробы вместо 16 и шире радиус у близких углов.
+- Ночные и туманные переходы без полос: готовый кадр сглажен на один уровень серого (дизеринг), плавные градиенты ночи не распадаются на ступени.
+- Слежение за кадром точнее: карта движения выросла в полтора раза, поиск сдвига шире.
+- Цена всего набора: около миллисекунды на кадр на средней карте. Слабым машинам по-прежнему помогают пресет More FPS и «Автокачество».
+
+### English
+
+**Improved**
+- Fire truly shines. The firelight on the ground and the character is doubled, the halo in the air is up, the pool of light reaches full strength at a modest fire, far torches show from farther away. The fire filter doors are open wider: a flame core and warm light pass without the old gates, while white wings and pale fur are held by their own cut.
+- The sun shafts are half again finer: the light buffer grew from 180 to 270 rows, the shafts are crisper and their edges calmer.
+- The firelight is more precise: the light field grew half again, the halos and the pools sit tighter on their lamps, small fires are found from farther away.
+- The contact shadows are deeper and cleaner: 24 samples instead of 16 and a wider radius for near corners.
+- The night and fog gradients show no bands: the finished frame is dithered by one grey level, so the smooth gradients do not break into steps.
+- The frame tracking is more precise: the motion map grew half again, the shift search is wider.
+- The whole set costs about a millisecond a frame on a mid-range card. The More FPS preset and Auto quality still help weaker machines.
+
 ## 1.6.5-release «Лунная тропа» / "Moonlit Path"
 
 ### Русский

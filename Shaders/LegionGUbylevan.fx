@@ -122,7 +122,7 @@
 
 // The light buffer (source, softening, radial blur, arc blur) has a fixed number of rows at any resolution, so
 // the shafts have the same shape at 720p and at 1440p and the blur costs the same.
-#define LEGIONGU_LIGHT_H 180
+#define LEGIONGU_LIGHT_H 270  // 180 until 1.6.5: the quality build draws the shafts half again finer
 #define LEGIONGU_LIGHT_W (LEGIONGU_LIGHT_H * BUFFER_WIDTH / BUFFER_HEIGHT)
 // Scene texels per light texel and axis, at most 4 point taps per axis.
 #if (BUFFER_HEIGHT / (LEGIONGU_LIGHT_H * LEGIONGU_RAYS_DOWNSCALE)) >= 4
@@ -1565,15 +1565,15 @@ namespace LegionGU
 	static const int MO_TAPS_Y = 7;
 	static const int MO_TAPS = 84;
 
-	texture2D MoSceneTex { Width = 128; Height = 72; Format = R16F; };
-	texture2D MoPrevTex { Width = 128; Height = 72; Format = R16F; };
+	texture2D MoSceneTex { Width = 192; Height = 108; Format = R16F; };
+	texture2D MoPrevTex { Width = 192; Height = 108; Format = R16F; };
 	sampler2D MoScene { Texture = MoSceneTex; };
 	sampler2D MoScenePoint { Texture = MoSceneTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 	sampler2D MoPrev { Texture = MoPrevTex; };
 
 	float4 MotionDownPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
-		float2 o = float2(0.25 / 128.0, 0.25 / 72.0);
+		float2 o = float2(0.25 / 192.0, 0.25 / 108.0);
 		float l = dot(tex2Dlod(ColorLinear, float4(uv - o, 0.0, 0.0)).rgb
 		            + tex2Dlod(ColorLinear, float4(uv + float2(o.x, -o.y), 0.0, 0.0)).rgb
 		            + tex2Dlod(ColorLinear, float4(uv + float2(-o.x, o.y), 0.0, 0.0)).rgb
@@ -1611,15 +1611,15 @@ namespace LegionGU
 				sc[t] = tex2Dlod(MoScene, float4(gs[t], 0.0, 0.0)).x;
 			}
 		}
-		float2 texel = float2(1.0 / 128.0, 1.0 / 72.0);
+		float2 texel = float2(1.0 / 192.0, 1.0 / 108.0);
 		float sadZero = MotionSAD(sc, gs, float2(0.0, 0.0));
 		float2 best = float2(0.0, 0.0);
 		float sadBest = sadZero;
 		[loop]
-		for (int j = -3; j <= 3; ++j)
+		for (int j = -4; j <= 4; ++j)
 		{
 			[loop]
-			for (int i = -3; i <= 3; ++i)
+			for (int i = -4; i <= 4; ++i)
 			{
 				float2 off = float2(i, j) * (4.0 * texel);
 				float s = MotionSAD(sc, gs, off);
@@ -2846,7 +2846,7 @@ namespace LegionGU
 
 	static const float AO_TAN_HALF_FOV = 0.6;  // assumed tan of half the vertical field of view; only scales the radius
 	static const float AO_RADIUS = 1.0;        // yards around a point that can shade it
-	static const float AO_MAX_PX = 40.0;       // largest radius in half-resolution pixels
+	static const float AO_MAX_PX = 56.0;       // largest radius in half-resolution pixels (40 until 1.6.5)
 	static const float AO_BIAS = 0.15;         // cosine below which a sample does not shade: flat ground stays clean
 	static const float AO_GAIN = 3.5;          // a corner shades about a third of the disk; this brings it to full
 	static const float AO_DARK = 0.6;          // darkening of a full corner at «Тени в щелях» 100
@@ -2905,16 +2905,16 @@ namespace LegionGU
 		float3 n = normalize(cross(abs(r.z) < abs(l.z) ? r : l, abs(d.z) < abs(t.z) ? d : t));
 		float up = saturate(dot(n, SurfUp()));
 
-		// Sixteen samples on a disk AO_RADIUS yards across at this depth, turned per pixel.
+		// Twenty-four samples on a disk AO_RADIUS yards across at this depth, turned per pixel (sixteen until 1.6.5).
 		float rpx = min(AO_RADIUS / (p.z * AO_TAN_HALF_FOV) * 0.5 * (BUFFER_HEIGHT / 2), AO_MAX_PX);
 		if (rpx < 1.0)
 			return float2(0.0, up);
 		float turn = 6.2831853 * frac(52.9829189 * frac(dot(pos.xy, float2(0.06711056, 0.00583715))));
 		float occ = 0.0;
 		[unroll]
-		for (int k = 0; k < 8; ++k)
+		for (int k = 0; k < 12; ++k)
 		{
-			float a = turn + k * 0.7853982;
+			float a = turn + k * 0.5235988;
 			float2 dir = float2(cos(a), sin(a)) * rpx * px;
 			[unroll]
 			for (int s = 0; s < 2; ++s)
@@ -2925,7 +2925,7 @@ namespace LegionGU
 				occ += saturate(dot(n, v) / max(dist, 1e-4) - AO_BIAS) * fall;
 			}
 		}
-		occ = saturate(occ / 16.0 * AO_GAIN) * (1.0 - smoothstep(AO_FAR * 0.6, AO_FAR, p.z));
+		occ = saturate(occ / 24.0 * AO_GAIN) * (1.0 - smoothstep(AO_FAR * 0.6, AO_FAR, p.z));
 		return float2(occ, up);
 	}
 

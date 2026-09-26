@@ -87,7 +87,7 @@
 
 // The light buffer (source, softening, radial blur, arc blur) has a fixed number of rows at any resolution, so
 // the shafts have the same shape at 720p and at 1440p and the blur costs the same.
-#define LEGIONGU_LIGHT_H 180
+#define LEGIONGU_LIGHT_H 270  // 180 until 1.6.5: the quality build draws the shafts half again finer
 #define LEGIONGU_LIGHT_W (LEGIONGU_LIGHT_H * BUFFER_WIDTH / BUFFER_HEIGHT)
 // Scene texels per light texel and axis, at most 4 point taps per axis.
 #if (BUFFER_HEIGHT / (LEGIONGU_LIGHT_H * LEGIONGU_RAYS_DOWNSCALE)) >= 4
@@ -102,11 +102,11 @@
 // light field at three widths: L0 on the glow buffer, L1 at a third of it, L2 at a ninth. Colour taps per axis of
 // the glow downsample: bilinear taps of 2 x 2 pixels over the BUFFER_HEIGHT / 90 pixels of a block, at most 4
 // (at 1440p they sit 4 pixels apart and read a quarter of the frame: the search costs the same at any size).
-#define LEGIONGU_GLOW_H 90
+#define LEGIONGU_GLOW_H 135  // 90 until 1.6.5: the quality build finds smaller lights and draws tighter pools
 #define LEGIONGU_GLOW_W (LEGIONGU_GLOW_H * BUFFER_WIDTH / BUFFER_HEIGHT)
-#define LEGIONGU_L1_H 30
+#define LEGIONGU_L1_H 45
 #define LEGIONGU_L1_W (LEGIONGU_L1_H * BUFFER_WIDTH / BUFFER_HEIGHT)
-#define LEGIONGU_L2_H 10
+#define LEGIONGU_L2_H 15
 #define LEGIONGU_L2_W (LEGIONGU_L2_H * BUFFER_WIDTH / BUFFER_HEIGHT)
 #if (BUFFER_HEIGHT / (LEGIONGU_GLOW_H * 2)) >= 4
 	#define LEGIONGU_GLOW_TAPS 4
@@ -1042,9 +1042,9 @@ namespace LegionGUNights
 	static const float INDOOR_REACH = 20.0;     // yards: indoors, what lies farther is the street outside
 	static const float NIGHT_FAR_FROM = 150.0;  // yards: from here far land goes over to the night curve of the sky
 	static const float NIGHT_FAR_SKY = 450.0;   // and from here it is fully on it
-	static const float LIGHT_FAR = 60.0;        // yards: a light this far glows half as much, at twice the distance a fifth
-	static const float2 LIGHT_WHITE = float2(0.9, 0.97);    // peak at which any colour counts as a light: only a nearly
-	                                                        // clipped disc (a flame, a lamp); moonlit white wings stay below
+	static const float LIGHT_FAR = 80.0;        // yards: a light this far glows half as much (60 to 1.6.5)
+	static const float2 LIGHT_WHITE = float2(0.8, 0.92);    // peak at which any colour counts as a light (a flame core,
+	                                                        // a lamp); white wings pass here but the pale cut below holds them
 	static const float2 LIGHT_SAT = float2(0.3, 0.5);       // saturation at which a less bright source counts
 	static const float2 LIGHT_COLOURED = float2(0.3, 0.45); // and the peak it needs then
 	static const float LIGHT_SELF_CUT = 0.9;    // glow taken from cold light on the player's own model (see LightFindPS)
@@ -1099,21 +1099,23 @@ namespace LegionGUNights
 	// Gaussian in the depth difference): the ground and the wall around a torch, not a hill far behind it. The lift
 	// is LIFT_GAIN times that light over the ambient, eased into LIFT_MAX, on the colour before the night curve,
 	// the albedo seen under the ambient.
-	static const float LIGHT_SIG0 = 0.0224;
-	static const float LIGHT_SIG1 = 0.0709;
-	static const float LIGHT_SIG2 = 0.214;
+	// Sigma 2 texels of each level in screen heights; the levels grew half again in 1.6.6, so the widths are
+	// two thirds of the old ones: the pools and the halos sit tighter on their lamps.
+	static const float LIGHT_SIG0 = 0.0149;
+	static const float LIGHT_SIG1 = 0.0473;
+	static const float LIGHT_SIG2 = 0.143;
 	static const float LIGHT_R = 2.5;
 	static const float FOV_TAN2 = 1.1547;
 	static const float MATCH_YD = 3.5;
 	static const float POOL_YD = 10.0;         // yards in depth a light keeps the game's lighting around it (see NightApply)
 	static const float POOL_FROM = 0.05;       // light field (in multiples of the pixel) where a pool begins
-	static const float POOL_FULL = 0.5;        // and where it is full
+	static const float POOL_FULL = 0.25;       // and where it is full (0.5 to 1.6.5: pools reached full only right at the fire)
 	static const float POOL_KEEP = 0.85;       // share of the game's own light kept in a full pool
 	static const float POOL_TINT = 0.6;        // share of the light's own colour in a full pool
-	static const float POOL_LIFT = 0.8;        // a full pool is this much brighter than the game made it
+	static const float POOL_LIFT = 1.6;        // a full pool is this much brighter than the game made it (0.8 to 1.6.5)
 	static const float3 FIRE_COLOUR = float3(1.0, 0.5, 0.18); // the colour of firelight
 	static const float FIRE_LEAN = 0.75;       // how far a warm light's tint leans toward it
-	static const float LIFT_GAIN = 7.5;
+	static const float LIFT_GAIN = 12.0;       // 7.5 to 1.6.5
 	static const float LIFT_MAX = 2.0;
 	static const float LIFT_LIT_CUT = 0.8;
 	// The glow in the air: the same fields at a width of GLOW_AIR_R yards (times 1 + GLOW_AIR_R_FOG times the fog dial: wider
@@ -1130,7 +1132,7 @@ namespace LegionGUNights
 	static const float GLOW_AIR_GATE_LO = 0.62;
 	static const float GLOW_AIR_GATE_HI = 0.87;
 	static const float GLOW_AIR_GAIN = 1.2;
-	static const float GLOW_AIR_MAX = 0.32;
+	static const float GLOW_AIR_MAX = 0.45;    // 0.32 to 1.6.5
 	// The air glow is eased as GLOW_AIR_MAX (1 - exp(-(a / GLOW_AIR_KNEE)^GLOW_AIR_POW)): below 1 the power lifts weak
 	// light more than strong, so small lights (glowing eyes, a blade) get a visible halo and a big fire does not flood.
 	static const float GLOW_AIR_KNEE = 0.045;
@@ -2081,7 +2083,7 @@ namespace LegionGUNights
 		float warmL = saturate((light.r - light.b) / max(light.r, 1e-5) * 2.5);
 		keep *= saturate(max(max(smoothstep(LIGHT_WHITE.x, LIGHT_WHITE.y, peak),
 			smoothstep(LIGHT_SAT.x, LIGHT_SAT.y, lsat) * smoothstep(LIGHT_COLOURED.x, LIGHT_COLOURED.y, peak)),
-			warmL * smoothstep(0.2, 0.45, peak)));
+			warmL * smoothstep(0.12, 0.3, peak)));
 		// Pure red is text, not fire: enemy names over heads are saturated red with almost no green, while a
 		// flame is orange, half green in its red. Red runes and crystals dim with the names; a fair trade.
 		keep *= 1.0 - 0.9 * warmL * (1.0 - smoothstep(0.18, 0.35, light.g / max(light.r, 1e-5)));
@@ -3410,17 +3412,20 @@ namespace LegionGUNights
 			c *= 1.0 - v * VIGNETTE_MAX * smoothstep(0.5, 2.0, dot(d, d));
 		}
 
-		// Film grain (the slider): a new pattern every frame, strongest in the middle tones.
+		// Film grain (the slider): a new pattern every frame, strongest in the middle tones. The same hash also
+		// dithers the finished frame by one grey level: the night and the fog draw smooth gradients, and without
+		// it 8-bit output banded them (the quality build of 1.6.6).
+		uint gh = uint(p.x) * 1973u + uint(p.y) * 9277u + FrameCount * 26699u;
+		gh = (gh ^ (gh >> 13u)) * 1274126177u;
+		gh ^= gh >> 16u;
+		float gn = float(gh & 65535u) / 65535.0 - 0.5;
 		float grain = LegionGUValue(LEGIONGU_CTL_GRAIN, FilmGrain) * 0.01;
 		if (grain > 0.0)
 		{
-			uint gh = uint(p.x) * 1973u + uint(p.y) * 9277u + FrameCount * 26699u;
-			gh = (gh ^ (gh >> 13u)) * 1274126177u;
-			gh ^= gh >> 16u;
-			float gn = float(gh & 65535u) / 65535.0 - 0.5;
 			float gl = dot(c, LUMA601);
 			c = saturate(c + gn * grain * GRAIN_MAX * (0.3 + 2.8 * gl * (1.0 - gl)));
 		}
+		c = saturate(c + gn * (1.0 / 255.0));
 		return float4(c, c4.a);
 	}
 
