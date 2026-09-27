@@ -209,6 +209,15 @@ float LegionGUValue(int i, float slider)
 	return LegionGUPanel() ? tex2Dfetch(LegionGUCtl, int2(i, 0)).x * 100.0 : slider;
 }
 
+#if __RENDERER__ < 0xa000
+// Direct3D 9 (shader model 3, the 1.12 to 3.3.5 clients) has no integer bit operations: a bit of a cell's
+// value 0..63 is read with float maths.
+bool LegionGUBit(float cell, float bit)
+{
+	return floor(floor(tex2Dfetch(LegionGUCtl, int2(cell, 0)).x * 63.0 + 0.5) / bit) % 2.0 >= 1.0;
+}
+#endif
+
 // A part switched on in the panel: the whole mod and the part. Without the panel the technique's own switch
 // (its ReShade checkbox and hotkey) decides, so this is true, unless LEGIONGU_NEED_PANEL asks for the addon.
 bool LegionGUOn(uint bit)
@@ -217,10 +226,14 @@ bool LegionGUOn(uint bit)
 		return LEGIONGU_NEED_PANEL == 0;
 	// With the world map open (state bit 32) everything is off: part of the map was drawn before REST started the
 	// effects, and the night darkened it along the hidden land behind it.
+#if __RENDERER__ < 0xa000
+	return !LegionGUBit(LEGIONGU_CTL_STATE, 32.0) && LegionGUBit(LEGIONGU_CTL_FLAGS, 1.0) && LegionGUBit(LEGIONGU_CTL_FLAGS, float(bit));
+#else
 	if ((uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_STATE, 0)).x * 63.0 + 0.5) & 32u) != 0u)
 		return false;
 	uint f = uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_FLAGS, 0)).x * 63.0 + 0.5);
 	return (f & 1u) != 0u && (f & bit) != 0u;
+#endif
 }
 
 // A part with a ReShade checkbox of its own: the panel while it is live, else the checkbox.
@@ -234,8 +247,12 @@ bool LegionGUState(uint bit)
 {
 	if (!LegionGUPanel())
 		return false;
+#if __RENDERER__ < 0xa000
+	return LegionGUBit(LEGIONGU_CTL_STATE, float(bit));
+#else
 	uint s = uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_STATE, 0)).x * 63.0 + 0.5);
 	return (s & bit) != 0u;
+#endif
 }
 
 // The game's time of day in hours, while LegionGUState(1u).
@@ -253,14 +270,22 @@ int LegionGUStyleValue()
 // A switch of LEGIONGU_CTL_EXTRA; all off without the panel.
 bool LegionGUExtra(uint bit)
 {
+#if __RENDERER__ < 0xa000
+	return LegionGUPanel() && LegionGUBit(LEGIONGU_CTL_EXTRA, float(bit));
+#else
 	return LegionGUPanel() && (uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_EXTRA, 0)).x * 63.0 + 0.5) & bit) != 0u;
+#endif
 }
 
 // The depth check view (/gu check in the game chat, extra bit 16): the effects draw the depth instead of the
 // picture, so a player sees in one look whether the depth works.
 bool LegionGUCheckView()
 {
+#if __RENDERER__ < 0xa000
+	return LegionGUPanel() && LegionGUBit(LEGIONGU_CTL_EXTRA, 16.0);
+#else
 	return LegionGUPanel() && (uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_EXTRA, 0)).x * 63.0 + 0.5) & 16u) != 0u;
+#endif
 }
 
 // The player's facing in radians, counterclockwise from north, quantised to a 64th of a turn; 0 without the panel.
@@ -3537,11 +3562,18 @@ namespace LegionGUNights
 		// dithers the finished frame by one grey level: the night and the fog draw smooth gradients, and without
 		// it 8-bit output banded them (the quality build of 1.6.6). The hash is PCG (beta-1.0): the first, homegrown
 		// one left neighbours along a row correlated, and the dither showed as one-pixel TV-like lines on a dark sky.
+#if __RENDERER__ < 0xa000
+		// Direct3D 9 has no integer bit operations: a float hash (Dave Hoskins, hash13) of the pixel and the frame.
+		float3 gp = frac(float3(float2(p), float(FrameCount % 1024u)) * 0.1031);
+		gp += dot(gp, gp.zyx + 31.32);
+		float gn = frac((gp.x + gp.y) * gp.z) - 0.5;
+#else
 		uint gh = uint(p.x) + uint(p.y) * 65521u + FrameCount * 26699u;
 		gh = gh * 747796405u + 2891336453u;
 		gh = ((gh >> ((gh >> 28u) + 4u)) ^ gh) * 277803737u;
 		gh = (gh >> 22u) ^ gh;
 		float gn = float(gh & 65535u) / 65535.0 - 0.5;
+#endif
 		float grain = LegionGUValue(LEGIONGU_CTL_GRAIN, FilmGrain) * 0.01;
 		if (grain > 0.0)
 		{

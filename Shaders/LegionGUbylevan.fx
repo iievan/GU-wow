@@ -67,6 +67,14 @@
 	#error "LEGIONGU_RAYS_DOWNSCALE must be a whole number from 2 to 8"
 #endif
 
+// Direct3D 9 (shader model 3) allows 4096 instructions per shader: the unrolled grids of the fog state and the
+// sun search went past that and the pass was refused, so there these loops stay loops.
+#if __RENDERER__ < 0xa000
+	#define LEGIONGU_UNROLL [loop]
+#else
+	#define LEGIONGU_UNROLL [unroll]
+#endif
+
 // 1 = load Textures/LegionGUMask.png. White means "UI here", black means "world": no fog is drawn on white, and
 // white pixels cast no rays. The light of the rays itself falls on the UI too, so the glow around the sun has
 // no edge where a mask area begins. The shipped mask is soft and fits the standard Legion layout at 21:9: the
@@ -226,6 +234,15 @@ float LegionGUValue(int i, float slider)
 	return LegionGUPanel() ? tex2Dfetch(LegionGUCtl, int2(i, 0)).x * 100.0 : slider;
 }
 
+#if __RENDERER__ < 0xa000
+// Direct3D 9 (shader model 3, the 1.12 to 3.3.5 clients) has no integer bit operations: a bit of a cell's
+// value 0..63 is read with float maths.
+bool LegionGUBit(float cell, float bit)
+{
+	return floor(floor(tex2Dfetch(LegionGUCtl, int2(cell, 0)).x * 63.0 + 0.5) / bit) % 2.0 >= 1.0;
+}
+#endif
+
 // A part switched on in the panel: the whole mod and the part. Without the panel the technique's own switch
 // (its ReShade checkbox and hotkey) decides, so this is true, unless LEGIONGU_NEED_PANEL asks for the addon.
 bool LegionGUOn(uint bit)
@@ -234,10 +251,14 @@ bool LegionGUOn(uint bit)
 		return LEGIONGU_NEED_PANEL == 0;
 	// With the world map open (state bit 32) everything is off: part of the map was drawn before REST started the
 	// effects, and the night darkened it along the hidden land behind it.
+#if __RENDERER__ < 0xa000
+	return !LegionGUBit(LEGIONGU_CTL_STATE, 32.0) && LegionGUBit(LEGIONGU_CTL_FLAGS, 1.0) && LegionGUBit(LEGIONGU_CTL_FLAGS, float(bit));
+#else
 	if ((uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_STATE, 0)).x * 63.0 + 0.5) & 32u) != 0u)
 		return false;
 	uint f = uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_FLAGS, 0)).x * 63.0 + 0.5);
 	return (f & 1u) != 0u && (f & bit) != 0u;
+#endif
 }
 
 // A part with a ReShade checkbox of its own: the panel while it is live, else the checkbox.
@@ -251,8 +272,12 @@ bool LegionGUState(uint bit)
 {
 	if (!LegionGUPanel())
 		return false;
+#if __RENDERER__ < 0xa000
+	return LegionGUBit(LEGIONGU_CTL_STATE, float(bit));
+#else
 	uint s = uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_STATE, 0)).x * 63.0 + 0.5);
 	return (s & bit) != 0u;
+#endif
 }
 
 // The game's time of day in hours, while LegionGUState(1u).
@@ -271,7 +296,11 @@ int LegionGUStyleValue()
 // picture, so a player sees in one look whether the depth works.
 bool LegionGUCheckView()
 {
+#if __RENDERER__ < 0xa000
+	return LegionGUPanel() && LegionGUBit(LEGIONGU_CTL_EXTRA, 16.0);
+#else
 	return LegionGUPanel() && (uint(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_EXTRA, 0)).x * 63.0 + 0.5) & 16u) != 0u;
+#endif
 }
 
 // The player's facing in radians, counterclockwise from north, quantised to a 64th of a turn; 0 without the panel.
@@ -1188,7 +1217,7 @@ namespace LegionGU
 		[loop]
 		for (int j = 0; j < GRID_Y; ++j)
 		{
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int i = 0; i < GRID_X; ++i)
 			{
 				float raw = RawDepth(GridUV(i, j));
@@ -1518,7 +1547,7 @@ namespace LegionGU
 		float v = GROUND_TOP + GROUND_STEP * j;
 		y = 1.0 - 2.0 * v;
 		float zmax = 0.0;
-		[unroll]
+		LEGIONGU_UNROLL
 		for (int i = 0; i < GROUND_TAPS; ++i)
 		{
 			float x = i < GROUND_TAPS / 2 ? 0.03 + 0.047 * i : 0.6 + 0.047 * (i - GROUND_TAPS / 2);
@@ -1550,7 +1579,7 @@ namespace LegionGU
 		float sww = 0.0;
 		float below = 1e9;
 		bool open = true;
-		[unroll]
+		LEGIONGU_UNROLL
 		for (int j = GROUND_ROWS - 1; j >= 0; --j)
 		{
 			float y;
@@ -1654,8 +1683,39 @@ namespace LegionGU
 		return sum / n;
 	}
 
+#if __RENDERER__ < 0xa000
+	// Direct3D 9 cannot index an array inside a loop: every offset reads its taps again, on a 6 x 4 grid that keeps
+	// the pass within the shader model 3 instruction budget.
+	static const int MO9_TAPS_X = 6;
+	static const int MO9_TAPS_Y = 4;
+
+	float MotionSAD9(float2 off)
+	{
+		float sum = 0.0;
+		float n = 1e-4;
+		[loop]
+		for (int j0 = 0; j0 < MO9_TAPS_Y; ++j0)
+		{
+			[loop]
+			for (int i0 = 0; i0 < MO9_TAPS_X; ++i0)
+			{
+				float2 g = float2(0.1 + 0.8 * (i0 + 0.5) / MO9_TAPS_X, 0.1 + 0.8 * (j0 + 0.5) / MO9_TAPS_Y);
+				float2 q = g + off;
+				float inside = (q.x > 0.02 && q.x < 0.98 && q.y > 0.02 && q.y < 0.98) ? 1.0 : 0.0;
+				sum += abs(tex2Dlod(MoScene, float4(g, 0.0, 0.0)).x - tex2Dlod(MoPrev, float4(q, 0.0, 0.0)).x) * inside;
+				n += inside;
+			}
+		}
+		return sum / n;
+	}
+	#define MO_SAD(off) MotionSAD9(off)
+#else
+	#define MO_SAD(off) MotionSAD(sc, gs, off)
+#endif
+
 	float4 MotionEstimatePS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
+#if __RENDERER__ >= 0xa000
 		float sc[MO_TAPS];
 		float2 gs[MO_TAPS];
 		[loop]
@@ -1669,8 +1729,9 @@ namespace LegionGU
 				sc[t] = tex2Dlod(MoScene, float4(gs[t], 0.0, 0.0)).x;
 			}
 		}
+#endif
 		float2 texel = float2(1.0 / 192.0, 1.0 / 108.0);
-		float sadZero = MotionSAD(sc, gs, float2(0.0, 0.0));
+		float sadZero = MO_SAD(float2(0.0, 0.0));
 		float2 best = float2(0.0, 0.0);
 		float sadBest = sadZero;
 		[loop]
@@ -1680,7 +1741,7 @@ namespace LegionGU
 			for (int i = -4; i <= 4; ++i)
 			{
 				float2 off = float2(i, j) * (4.0 * texel);
-				float s = MotionSAD(sc, gs, off);
+				float s = MO_SAD(off);
 				if (s < sadBest)
 				{
 					sadBest = s;
@@ -1696,7 +1757,7 @@ namespace LegionGU
 			for (int i2 = -2; i2 <= 2; ++i2)
 			{
 				float2 off = coarse + float2(i2, j2) * texel;
-				float s = MotionSAD(sc, gs, off);
+				float s = MO_SAD(off);
 				if (s < sadBest)
 				{
 					sadBest = s;
@@ -1799,7 +1860,7 @@ namespace LegionGU
 		for (int j = 0; j < GRID_Y; ++j)
 		{
 			float rowFar = 0.0;
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int i = 0; i < GRID_X; ++i)
 			{
 				float2 g = GridUV(i, j);
@@ -2258,10 +2319,10 @@ namespace LegionGU
 	{
 		float2 px = float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 		float3 c = float3(0.0, 0.0, 0.0);
-		[unroll]
+		LEGIONGU_UNROLL
 		for (int j = 0; j < LEGIONGU_COLOUR_TAPS; ++j)
 		{
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int i = 0; i < LEGIONGU_COLOUR_TAPS; ++i)
 			{
 				float2 o = ((float2(i, j) + 0.5) / float(LEGIONGU_COLOUR_TAPS) - 0.5) * float(LEGIONGU_RAYS_DOWNSCALE);
@@ -2277,10 +2338,10 @@ namespace LegionGU
 		{
 			float reversed = EffectiveReversed(depthState.w);
 			air = 0.0;
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int j2 = 0; j2 < LEGIONGU_SKY_TAPS; ++j2)
 			{
-				[unroll]
+				LEGIONGU_UNROLL
 				for (int i2 = 0; i2 < LEGIONGU_SKY_TAPS; ++i2)
 				{
 					float2 o = ((float2(i2, j2) + 0.5) / float(LEGIONGU_SKY_TAPS) - 0.5) * float(LEGIONGU_RAYS_DOWNSCALE);
@@ -2345,7 +2406,7 @@ namespace LegionGU
 		[loop]
 		for (int j = 0; j < STATS_TAPS; ++j)
 		{
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int i = 0; i < STATS_TAPS; ++i)
 			{
 				int2 xy = int2(base + (float2(i, j) + 0.5) * stride);
@@ -2382,7 +2443,7 @@ namespace LegionGU
 		[loop]
 		for (int y1 = 0; y1 < STATS_H; ++y1)
 		{
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int x1 = 0; x1 < STATS_W; ++x1)
 				gmax = max(gmax, tex2Dfetch(RaysStats, int2(x1, y1)).y);
 		}
@@ -2397,7 +2458,7 @@ namespace LegionGU
 		[loop]
 		for (int y2 = 0; y2 < STATS_H; ++y2)
 		{
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int x2 = 0; x2 < STATS_W; ++x2)
 			{
 				float4 st = tex2Dfetch(RaysStats, int2(x2, y2));
@@ -2435,7 +2496,7 @@ namespace LegionGU
 				[loop]
 				for (int y3 = 0; y3 < STATS_H; ++y3)
 				{
-					[unroll]
+					LEGIONGU_UNROLL
 					for (int x3 = 0; x3 < STATS_W; ++x3)
 					{
 						float4 st3 = tex2Dfetch(RaysStats, int2(x3, y3));
@@ -2591,7 +2652,7 @@ namespace LegionGU
 			[loop]
 			for (int y = 0; y < STATS_H; ++y)
 			{
-				[unroll]
+				LEGIONGU_UNROLL
 				for (int x = 0; x < STATS_W; ++x)
 				{
 					float2 cell = float2((x + 0.5) / STATS_W, (y + 0.5) / STATS_H);
@@ -2620,7 +2681,7 @@ namespace LegionGU
 			[loop]
 			for (int y = 0; y < STATS_H; ++y)
 			{
-				[unroll]
+				LEGIONGU_UNROLL
 				for (int x = 0; x < STATS_W; ++x)
 				{
 					float2 cell = float2((x + 0.5) / STATS_W, (y + 0.5) / STATS_H);
@@ -2667,10 +2728,10 @@ namespace LegionGU
 		float2 block = float2(1.0 / LEGIONGU_LIGHT_W, 1.0 / LEGIONGU_LIGHT_H);
 
 		float3 acc = float3(0.0, 0.0, 0.0);
-		[unroll]
+		LEGIONGU_UNROLL
 		for (int j = 0; j < LEGIONGU_SRC_TAPS; ++j)
 		{
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int i = 0; i < LEGIONGU_SRC_TAPS; ++i)
 			{
 				float2 t = uv + ((float2(i, j) + 0.5) / float(LEGIONGU_SRC_TAPS) - 0.5) * block;
@@ -2734,7 +2795,7 @@ namespace LegionGU
 		float wsum = 0.0;
 		float w = 1.0;
 		float scale = 1.0;
-		[unroll]
+		LEGIONGU_UNROLL
 		for (int i = 0; i < 16; ++i)
 		{
 			sum += tex2Dlod(src, float4(s.p + v * scale - stepP * i, 0.0, 0.0)).rgb * w;
@@ -2774,7 +2835,7 @@ namespace LegionGU
 		float wsum = 1.0;
 		float2 a = v;
 		float2 b = v;
-		[unroll]
+		LEGIONGU_UNROLL
 		for (int k = 1; k <= K; ++k)
 		{
 			a = float2(a.x * cs - a.y * sn, a.x * sn + a.y * cs);
@@ -2948,7 +3009,7 @@ namespace LegionGU
 		if (min(gap.r, min(gap.g, gap.b)) < BRIDGE_GAP || BridgeBits(2, th) != 5.0)
 			return false;
 		float sum = 0.0;
-		[unroll]
+		LEGIONGU_UNROLL
 		for (int i = 3; i < LEGIONGU_CTL_CELLS - 2; i += 2)
 			sum += BridgeValue(i, th);
 		return abs(sum % 64.0 - BridgeValue(LEGIONGU_CTL_CELLS - 2, th)) < 0.5;
@@ -3074,12 +3135,12 @@ namespace LegionGU
 			return float2(0.0, up);
 		float turn = 6.2831853 * frac(52.9829189 * frac(dot(pos.xy, float2(0.06711056, 0.00583715))));
 		float occ = 0.0;
-		[unroll]
+		LEGIONGU_UNROLL
 		for (int k = 0; k < 12; ++k)
 		{
 			float a = turn + k * 0.5235988;
 			float2 dir = float2(cos(a), sin(a)) * rpx * px;
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int s = 0; s < 2; ++s)
 			{
 				float3 v = ViewPos(uv + dir * (s == 0 ? 0.45 : 1.0), reversed) - p;
@@ -3103,10 +3164,10 @@ namespace LegionGU
 		float2 px = 3.0 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 		float2 sum = float2(0.0, 0.0);
 		float wsum = 0.0;
-		[unroll]
+		LEGIONGU_UNROLL
 		for (int y = -1; y <= 1; ++y)
 		{
-			[unroll]
+			LEGIONGU_UNROLL
 			for (int x = -1; x <= 1; ++x)
 			{
 				float2 t = uv + float2(x, y) * px;
