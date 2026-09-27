@@ -214,6 +214,8 @@ static class WowGU
 			{
 				try
 				{
+					// The mod was removed from this game: the watcher goes too, without waiting for a restart.
+					if (!File.Exists(Path.Combine(current.Dir, Marker))) { timer.Stop(); Application.Exit(); return; }
 					var sent = File.Exists(sentFile) ? File.ReadAllLines(sentFile).ToList() : new List<string>();
 					var wtf = Path.Combine(current.Dir, "WTF");
 					if (!Directory.Exists(wtf)) return;
@@ -560,6 +562,18 @@ static class WowGU
 		// 1. ReShade with add-on support, unless it is already there.
 		if (IsReShade(G("dxgi.dll")) || IsReShade(G("d3d9.dll")))
 			Say(T("ReShade уже установлен, оставляю его.", "ReShade is already installed, keeping it."));
+		else if (File.Exists(G(dll)))
+		{
+			// ReShade goes in under this very name, so its setup refuses a foreign file there (DXVK on Turtle WoW, for
+			// one). The player decides about that file, the installer does not touch it.
+			var who = (FileVersionInfo.GetVersionInfo(G(dll)).ProductName ?? "").Trim();
+			var name = dll + (who.Length > 0 ? " (" + who + ")" : "");
+			Say(T("В папке игры уже лежит чужой файл " + name + ". ReShade ставится под тем же именем, поэтому установка остановлена.",
+				"The game folder already has a foreign file " + name + ". ReShade goes in under the same name, so the install has been stopped."));
+			Say(T("Переименуйте этот файл, например в " + dll + ".off, и нажмите «Установить» ещё раз.",
+				"Rename that file, for example to " + dll + ".off, and press Install again."));
+			return;
+		}
 		else
 		{
 			Say(T("Скачиваю ReShade с reshade.me…", "Downloading ReShade from reshade.me…"));
@@ -708,24 +722,27 @@ static class WowGU
 				MessageBoxDefaultButton.Button1) == DialogResult.Yes;
 			marker["watch"] = wants ? "1" : "0";
 		}
+		// The marker goes first: a watcher quits when its game has none.
+		WriteMarker(marker);
 		if (marker["watch"] == "1")
 		{
 			try
 			{
 				var me = Assembly.GetExecutingAssembly().Location;
+				DropWatch();
 				Microsoft.Win32.Registry.SetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run",
-					"GU-WOW-Watch", "\"" + me + "\" --watch \"" + current.Dir + "\"");
-				Process.Start(new ProcessStartInfo(me, "--watch \"" + current.Dir + "\"") { UseShellExecute = false });
+					WatchName(), "\"" + me + "\" --watch \"" + current.Dir + "\"");
+				StartWatchers();
 				Say(T("Помощник поддержки поставлен: сообщения об ошибках уходят разработчику по вашей кнопке «Отправить». Снимается удалением мода.", "The support helper is installed: error reports go to the developer when you press Send. Removing the mod removes it too."));
 			}
 			catch { }
 		}
 		else
 		{
-			try { Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true).DeleteValue("GU-WOW-Watch", false); } catch { }
+			DropWatch();
+			StartWatchers();
 			Say(T("Помощник поддержки не ставился: отчёты об ошибках будут открываться страницей в браузере.", "The support helper was not installed: error reports will open as a page in the browser."));
 		}
-		WriteMarker(marker);
 		Say("");
 		// Only the keys the player really has.
 		var done = T("Готово. Запустите игру.", "Done. Start the game.");
@@ -737,8 +754,8 @@ static class WowGU
 	static void Uninstall()
 	{
 		var marker = ReadMarker();
-		// The report watcher goes with the mod.
-		try { Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true).DeleteValue("GU-WOW-Watch", false); } catch { }
+		// The report watcher of this game goes with the mod; the watchers of other games stay.
+		DropWatch();
 		foreach (var f in new[] { @"reshade-shaders\Shaders\LegionGUbylevan.fx", @"reshade-shaders\Shaders\LegionGUNightsbylevan.fx", @"reshade-shaders\Textures\LegionGUMask.png", Preset })
 			if (File.Exists(G(f))) File.Delete(G(f));
 		if (Directory.Exists(G(@"Interface\AddOns\LegionGU"))) Directory.Delete(G(@"Interface\AddOns\LegionGU"), true);
@@ -782,6 +799,73 @@ static class WowGU
 	static bool IsReShade(string path)
 	{
 		return File.Exists(path) && (FileVersionInfo.GetVersionInfo(path).ProductName ?? "").Contains("ReShade");
+	}
+
+	// The report watcher starts with Windows from HKCU Run, one value per game folder, so a second game keeps the
+	// first one's watcher and removing the mod from one game leaves the others. Up to 1.8.0 it was one value for the
+	// whole PC, "GU-WOW-Watch"; that value moves to its folder's own name at the next install or removal.
+	const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+	const string WatchPrefix = "GU-WOW-Watch";
+
+	static string WatchKey(string dir)
+	{
+		return Path.GetFullPath(dir).TrimEnd('\\').ToLowerInvariant();
+	}
+
+	static string WatchName(string dir)
+	{
+		using (var h = SHA256.Create())
+			return WatchPrefix + " " + string.Concat(h.ComputeHash(Encoding.UTF8.GetBytes(WatchKey(dir))).Take(4).Select(b => b.ToString("x2")));
+	}
+
+	static string WatchName() { return WatchName(current.Dir); }
+
+	// The game folder of a Run value: the last quoted part of "<exe>" --watch "<folder>".
+	static string WatchDir(string command)
+	{
+		var m = Regex.Match(command ?? "", "--watch \"([^\"]+)\"");
+		return m.Success ? m.Groups[1].Value : null;
+	}
+
+	// Removes this game's watcher entry; the old PC-wide entry of another game moves to that game's own name.
+	static void DropWatch()
+	{
+		try
+		{
+			using (var run = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey, true))
+			{
+				if (run == null) return;
+				run.DeleteValue(WatchName(), false);
+				var legacy = run.GetValue(WatchPrefix) as string;
+				if (legacy == null) return;
+				var dir = WatchDir(legacy);
+				if (dir != null && WatchKey(dir) != WatchKey(current.Dir)) run.SetValue(WatchName(dir), legacy);
+				run.DeleteValue(WatchPrefix, false);
+			}
+		}
+		catch { }
+	}
+
+	// The install stops every running GU-WOW.exe, the watchers of other games too: all of them start again here.
+	// Each watcher holds a mutex per folder, so one already running quits at once.
+	static void StartWatchers()
+	{
+		try
+		{
+			using (var run = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey, false))
+			{
+				if (run == null) return;
+				foreach (var name in run.GetValueNames())
+				{
+					if (!name.StartsWith(WatchPrefix)) continue;
+					var command = run.GetValue(name) as string ?? "";
+					var m = Regex.Match(command, "^\"([^\"]+)\" (.*)$");
+					if (m.Success && File.Exists(m.Groups[1].Value))
+						Process.Start(new ProcessStartInfo(m.Groups[1].Value, m.Groups[2].Value) { UseShellExecute = false });
+				}
+			}
+		}
+		catch { }
 	}
 
 	static string Sha256(string path)
