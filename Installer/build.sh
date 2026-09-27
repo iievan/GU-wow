@@ -10,6 +10,8 @@ export MSYS2_ARG_CONV_EXCL="*" MSYS_NO_PATHCONV=1
  "/resource:$R/AddOn/LegionGU/LegionGU.lua,p~Interface~AddOns~LegionGU~LegionGU.lua" \
  "/resource:$R/AddOn/LegionGU/LegionGU.toc,toc" \
  "/resource:$R/AddOn/LegionGU/Bindings.xml,p~Interface~AddOns~LegionGU~Bindings.xml" \
+ "/resource:$R/AddOn/LegionGU-Classic/LegionGU.lua,c~Interface~AddOns~LegionGU~LegionGU.lua" \
+ "/resource:$R/AddOn/LegionGU-Classic/LegionGU.toc,c~Interface~AddOns~LegionGU~LegionGU.toc" \
  "/resource:$R/Installer/payload/ReshadeEffectShaderToggler.addon64,p~ReshadeEffectShaderToggler.addon64" \
  "/resource:$R/Installer/payload/ReshadeEffectShaderToggler.ini,p~ReshadeEffectShaderToggler.ini" \
  wowGU.cs

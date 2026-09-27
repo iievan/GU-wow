@@ -593,12 +593,14 @@ static class WowGU
 			marker["reshade"] = dll;
 		}
 
-		// 2. Effects, textures, the in-game panel.
+		// 2. Effects, textures, the in-game panel. Classic 1.12 runs Lua 5.0 and gets its own addon (c~), with the
+		// same key bindings; TBC 2.4.3 has none yet.
+		bool classic = current.Major == 1;
 		foreach (var name in Assembly.GetExecutingAssembly().GetManifestResourceNames())
 		{
-			if (!name.StartsWith("p~")) continue;
+			if (!name.StartsWith("p~") && !(classic && name.StartsWith("c~"))) continue;
 			var rel = name.Substring(2).Replace('~', '\\');
-			if (rel.StartsWith(@"Interface\") && current.Major < 3) continue;
+			if (name.StartsWith("p~") && rel.StartsWith(@"Interface\") && current.Major < 3 && !(classic && rel.EndsWith("Bindings.xml"))) continue;
 			if (rel.StartsWith("ReshadeEffectShader") || rel == Preset) continue;
 			Directory.CreateDirectory(Path.GetDirectoryName(G(rel)));
 			File.WriteAllBytes(G(rel), Resource(name));
@@ -610,6 +612,7 @@ static class WowGU
 			File.WriteAllText(G(@"Interface\AddOns\LegionGU\LegionGU.toc"), toc, new UTF8Encoding(false));
 			Say(T("Меню в игре: Интерфейс > Модификации > GUWOW!, или команда /gu.", "The in-game menu: Interface > AddOns > GUWOW!, or the /gu command."));
 		}
+		else if (classic) Say(T("Меню в игре: команда /gu или кнопка у миникарты.", "The in-game menu: the /gu command or the minimap button."));
 		else Say(T("Меню в игре для этого клиента не ставится: настройки в окне ReShade (Scroll Lock).", "The in-game menu is not installed for this client: settings live in the ReShade window (Scroll Lock)."));
 		MergePreset();
 		Say(T("Эффекты и пресет на месте.", "The effects and the preset are in place."));
@@ -678,7 +681,8 @@ static class WowGU
 		if (IniGet(rs, "GENERAL", "IntermediateCachePath") == cache)
 			Directory.CreateDirectory(G(@"reshade-shaders\Cache"));
 		Say(T("Надпись ReShade при запуске игры сжата до тонкой полосы, собранные эффекты хранятся в папке игры.", "The ReShade banner at game start is squeezed to a thin strip; the compiled effects are kept in the game folder."));
-		// Without the addon there is no signal from the game world: the effects must not wait for it.
+		// Without the addon there is no signal from the game world: the effects must not wait for it. The 1.12 addon
+		// is not yet checked in a live game, so there too the effects run as set in ReShade until its strip is read.
 		if (current.Major < 3)
 		{
 			var defs = IniGet(rs, "GENERAL", "PreprocessorDefinitions") ?? "";
