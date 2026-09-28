@@ -730,6 +730,13 @@ static class WowGU
 			if (!File.Exists(cfg + ".wowgu-backup")) File.Copy(cfg, cfg + ".wowgu-backup");
 			if (current.Major >= 6) ConfigSet(cfg, "MSAAQuality", "0"); else ConfigSet(cfg, "gxMultisample", "1");
 			Say(T("Сглаживание MSAA выключено, копия настроек: WTF\\Config.wtf.wowgu-backup.", "MSAA anti-aliasing is turned off; a copy of the settings: WTF\\Config.wtf.wowgu-backup."));
+			// With triple buffering the 1.12 client draws the world again after GU-WOW.addon32 has run the effects, and
+			// the fog and the rays never reach the screen.
+			if (marker.ContainsKey("addon32") && ConfigValue(current.Dir, "gxTripleBuffer") == "1")
+			{
+				ConfigSet(cfg, "gxTripleBuffer", "0");
+				Say(T("Тройная буферизация выключена: с ней туман и лучи не видны.", "Triple buffering is turned off: with it the fog and the rays do not show."));
+			}
 		}
 		// The report watcher: the player is asked once. Yes puts it into HKCU Run (no admin rights) and starts
 		// it now; the in-game report then leaves within seconds. No keeps the machine untouched: the marker
@@ -806,12 +813,12 @@ static class WowGU
 		var cfg = G(@"WTF\Config.wtf");
 		if (File.Exists(cfg + ".wowgu-backup"))
 		{
-			foreach (var key in new[] { "MSAAQuality", "gxMultisample" })
+			foreach (var key in new[] { "MSAAQuality", "gxMultisample", "gxTripleBuffer" })
 			{
 				var old = ConfigValue(Path.GetDirectoryName(cfg + ".wowgu-backup"), key, Path.GetFileName(cfg + ".wowgu-backup"));
 				if (old.Length > 0) ConfigSet(cfg, key, old); else ConfigRemove(cfg, key);
 			}
-			Say(T("Сглаживание вернулось как было.", "Anti-aliasing restored to what it was."));
+			Say(T("Сглаживание и буферизация вернулись как были.", "Anti-aliasing and buffering restored to what they were."));
 		}
 		if (File.Exists(G(Marker))) File.Delete(G(Marker));
 		Say(T("GU-WOW удалён.", "GU-WOW removed."));

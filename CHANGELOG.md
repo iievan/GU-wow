@@ -18,6 +18,7 @@
 - Ночные огни не тянутся кометой при повороте камеры.
 - Текст чата читается ночью.
 - Установщик называет чужой `d3d9.dll` (например DXVK) и подсказывает, как его переименовать.
+- Установщик выключает в 1.12 тройную буферизацию: с ней туман и лучи не доходят до экрана. Удаление мода возвращает её.
 - Помощник отчётов свой у каждой игры: удаление мода из одной игры не трогает другие.
 
 **Важно для 1.12**
@@ -37,6 +38,7 @@
 - The night lights no longer trail like a comet when the camera turns.
 - The chat text reads at night.
 - The installer names a foreign `d3d9.dll` (DXVK, for one) and says how to rename it.
+- The installer turns triple buffering off in 1.12: with it the fog and the rays never reach the screen. Removing the mod turns it back on.
 - The report helper is per game: removing the mod from one game leaves the others alone.
 
 **Good to know for 1.12**
