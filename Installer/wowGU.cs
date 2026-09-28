@@ -23,9 +23,9 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("GU-WOW: fog, sun rays, night and picture for World of Warcraft. Installer and support helper.")]
 [assembly: AssemblyCompany("levan")]
 [assembly: AssemblyCopyright("© 2026 levan")]
-[assembly: AssemblyVersion("1.7.1")]
-[assembly: AssemblyFileVersion("1.7.1")]
-[assembly: AssemblyInformationalVersion("1.7.1-release")]
+[assembly: AssemblyVersion("1.7.2")]
+[assembly: AssemblyFileVersion("1.7.2")]
+[assembly: AssemblyInformationalVersion("1.7.2-release")]
 
 class ShotForm : Form
 {
@@ -35,7 +35,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.7.1-release";
+	const string Version = "1.7.2-release";
 	static readonly bool RU = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru";
 	static string T(string ru, string en) { return RU ? ru : en; }
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
@@ -47,6 +47,8 @@ static class WowGU
 	const string ReShadeSha256 = "afe4c8f13048306307983b8b3d41d5bf00a86820440b0e57dea10950e1176445";
 	const string Marker = "wowGU.txt";
 	const string Preset = "LegionGUbylevan.ini";
+	// The name a foreign DirectX file (DXVK, for one) waits under while GU-WOW is installed.
+	const string Parked = ".off";
 	static readonly string[] Exes = { "Wow-64.exe", "Wow64.exe", "WowT-64.exe", "WowB-64.exe", "Wow.exe", "WowClassic.exe", "WowClassicT.exe" };
 
 	static Form form;
@@ -562,20 +564,32 @@ static class WowGU
 		// 1. ReShade with add-on support, unless it is already there.
 		if (IsReShade(G("dxgi.dll")) || IsReShade(G("d3d9.dll")))
 			Say(T("ReShade уже установлен, оставляю его.", "ReShade is already installed, keeping it."));
-		else if (File.Exists(G(dll)))
+		else if (File.Exists(G(dll)) && (current.Api != "d3d9" || File.Exists(G(dll + Parked))))
 		{
-			// ReShade goes in under this very name, so its setup refuses a foreign file there (DXVK on Turtle WoW, for
-			// one). The player decides about that file, the installer does not touch it.
+			// ReShade goes in under this very name, so its setup refuses a foreign file there. Outside DirectX 9 the
+			// player decides about that file, the installer does not touch it.
 			var who = (FileVersionInfo.GetVersionInfo(G(dll)).ProductName ?? "").Trim();
 			var name = dll + (who.Length > 0 ? " (" + who + ")" : "");
 			Say(T("В папке игры уже лежит чужой файл " + name + ". ReShade ставится под тем же именем, поэтому установка остановлена.",
 				"The game folder already has a foreign file " + name + ". ReShade goes in under the same name, so the install has been stopped."));
-			Say(T("Переименуйте этот файл, например в " + dll + ".off, и нажмите «Установить» ещё раз.",
-				"Rename that file, for example to " + dll + ".off, and press Install again."));
+			var spare = dll + (File.Exists(G(dll + Parked)) ? ".old" : Parked);
+			Say(T("Переименуйте этот файл, например в " + spare + ", и нажмите «Установить» ещё раз.",
+				"Rename that file, for example to " + spare + ", and press Install again."));
 			return;
 		}
 		else
 		{
+			// A foreign d3d9.dll (DXVK on Turtle WoW, for one) steps aside under its own name while GU-WOW is there;
+			// removing the mod puts it back.
+			if (File.Exists(G(dll)))
+			{
+				var who = (FileVersionInfo.GetVersionInfo(G(dll)).ProductName ?? "").Trim();
+				File.Move(G(dll), G(dll + Parked));
+				marker["parked"] = dll;
+				WriteMarker(marker);
+				Say(T("Чужой файл " + dll + (who.Length > 0 ? " (" + who + ")" : "") + " отключён на время работы мода: ReShade ставится под тем же именем. Удаление мода вернёт его.",
+					"The foreign file " + dll + (who.Length > 0 ? " (" + who + ")" : "") + " is off while the mod is in: ReShade goes in under the same name. Removing the mod brings it back."));
+			}
 			Say(T("Скачиваю ReShade с reshade.me…", "Downloading ReShade from reshade.me…"));
 			var setup = Path.Combine(Path.GetTempPath(), "ReShade_Setup_6.8.0_Addon.exe");
 			var local = Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "ReShade_Setup_6.8.0_Addon.exe");
@@ -589,7 +603,13 @@ static class WowGU
 			Say(T("Устанавливаю ReShade…", "Installing ReShade…"));
 			var p = Process.Start(new ProcessStartInfo(setup, "\"" + current.Exe + "\" --api " + current.Api + " --headless") { UseShellExecute = false, CreateNoWindow = true });
 			p.WaitForExit();
-			if (p.ExitCode != 0 || !IsReShade(G(dll))) { Say(T("ReShade не установился (код ", "ReShade did not install (code ") + p.ExitCode + ")."); return; }
+			if (p.ExitCode != 0 || !IsReShade(G(dll)))
+			{
+				Say(T("ReShade не установился (код ", "ReShade did not install (code ") + p.ExitCode + ").");
+				Unpark(marker);
+				if (marker.Count > 0) WriteMarker(marker); else if (File.Exists(G(Marker))) File.Delete(G(Marker));
+				return;
+			}
 			marker["reshade"] = dll;
 		}
 
@@ -810,6 +830,7 @@ static class WowGU
 			Say(T("ReShade удалён.", "ReShade removed."));
 		}
 		else Say(T("ReShade ставили не через GU-WOW, он остаётся.", "ReShade was not installed by GU-WOW, so it stays."));
+		Unpark(marker);
 		var cfg = G(@"WTF\Config.wtf");
 		if (File.Exists(cfg + ".wowgu-backup"))
 		{
@@ -825,6 +846,22 @@ static class WowGU
 	}
 
 	// ------------------------------------------------------------------ helpers
+
+	// The foreign DirectX file set aside by the install goes back under its own name once that name is free.
+	static void Unpark(Dictionary<string, string> marker)
+	{
+		string dll;
+		if (!marker.TryGetValue("parked", out dll) || !File.Exists(G(dll + Parked))) return;
+		if (File.Exists(G(dll)))
+		{
+			Say(T("Файл " + dll + Parked + " не возвращён: имя " + dll + " занято. Переименуйте его сами.",
+				"The file " + dll + Parked + " was not brought back: the name " + dll + " is taken. Rename it yourself."));
+			return;
+		}
+		File.Move(G(dll + Parked), G(dll));
+		marker.Remove("parked");
+		Say(T("Файл " + dll + " снова включён.", "The file " + dll + " is on again."));
+	}
 
 	static byte[] Resource(string name)
 	{

@@ -1,5 +1,17 @@
 # GUWOW! (в разработке GU-WOW): история версий / Version history
 
+## 1.7.2-release «Адаптация 1.12 · Живой огонь» / "1.12 adaptation · Living Flame"
+
+### Русский
+
+**Новое**
+- Мод ставится в игру с DXVK без ручных шагов: установщик отключает DXVK на время работы мода. Удаление мода включает DXVK обратно.
+
+### English
+
+**New**
+- The mod goes into a game with DXVK with no manual steps: the installer turns DXVK off while the mod is in. Removing the mod turns DXVK back on.
+
 ## 1.7.1-release «Адаптация 1.12 · Живой огонь» / "1.12 adaptation · Living Flame"
 
 Сборка для Classic 1.12 (Turtle WoW). Legion 7.3.5 получает исправления ночных огней и чата.

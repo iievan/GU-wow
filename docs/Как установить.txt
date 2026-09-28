@@ -1,4 +1,4 @@
-GUWOW! 1.7.1-release «Адаптация 1.12 · Живой огонь»: туман, лучи солнца, ночь, огни и картинка для World of Warcraft (проверено на Tauri, Legion 7.3.5, и на Turtle WoW, Classic 1.12).
+GUWOW! 1.7.2-release «Адаптация 1.12 · Живой огонь»: туман, лучи солнца, ночь, огни и картинка для World of Warcraft (проверено на Tauri, Legion 7.3.5, и на Turtle WoW, Classic 1.12).
 
 Установка
 1. Закройте игру.
