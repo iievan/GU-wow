@@ -1,8 +1,8 @@
 ## Interface: 11200
 ## Title: GUWOW!
-## Notes: GUWOW! settings for the fog, the sun rays, the night and the picture, inside the game. Open: /gu or the minimap button.
-## Notes-ruRU: Настройки тумана, лучей солнца, ночи и картинки GUWOW! прямо в игре. Открыть: /gu или кнопка у миникарты.
+## Notes: GUWOW! settings for the fog, the sun rays, the night and the picture, inside the game. Open: /guwow or the minimap button.
+## Notes-ruRU: Настройки тумана, лучей солнца, ночи и картинки GUWOW! прямо в игре. Открыть: /guwow или кнопка у миникарты.
 ## Author: levan
-## Version: public-release-beta-1.0
+## Version: 1.7.1-release
 ## SavedVariables: LegionGUDB
 LegionGU.lua

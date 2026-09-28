@@ -1,10 +1,10 @@
 -- GU-WOW by levan: the in-game menu for Classic 1.12. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
 -- The same strip as the main addon (AddOn/LegionGU): 81 cells of 4 by 4 pixels in the top left corner, one bit per
 -- colour channel, read and covered by LegionGUBridge. 1.12 runs Lua 5.0 and has no options window for addons, so
--- this is a file of its own: the menu is a window opened by /gu and the minimap button. Lua 5.0 has no # and no %,
+-- this is a file of its own: the menu is a window opened by /guwow and the minimap button. Lua 5.0 has no # and no %,
 -- a loop variable is one for the whole loop, and the script handlers get this, event and arg1, not parameters.
 
-local VERSION = "public-release-beta-1.0"
+local VERSION = "1.7.1-release"
 local CELL = 4
 local CELLS = 81
 
@@ -26,18 +26,18 @@ local function Say(text)
 	DEFAULT_CHAT_FRAME:AddMessage("|cffffd200GUWOW!:|r " .. text)
 end
 
--- The standard settings, the same as in the main addon.
+-- The standard settings of the 1.12 client, set by eye in the live game.
 local DEFAULTS = {
 	master = true, fog = true, weather = true, wet = true, rays = true, night = true, eye = true,
 	zones = true, autoQuality = false, targetFps = 45, orbit = false, hideNames = true, cinema = true, style = 0,
 	chatBack = true,
-	fogThickness = 10, fogDistance = 100, mist = 70, mistDensity = 45, raysStrength = 100,
-	nightDarkness = 80, nightDepth = 70, lightGlow = 100, caveDarkness = 75,
-	sharpness = 25, grade = 80, vignette = 55, ao = 90,
-	hazeStrength = 30, hdrStrength = 15, grain = 10, bokeh = false, photoBlur = 50,
-	mistHigh = 40, rayDefinition = 55, mistFlow = 10,
-	bright = 60, contrast = 55, satur = 50, warmth = 50,
-	raysOpen = 45, raysReach = 50, sunGlow = 50, mistNear = 25,
+	fogThickness = 5, fogDistance = 100, mist = 40, mistDensity = 30, raysStrength = 100,
+	nightDarkness = 25, nightDepth = 10, lightGlow = 40, caveDarkness = 50,
+	sharpness = 25, grade = 80, vignette = 55, ao = 66,
+	hazeStrength = 31, hdrStrength = 60, grain = 31, bokeh = false, photoBlur = 50,
+	mistHigh = 55, rayDefinition = 63, mistFlow = 40,
+	bright = 60, contrast = 55, satur = 50, warmth = 55,
+	raysOpen = 65, raysReach = 80, sunGlow = 66, mistNear = 23,
 }
 -- The order of the values in the strip, the same as LEGIONGU_CTL_* in the shaders (after the flags).
 local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDarkness", "lightGlow",
@@ -85,6 +85,7 @@ local preview, previewName
 local photo = false
 local checkView = false
 local lowQuality = false
+local inInstance = false
 local zoneKind
 local widgets = {}
 local menu
@@ -206,6 +207,7 @@ end
 
 local function UpdateZone()
 	zoneKind = GetRealZoneText and ZONES[GetRealZoneText() or ""] or nil
+	inInstance = IsInInstance and IsInInstance() and true or false
 end
 
 -- A value on screen: the preview's while one is on, the player's own otherwise.
@@ -216,7 +218,9 @@ local function V(key)
 	return DB[key]
 end
 
--- A value as the shader gets it: nudged by the zone, and off for the heavy parts in low quality.
+-- A value as the shader gets it: nudged by the zone, and off for the heavy parts in low quality. The dungeon
+-- darkness works in dungeons only: 1.12 lights its rooms far dimmer than Legion, and to the shader a tavern or the
+-- halls of Ironforge look like a cave (no sky for a few seconds, a dark frame), so any room went as dark as night.
 local QUALITY_OFF = { ao = true, mist = true, sharpness = true }
 local function Effective(key)
 	local v = V(key)
@@ -224,6 +228,9 @@ local function Effective(key)
 		v = v * KIND_MODS[zoneKind][key]
 	end
 	if lowQuality and QUALITY_OFF[key] then
+		v = 0
+	end
+	if key == "caveDarkness" and not inInstance then
 		v = 0
 	end
 	return math.max(0, math.min(100, v))
@@ -317,7 +324,19 @@ end
 -- The interface the effects leave alone. 1.12 draws the windows into the same frame as the world, and REST is
 -- Legion's only, so without this the fog and the rays lay over them. The second strip row tells the shader the
 -- rectangles of what is on screen: open windows first, each of its own, then the bars in groups.
+-- A frame's bounds are often much wider than its art: the unit frames hold a portrait and a panel of bars with
+-- empty world round them, the stance and pet bars span the whole bar width for one or two buttons. The world in
+-- there stayed without fog, a box plainly seen around the window. So the bars go by their buttons and the unit
+-- frames by their portrait and their bars, each grown by `grow` units to the art's rim.
 -- ---------------------------------------------------------------------------------------------------------------
+
+local function Numbered(prefix, count, suffix)
+	local t = {}
+	for i = 1, count do
+		table.insert(t, prefix .. i .. (suffix or ""))
+	end
+	return t
+end
 
 local UI_GROUPS = {}
 for _, n in ipairs({ "GUWOWMenu", "GameMenuFrame", "OptionsFrame", "SoundOptionsFrame", "UIOptionsFrame",
@@ -327,15 +346,23 @@ for _, n in ipairs({ "GUWOWMenu", "GameMenuFrame", "OptionsFrame", "SoundOptions
 	"LootFrame", "HelpFrame", "DressUpFrame", "ItemTextFrame", "GameTooltip" }) do
 	table.insert(UI_GROUPS, { n })
 end
+local unitGrow = 6
 for _, g in ipairs({
-	{ "ContainerFrame1", "ContainerFrame2", "ContainerFrame3", "ContainerFrame4", "ContainerFrame5", "ContainerFrame6",
-		"ContainerFrame7", "ContainerFrame8", "ContainerFrame9", "ContainerFrame10", "ContainerFrame11", "ContainerFrame12" },
+	Numbered("ContainerFrame", 12),
 	{ "ChatFrame1", "ChatFrame2", "ChatFrame3", "ChatFrame4", "ChatFrame5", "ChatFrame6", "ChatFrame7", "ChatFrameEditBox" },
-	{ "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight", "PetActionBarFrame", "ShapeshiftBarFrame" },
+	{ "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight" },
+	{ "MainMenuBarLeftEndCap" },
+	{ "MainMenuBarRightEndCap" },
+	Numbered("ShapeshiftButton", 10),
+	Numbered("PetActionButton", 10),
 	{ "MultiBarRight", "MultiBarLeft" },
-	{ "PlayerFrame", "PetFrame" },
-	{ "TargetFrame", "TargetofTargetFrame" },
-	{ "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3", "PartyMemberFrame4" },
+	{ "PlayerPortrait", "PlayerLevelText", grow = unitGrow },
+	{ "PlayerName", "PlayerFrameHealthBar", "PlayerFrameManaBar", grow = unitGrow },
+	{ "TargetPortrait", "TargetLevelText", grow = unitGrow },
+	{ "TargetName", "TargetFrameHealthBar", "TargetFrameManaBar", grow = unitGrow },
+	{ "TargetofTargetFrame" },
+	{ "PetFrame" },
+	Numbered("PartyMemberFrame", 4),
 	{ "MinimapCluster" },
 	{ "BuffFrame", "TemporaryEnchantFrame" },
 	{ "CastingBarFrame" },
@@ -354,28 +381,56 @@ local function UICell(i, v)
 	UIBits(i + 2, Mod(v, 8))
 end
 
--- A visible group's rectangle in screen shares, top down, with a few pixels of margin; nil if nothing is shown.
+-- A visible group's rectangle in the units of the frames on UIParent, with a few pixels of margin; nil if nothing
+-- is shown. The scale goes by the frames' own scales up to UIParent. The screen is measured by a frame stretched
+-- over UIParent through the same calls: in the 1.12 client UIParent:GetWidth() disagrees with the frame
+-- coordinates by the interface scale, and with uiScale 0.84 the rectangles came out 1.19 times too far from the corner.
 local UI_PAD = 3
+local uiProbe = CreateFrame("Frame", nil, UIParent)
+uiProbe:SetAllPoints(UIParent)
+-- A portrait or a name is a texture or a font string: no scale of its own, it takes its frame's.
+local function ScaleToUI(f)
+	local s = 1
+	while f and f ~= UIParent do
+		if f.GetScale then
+			s = s * (f:GetScale() or 1)
+		end
+		f = f:GetParent()
+	end
+	return s
+end
 local function GroupRect(names)
 	local l, t, r, b
 	for _, n in ipairs(names) do
 		local f = getglobal(n)
-		if f and f:IsVisible() and f:GetLeft() then
-			local s = f:GetEffectiveScale()
+		if f and f.GetLeft and f.IsVisible and f:IsVisible() and f:GetLeft() then
+			local s = ScaleToUI(f)
 			local fl, fr, ft, fb = f:GetLeft() * s, f:GetRight() * s, f:GetTop() * s, f:GetBottom() * s
 			l, r = math.min(l or fl, fl), math.max(r or fr, fr)
 			t, b = math.max(t or ft, ft), math.min(b or fb, fb)
 		end
 	end
+	local grow = names.grow or 0
+	if l then
+		l, t, r, b = l - grow, t + grow, r + grow, b - grow
+	end
 	return l, t, r, b
 end
 
+-- A group over 60% of the screen is no window: a client or another addon stretched a frame over the world, and the
+-- effects would leave the whole picture alone. Such a group is skipped. DB.uiSeen keeps what was sent last, each
+-- group by its first frame in screen percent, and DB.uiSkipped what was skipped, for a report from a live game.
+local function Clamp511(v)
+	return math.max(0, math.min(511, v))
+end
+local UI_MAX_SHARE = 0.6
 local lastUI
 local function PaintUI()
-	local sw = UIParent:GetWidth() * UIParent:GetEffectiveScale()
-	local sh = UIParent:GetHeight() * UIParent:GetEffectiveScale()
+	local x0, y0 = uiProbe:GetLeft() or 0, uiProbe:GetBottom() or 0
+	local sw = (uiProbe:GetRight() or 0) - x0
+	local sh = (uiProbe:GetTop() or 0) - y0
 	local px = UI_PAD * sh / ScreenHeight()
-	local coords = {}
+	local coords, seen, skipped = {}, {}, {}
 	-- Photo mode hides the interface with alpha, so everything is still "visible": no rectangles then.
 	if not photo and sw > 0 and sh > 0 then
 		for _, g in ipairs(UI_GROUPS) do
@@ -383,11 +438,20 @@ local function PaintUI()
 				break
 			end
 			local l, t, r, b = GroupRect(g)
-			if l and r > l and t > b then
-				table.insert(coords, math.max(0, math.floor((l - px) / sw * 511)))
-				table.insert(coords, math.max(0, math.floor((1 - (t + px) / sh) * 511)))
-				table.insert(coords, math.min(511, math.ceil((r + px) / sw * 511)))
-				table.insert(coords, math.min(511, math.ceil((1 - (b - px) / sh) * 511)))
+			if l then
+				l, r, t, b = l - x0, r - x0, t - y0, b - y0
+			end
+			local share = l and (r - l) * (t - b) / (sw * sh) or 0
+			local where = l and string.format("%s %d,%d-%d,%d", g[1], math.floor(l / sw * 100), math.floor((1 - t / sh) * 100),
+				math.floor(r / sw * 100), math.floor((1 - b / sh) * 100))
+			if l and share > UI_MAX_SHARE then
+				table.insert(skipped, where)
+			elseif l and r > l and t > b then
+				table.insert(seen, where)
+				table.insert(coords, Clamp511(math.floor((l - px) / sw * 511)))
+				table.insert(coords, Clamp511(math.floor((1 - (t + px) / sh) * 511)))
+				table.insert(coords, Clamp511(math.ceil((r + px) / sw * 511)))
+				table.insert(coords, Clamp511(math.ceil((1 - (b - px) / sh) * 511)))
 			end
 		end
 	end
@@ -399,6 +463,11 @@ local function PaintUI()
 		return
 	end
 	lastUI = key
+	DB.uiSeen = table.concat(seen, "; ")
+	DB.uiScreen = string.format("%dx%d, UIParent %dx%d", sw, sh, UIParent:GetWidth(), UIParent:GetHeight())
+	if table.getn(skipped) > 0 then
+		DB.uiSkipped = table.concat(skipped, "; ")
+	end
 	UIBits(0, 5)
 	local sum = 0
 	for i, v in ipairs(coords) do
@@ -811,8 +880,8 @@ Check(pMain, "autoQuality", T("Автокачество: упрощать тяж
 Check(pMain, "zones", T("Атмосфера по зонам", "Atmosphere by zone"), 20, -184, UpdateZone)
 Check(pMain, "chatBack", T("Подложка под чатом", "A shade behind the chat"), 20, -210, ChatBack)
 Slider(pMain, "targetFps", T("Держать кадров не ниже", "Keep FPS at least"), R, -170, 20, 120)
-Text(pMain, T("F11 включает и выключает весь мод, свою клавишу можно задать в назначении клавиш.\nКнопка у миникарты: левая открывает меню, правая включает и выключает, Shift + левая даёт фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu shot · /gu check проверка глубины.",
-	"F11 toggles the whole mod; your own key is in the key bindings.\nThe minimap button: left opens the menu, right toggles, Shift + left starts photo mode.\nChat commands: /gu menu · /gu photo · /gu shot · /gu check depth check."),
+Text(pMain, T("F11 включает и выключает весь мод, свою клавишу можно задать в назначении клавиш.\nКнопка у миникарты: левая открывает меню, правая включает и выключает, Shift + левая даёт фоторежим.\nКоманды чата: /guwow меню · /guwow photo · /guwow shot · /guwow check проверка глубины.",
+	"F11 toggles the whole mod; your own key is in the key bindings.\nThe minimap button: left opens the menu, right toggles, Shift + left starts photo mode.\nChat commands: /guwow menu · /guwow photo · /guwow shot · /guwow check depth check."),
 	24, -260, "GameFontHighlightSmall", 550)
 
 -- Atmosphere.
@@ -895,8 +964,9 @@ Button(pPhoto, T("Чистый снимок", "Clean screenshot"), R, -62, 150, 
 
 ShowPage(1)
 
-SLASH_LEGIONGU1 = "/gu"
-SLASH_LEGIONGU2 = "/guwow"
+-- /gu is the guild chat in the 1.12 client: the chat box switches to the guild at the space and the command never
+-- comes here. The menu and the hints go by /guwow.
+SLASH_LEGIONGU1 = "/guwow"
 SlashCmdList["LEGIONGU"] = function(msg)
 	msg = string.lower(msg or "")
 	if msg == "photo" or msg == "фото" then
@@ -907,14 +977,18 @@ SlashCmdList["LEGIONGU"] = function(msg)
 		checkView = not checkView
 		Paint()
 		if checkView then
-			Say(T("вид проверки: близкое светлое, дальнее темнее, небо чёрное. Красная рамка = эффекты не видят глубину. Выключить: /gu check.",
-				"check view: near is bright, far is darker, the sky is black. A red border means the effects see no depth. Turn off: /gu check."))
+			Say(T("вид проверки: близкое светлое, дальнее темнее, небо чёрное. Красная рамка = эффекты не видят глубину. Выключить: /guwow check.",
+				"check view: near is bright, far is darker, the sky is black. A red border means the effects see no depth. Turn off: /guwow check."))
 		else
 			Say(T("вид проверки выключен.", "the check view is off."))
 		end
+	elseif msg == "ui" or msg == "окна" then
+		Say(T("окна, которые обходят эффекты: ", "windows the effects leave alone: ") .. ((DB.uiSeen or "") ~= "" and DB.uiSeen or "-"))
+		Say(T("пропущены как слишком большие: ", "skipped as too large: ") .. (DB.uiSkipped or "-"))
+		Say(T("экран: ", "screen: ") .. (DB.uiScreen or "-"))
 	elseif msg == "help" or msg == "помощь" then
-		Say(T("/gu меню · /gu photo фоторежим · /gu shot чистый снимок · /gu check проверка глубины",
-			"/gu menu · /gu photo photo mode · /gu shot clean screenshot · /gu check depth check"))
+		Say(T("/guwow меню · /guwow photo фоторежим · /guwow shot чистый снимок · /guwow check проверка глубины",
+			"/guwow menu · /guwow photo photo mode · /guwow shot clean screenshot · /guwow check depth check"))
 	elseif menu:IsShown() then
 		menu:Hide()
 	else
@@ -985,10 +1059,14 @@ mm:SetScript("OnLeave", function()
 	GameTooltip:Hide()
 end)
 
--- The game menu (Esc) gets a GUWOW! button under «Macros»: 1.12 has no options window for addons. A client that
--- moved the buttons around gets it under «Return to game».
+-- The game menu (Esc) gets a «Third-party mods» button under «Macros»: 1.12 has no options window for addons. A
+-- client that moved the buttons around gets it under «Return to game». A label wider than the button widens it.
 local gmButton = CreateFrame("Button", "GameMenuButtonGUWOW", GameMenuFrame, "GameMenuButtonTemplate")
-gmButton:SetText("GUWOW!")
+gmButton:SetText(T("Сторонние модификации", "Third-party mods"))
+local gmTextWidth = gmButton.GetTextWidth and gmButton:GetTextWidth()
+if gmTextWidth and gmTextWidth + 16 > gmButton:GetWidth() then
+	gmButton:SetWidth(gmTextWidth + 16)
+end
 local _, below
 if GameMenuButtonLogout then
 	_, below = GameMenuButtonLogout:GetPoint(1)

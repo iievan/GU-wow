@@ -23,9 +23,9 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("GU-WOW: fog, sun rays, night and picture for World of Warcraft. Installer and support helper.")]
 [assembly: AssemblyCompany("levan")]
 [assembly: AssemblyCopyright("© 2026 levan")]
-[assembly: AssemblyVersion("1.8.0")]
-[assembly: AssemblyFileVersion("1.8.0")]
-[assembly: AssemblyInformationalVersion("public-release-beta-1.0")]
+[assembly: AssemblyVersion("1.7.1")]
+[assembly: AssemblyFileVersion("1.7.1")]
+[assembly: AssemblyInformationalVersion("1.7.1-release")]
 
 class ShotForm : Form
 {
@@ -35,7 +35,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "public-release-beta-1.0";
+	const string Version = "1.7.1-release";
 	static readonly bool RU = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru";
 	static string T(string ru, string en) { return RU ? ru : en; }
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
@@ -612,7 +612,7 @@ static class WowGU
 			File.WriteAllText(G(@"Interface\AddOns\LegionGU\LegionGU.toc"), toc, new UTF8Encoding(false));
 			Say(T("Меню в игре: Интерфейс > Модификации > GUWOW!, или команда /gu.", "The in-game menu: Interface > AddOns > GUWOW!, or the /gu command."));
 		}
-		else if (classic) Say(T("Меню в игре: команда /gu или кнопка у миникарты.", "The in-game menu: the /gu command or the minimap button."));
+		else if (classic) Say(T("Меню в игре: команда /guwow или кнопка у миникарты.", "The in-game menu: the /guwow command or the minimap button."));
 		else Say(T("Меню в игре для этого клиента не ставится: настройки в окне ReShade (Scroll Lock).", "The in-game menu is not installed for this client: settings live in the ReShade window (Scroll Lock)."));
 		MergePreset();
 		Say(T("Эффекты и пресет на месте.", "The effects and the preset are in place."));
@@ -635,7 +635,17 @@ static class WowGU
 			marker["rest"] = "1";
 			Say(T("Интерфейс остаётся чистым: туман и солнце его не трогают.", "The interface stays clean: fog and sun do not touch it."));
 		}
-		// Classic 1.12: the addon reports the windows and bars on screen, and the effects leave them alone.
+		// Classic 1.12 on DirectX 9: GU-WOW.addon32 runs the effects before the interface is drawn. Without it (or
+		// on the frames it does not catch) the addon reports the windows and bars, and the effects leave them alone.
+		else if (classic && !current.X64 && current.Api == "d3d9")
+		{
+			File.WriteAllBytes(G("GU-WOW.addon32"), Resource("a~GU-WOW.addon32"));
+			marker["addon32"] = "1";
+			Say(T("Интерфейс остаётся чистым: эффекты рисуются до окон и панелей игры.", "The interface stays clean: the effects are drawn before the game's windows and bars."));
+			// The module finds the interface by the full screen glow's own pass; with the glow off it has nothing to wait for.
+			if (ConfigValue(current.Dir, "ffxGlow") == "0")
+				Say(T("В настройках графики выключено полноэкранное свечение. Включите его, иначе туман ляжет и на окна игры.", "The full screen glow is off in the video settings. Turn it on, or the fog covers the game's windows too."));
+		}
 		else if (classic) Say(T("Интерфейс остаётся чистым: аддон сообщает эффектам, где окна и панели.", "The interface stays clean: the addon tells the effects where the windows and bars are."));
 		else Say(T("Для этого клиента туман ложится и на интерфейс: чистый интерфейс пока есть только для Legion 7.3.5 и Classic 1.12.", "On this client the fog covers the interface too: a clean interface is currently only available for Legion 7.3.5 and Classic 1.12."));
 
@@ -683,13 +693,21 @@ static class WowGU
 		if (IniGet(rs, "GENERAL", "IntermediateCachePath") == cache)
 			Directory.CreateDirectory(G(@"reshade-shaders\Cache"));
 		Say(T("Надпись ReShade при запуске игры сжата до тонкой полосы, собранные эффекты хранятся в папке игры.", "The ReShade banner at game start is squeezed to a thin strip; the compiled effects are kept in the game folder."));
-		// Without the addon there is no signal from the game world: the effects must not wait for it. The 1.12 addon
-		// is not yet checked in a live game, so there too the effects run as set in ReShade until its strip is read.
+		// Without the addon there is no signal from the game world: the effects must not wait for it. The 1.12 client
+		// has its addon, so there the effects wait for its strip and stay off on the loading screen and in the menus.
 		if (current.Major < 3)
 		{
+			string need = "LEGIONGU_NEED_PANEL=" + (classic ? "1" : "0");
 			var defs = IniGet(rs, "GENERAL", "PreprocessorDefinitions") ?? "";
-			if (!defs.Contains("LEGIONGU_NEED_PANEL"))
-				IniSet(rs, "GENERAL", "PreprocessorDefinitions", (defs.Length > 0 ? defs + "," : "") + "LEGIONGU_NEED_PANEL=0", true);
+			if (defs.Contains("LEGIONGU_NEED_PANEL=0") || defs.Contains("LEGIONGU_NEED_PANEL=1"))
+				IniSet(rs, "GENERAL", "PreprocessorDefinitions", defs.Replace("LEGIONGU_NEED_PANEL=0", need).Replace("LEGIONGU_NEED_PANEL=1", need), true);
+			else if (!defs.Contains("LEGIONGU_NEED_PANEL"))
+				IniSet(rs, "GENERAL", "PreprocessorDefinitions", (defs.Length > 0 ? defs + "," : "") + need, true);
+			// The 1.12 client draws the world into depth 0..0.94 and the sky at 1: read as it is, everything lies a
+			// few yards off and the fog never shows. The multiplier stretches 0.94 to 1.
+			defs = IniGet(rs, "GENERAL", "PreprocessorDefinitions") ?? "";
+			if (classic && !defs.Contains("RESHADE_DEPTH_MULTIPLIER"))
+				IniSet(rs, "GENERAL", "PreprocessorDefinitions", defs + ",RESHADE_DEPTH_MULTIPLIER=1.0638298", true);
 		}
 		if (Legion)
 		{
@@ -700,6 +718,10 @@ static class WowGU
 			IniSet(rs, "DEPTH", "DepthCopyBeforeClears", "0", true);
 			Say(T("Буфер глубины: ", "Depth buffer: ") + size.Width + "x" + size.Height + T(". Если поменяете разрешение или масштаб отрисовки, запустите GU-WOW снова.", ". If you change the resolution or the render scale, run GU-WOW again."));
 		}
+		// The 1.12 client never clears its depth buffer, so a copy taken at the clears is never made and the effects
+		// see an empty buffer (ReShade: "No clear operations were found for the selected depth buffer").
+		else if (classic)
+			IniSet(rs, "DEPTH", "DepthCopyBeforeClears", "0", true);
 
 		// 5. Config.wtf: MSAA off, the effects need the depth buffer.
 		var cfg = G(@"WTF\Config.wtf");
@@ -770,6 +792,7 @@ static class WowGU
 		if (marker.ContainsKey("rest"))
 			foreach (var f in new[] { "ReshadeEffectShaderToggler.addon64", "ReshadeEffectShaderToggler.ini" })
 				if (File.Exists(G(f))) File.Delete(G(f));
+		if (marker.ContainsKey("addon32") && File.Exists(G("GU-WOW.addon32"))) File.Delete(G("GU-WOW.addon32"));
 		string dll;
 		if (marker.TryGetValue("reshade", out dll))
 		{

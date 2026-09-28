@@ -1,5 +1,47 @@
 # GUWOW! (в разработке GU-WOW): история версий / Version history
 
+## 1.7.1-release «Адаптация 1.12 · Живой огонь» / "1.12 adaptation · Living Flame"
+
+Сборка для Classic 1.12 (Turtle WoW). Legion 7.3.5 получает исправления ночных огней и чата.
+
+### Русский
+
+**Новое**
+- GUWOW! работает в Classic 1.12: туман, лучи солнца, ночь по игровым часам, свет огней и картинка на DirectX 9.
+- Окна, панели и чат игры остаются чистыми: эффекты рисуются до интерфейса.
+- Своё меню в игре для 1.12: команда `/guwow`, кнопка у миникарты и кнопка GUWOW! в меню по Esc. Пресеты, коды настройки и фоторежим те же, что в Legion.
+- Стандартные настройки для 1.12 подобраны в живой игре на Turtle: туман легче, ночь мягче, картинка сочнее.
+- Установщик сам узнаёт клиент по файлу игры и ставит в 1.12 свой набор.
+
+**Исправлено**
+- В тавернах и домах 1.12 светло: темнота подземелий включается только внутри подземелий.
+- Ночные огни не тянутся кометой при повороте камеры.
+- Текст чата читается ночью.
+- Установщик называет чужой `d3d9.dll` (например DXVK) и подсказывает, как его переименовать.
+- Помощник отчётов свой у каждой игры: удаление мода из одной игры не трогает другие.
+
+**Важно для 1.12**
+- Полноэкранное свечение в настройках графики должно быть включено, иначе туман ляжет и на окна игры.
+
+### English
+
+**New**
+- GUWOW! runs in Classic 1.12: fog, sun rays, night by the game clock, the glow of lights and the picture on DirectX 9.
+- The game's windows, bars and chat stay clean: the effects are drawn before the interface.
+- An in-game menu of its own for 1.12: the `/guwow` command, the minimap button and the GUWOW! button in the Esc menu. The presets, share codes and photo mode are the same as in Legion.
+- The 1.12 defaults are picked in the live game on Turtle: lighter fog, a softer night, a richer picture.
+- The installer tells the client by the game file and puts the 1.12 set into 1.12.
+
+**Fixed**
+- Taverns and houses in 1.12 are lit: the dungeon darkness only works inside dungeons.
+- The night lights no longer trail like a comet when the camera turns.
+- The chat text reads at night.
+- The installer names a foreign `d3d9.dll` (DXVK, for one) and says how to rename it.
+- The report helper is per game: removing the mod from one game leaves the others alone.
+
+**Good to know for 1.12**
+- Keep the full screen glow on in the video settings, or the fog covers the game's windows too.
+
 ## public-release-beta-1.0 «Живой огонь» / "Living Flame"
 
 Первая публичная сборка. Публичное имя мода — **GUWOW!**; GU-WOW остаётся рабочим названием разработки (файлы, репозиторий). Внутри — всё из линеек 1.6 и 1.7 плюс новое ниже.
@@ -32,7 +74,7 @@
 - The fog motion is capped at a safe strength: above it the haze rolled in waves, and the slider past 40 adds no more.
 - The defaults are refreshed to the author's picks: thicker ground mist, the mist at the feet on, calm grain, brighter lights and rays, a slightly lighter and crisper picture.
 
-## 1.7.1-release «Живой огонь» / "Living Flame"
+## 1.7.1-pre «Живой огонь» / "Living Flame" (вошла в public-release-beta-1.0 / went into public-release-beta-1.0)
 
 ### Русский
 

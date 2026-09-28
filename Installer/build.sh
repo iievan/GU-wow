@@ -14,4 +14,5 @@ export MSYS2_ARG_CONV_EXCL="*" MSYS_NO_PATHCONV=1
  "/resource:$R/AddOn/LegionGU-Classic/LegionGU.toc,c~Interface~AddOns~LegionGU~LegionGU.toc" \
  "/resource:$R/Installer/payload/ReshadeEffectShaderToggler.addon64,p~ReshadeEffectShaderToggler.addon64" \
  "/resource:$R/Installer/payload/ReshadeEffectShaderToggler.ini,p~ReshadeEffectShaderToggler.ini" \
+ "/resource:$R/Installer/payload/GU-WOW.addon32,a~GU-WOW.addon32" \
  wowGU.cs

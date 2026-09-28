@@ -17,6 +17,7 @@ LegionGUNightsbylevan.fx (ночь, огни, картинка и фотореж
 
 СТОРОННИЕ ЧАСТИ
 GU-WOW.exe содержит ReshadeEffectShaderToggler (REST) 1.3.23 автора 4lex4nder: https://github.com/4lex4nder/ReshadeEffectShaderToggler. Он распространяется по лицензии MIT, см. REST-LICENSE.txt.
+GU-WOW.addon32 для клиента 1.12 сделал levan, исходник лежит в Installer/addon. Он собран с заголовками ReShade автора crosire, они распространяются по лицензии BSD-3-Clause или MIT.
 ReShade (автор crosire) в пакет не входит. Установщик скачивает официальную программу установки с https://reshade.me, она распространяется по своей лицензии.
 
 
@@ -36,4 +37,5 @@ The author's licence: sharing changed versions and making clones need the author
 
 THIRD-PARTY PARTS
 GU-WOW.exe contains ReshadeEffectShaderToggler (REST) 1.3.23 by 4lex4nder: https://github.com/4lex4nder/ReshadeEffectShaderToggler. It is licensed under MIT, see REST-LICENSE.txt.
+GU-WOW.addon32 for the 1.12 client is made by levan, the source is in Installer/addon. It is built with the ReShade headers by crosire, licensed under BSD-3-Clause or MIT.
 ReShade (by crosire) is not part of the package. The installer downloads the official setup from https://reshade.me. The setup comes under its own licence.
