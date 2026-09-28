@@ -216,11 +216,40 @@ sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter =
 texture2D LegionGUMotionTex { Width = 1; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUMotionS { Texture = LegionGUMotionTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
+#if __RENDERER__ < 0xa000
+// Direct3D 9 (the 1.12 to 3.3.5 clients) has no REST, so the effects run over the drawn interface. The 1.12 addon
+// paints a second strip row with the rectangles of the interface on screen (see BridgeUIReadPS), the bridge draws
+// them into LegionGUUITex at a quarter of the screen, and every effect leaves those pixels as they are, like the
+// strip's. Both effect files declare the textures with the same names, so ReShade shares them.
+#define LEGIONGU_UI_RECTS 20
+#define LEGIONGU_UI_CELLS 243    // the signature, three cells per coordinate 0..511, two for the checksum
+
+// Rectangle i in texel i (left, top, right, bottom in uv), texel LEGIONGU_UI_RECTS: x = 1 if the row was read
+// this frame.
+texture2D LegionGUUIRectTex { Width = LEGIONGU_UI_RECTS + 1; Height = 1; Format = RGBA32F; };
+sampler2D LegionGUUIRect { Texture = LegionGUUIRectTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+texture2D LegionGUUITex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = R8; };
+sampler2D LegionGUUI { Texture = LegionGUUITex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+
+// 1 on the interface, 0 on the world.
+float LegionGUUIAt(float2 uv)
+{
+	return tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x;
+}
+#endif
+
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
 // whatever runs before it.
 bool LegionGUInStrip(float2 p)
 {
+#if __RENDERER__ < 0xa000
+	// Direct3D 9: both strip rows, and the interface.
+	if (p.y < float(2 * LEGIONGU_CTL_CELL) && p.x < float((p.y < float(LEGIONGU_CTL_CELL) ? LEGIONGU_CTL_CELLS : LEGIONGU_UI_CELLS) * LEGIONGU_CTL_CELL))
+		return true;
+	return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
+#else
 	return p.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL) && p.y < float(LEGIONGU_CTL_CELL);
+#endif
 }
 
 bool LegionGUPanel()
@@ -1077,7 +1106,7 @@ namespace LegionGU
 	sampler2D RaysPing { Texture = RaysPingTex; };
 	sampler2D RaysPong { Texture = RaysPongTex; };
 
-#if LEGIONGU_UI_MASK
+#if LEGIONGU_UI_MASK && __RENDERER__ >= 0xa000
 	// A quarter of the screen size per axis, read bilinear: a mask edge is soft anyway, and a full-size mask read
 	// by two full-screen passes cost 0.08 ms at 3440 x 1440.
 	texture2D UIMaskTex < source = "LegionGUMask.png"; > { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = R8; };
@@ -1114,7 +1143,10 @@ namespace LegionGU
 	// 1 where the painted mask says "UI", 0 on the world.
 	float UIMask(float2 uv)
 	{
-#if LEGIONGU_UI_MASK
+#if __RENDERER__ < 0xa000
+		// Direct3D 9: the interface the addon reports; the painted mask is of the Legion layout.
+		return LegionGUUIAt(uv);
+#elif LEGIONGU_UI_MASK
 		return saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x);
 #else
 		return 0.0;
@@ -3040,17 +3072,83 @@ namespace LegionGU
 	// A triangle over the strip only, so the pass touches a few hundred pixels.
 	void BridgeHideVS(uint id : SV_VertexID, out float4 pos : SV_Position, out float2 uv : TEXCOORD0)
 	{
+#if __RENDERER__ < 0xa000
+		float2 size = float2(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL, 2 * LEGIONGU_CTL_CELL) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+#else
 		float2 size = float2(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL, LEGIONGU_CTL_CELL) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+#endif
 		uv = float2(id == 2 ? 2.0 : 0.0, id == 1 ? 2.0 : 0.0) * size;
 		pos = float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
 	}
 
 	float4 BridgeHidePS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
+#if __RENDERER__ < 0xa000
+		// Direct3D 9: row 0 as below, row 1 once it was read, each with the pixel row under the strip.
+		bool row0 = pos.y < float(LEGIONGU_CTL_CELL) && pos.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL);
+		bool row1 = pos.y >= float(LEGIONGU_CTL_CELL) && pos.y < float(2 * LEGIONGU_CTL_CELL)
+			&& pos.x < float(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL) && tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5;
+		if (tex2Dfetch(LegionGUCtl, int2(0, 0)).z < 0.5 || !(row0 || row1))
+			discard;
+		return tex2Dfetch(ColorPoint, int2(int(pos.x), 2 * LEGIONGU_CTL_CELL + 1));
+#else
 		if (tex2Dfetch(LegionGUCtl, int2(0, 0)).z < 0.5 || !LegionGUInStrip(pos.xy))
 			discard;
 		return tex2Dfetch(ColorPoint, int2(int(pos.x), LEGIONGU_CTL_CELL + 1));
+#endif
 	}
+
+#if __RENDERER__ < 0xa000
+	// The second row (Direct3D 9, the 1.12 addon): cell 0 the signature 5, then per rectangle left, top, right and
+	// bottom, 0..511 of the screen each in three cells, the high bits first, the last two cells the sum of the
+	// coordinates modulo 64. The thresholds are row 0's.
+	float BridgeUIBits(int i, float3 th)
+	{
+		float3 b = step(th, tex2Dfetch(ColorPoint, int2(i * LEGIONGU_CTL_CELL + LEGIONGU_CTL_CELL / 2, LEGIONGU_CTL_CELL + LEGIONGU_CTL_CELL / 2)).rgb);
+		return b.r * 4.0 + b.g * 2.0 + b.b;
+	}
+
+	float BridgeUICoord(int i, float3 th)
+	{
+		return BridgeUIBits(i, th) * 64.0 + BridgeUIBits(i + 1, th) * 8.0 + BridgeUIBits(i + 2, th);
+	}
+
+	// Texel i < LEGIONGU_UI_RECTS the rectangle in uv, texel LEGIONGU_UI_RECTS whether the row was read. A row not
+	// read (no addon, a clean screenshot) leaves no interface: the effects cover the whole picture.
+	float4 BridgeUIReadPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		int texel = int(pos.x);
+		float3 th;
+		if (!BridgeSeen(th) || BridgeUIBits(0, th) != 5.0)
+			return 0.0;
+		float sum = 0.0;
+		LEGIONGU_UNROLL
+		for (int i = 0; i < LEGIONGU_UI_RECTS * 4; i++)
+			sum += BridgeUICoord(1 + 3 * i, th);
+		if (abs(sum % 64.0 - (BridgeUIBits(LEGIONGU_UI_CELLS - 2, th) * 8.0 + BridgeUIBits(LEGIONGU_UI_CELLS - 1, th))) > 0.5)
+			return 0.0;
+		if (texel >= LEGIONGU_UI_RECTS)
+			return float4(1.0, 0.0, 0.0, 0.0);
+		int c = 1 + 12 * texel;
+		return float4(BridgeUICoord(c, th), BridgeUICoord(c + 3, th), BridgeUICoord(c + 6, th), BridgeUICoord(c + 9, th)) / 511.0;
+	}
+
+	// The interface at a quarter of the screen: 1 inside any rectangle, two screen pixels wider on each side, so
+	// the full-size pixels at a rectangle's edge are in.
+	float4 BridgeUIDrawPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		float2 grow = 2.0 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+		float ui = 0.0;
+		LEGIONGU_UNROLL
+		for (int i = 0; i < LEGIONGU_UI_RECTS; i++)
+		{
+			float4 r = tex2Dfetch(LegionGUUIRect, int2(i, 0));
+			if (r.z > r.x && all(uv >= r.xy - grow) && all(uv <= r.zw + grow))
+				ui = 1.0;
+		}
+		return ui;
+	}
+#endif
 
 	technique LegionGUBridge <
 		ui_label = "GU-WOW: меню в игре";
@@ -3060,6 +3158,10 @@ namespace LegionGU
 	{
 		pass BridgeRead { VertexShader = FullscreenVS; PixelShader = BridgeReadPS; RenderTarget = LegionGUCtlTex; }
 		pass BridgeSave { VertexShader = FullscreenVS; PixelShader = BridgeSavePS; RenderTarget = BridgePrevTex; }
+#if __RENDERER__ < 0xa000
+		pass BridgeUIRead { VertexShader = FullscreenVS; PixelShader = BridgeUIReadPS; RenderTarget = LegionGUUIRectTex; }
+		pass BridgeUIDraw { VertexShader = FullscreenVS; PixelShader = BridgeUIDrawPS; RenderTarget = LegionGUUITex; }
+#endif
 		pass BridgeHide { VertexShader = BridgeHideVS; PixelShader = BridgeHidePS; }
 	}
 

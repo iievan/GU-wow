@@ -115,6 +115,12 @@
 #else
 	#define LEGIONGU_GLOW_TAPS 1
 #endif
+// DirectX 9 (shader model 3) has too few temp registers for the 5 x 5 light arrays of LightsAt: from 1080 rows
+// up the effect failed with X4505. There the search takes at most 2 x 2 taps per block, as at 720p.
+#if __RENDERER__ < 0xa000 && LEGIONGU_GLOW_TAPS > 2
+	#undef LEGIONGU_GLOW_TAPS
+	#define LEGIONGU_GLOW_TAPS 2
+#endif
 
 // Taps per axis of the downsample. A bilinear colour tap averages 2 x 2 pixels, so N / 2 of them cover a
 // block of N x N. The sky share takes single depth taps, at most 4 x 4.
@@ -191,11 +197,34 @@ sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter =
 texture2D LegionGUMotionTex { Width = 1; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUMotionS { Texture = LegionGUMotionTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
+#if __RENDERER__ < 0xa000
+// Direct3D 9: the interface on screen, from the addon's second strip row (see LegionGUbylevan.fx). The same
+// textures as there, shared by name.
+#define LEGIONGU_UI_RECTS 20
+#define LEGIONGU_UI_CELLS 243
+
+texture2D LegionGUUITex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = R8; };
+sampler2D LegionGUUI { Texture = LegionGUUITex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+
+// 1 on the interface, 0 on the world.
+float LegionGUUIAt(float2 uv)
+{
+	return tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x;
+}
+#endif
+
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
 // whatever runs before it.
 bool LegionGUInStrip(float2 p)
 {
+#if __RENDERER__ < 0xa000
+	// Direct3D 9: both strip rows, and the interface.
+	if (p.y < float(2 * LEGIONGU_CTL_CELL) && p.x < float((p.y < float(LEGIONGU_CTL_CELL) ? LEGIONGU_CTL_CELLS : LEGIONGU_UI_CELLS) * LEGIONGU_CTL_CELL))
+		return true;
+	return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
+#else
 	return p.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL) && p.y < float(LEGIONGU_CTL_CELL);
+#endif
 }
 
 bool LegionGUPanel()
@@ -1267,7 +1296,7 @@ namespace LegionGUNights
 	sampler2D RaysPing { Texture = RaysPingTex; };
 	sampler2D RaysPong { Texture = RaysPongTex; };
 
-#if LEGIONGU_UI_MASK
+#if LEGIONGU_UI_MASK && __RENDERER__ >= 0xa000
 	// A quarter of the screen size per axis, read bilinear: a mask edge is soft anyway, and a full-size mask read
 	// by two full-screen passes cost 0.08 ms at 3440 x 1440.
 	texture2D UIMaskTex < source = "LegionGUMask.png"; > { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = R8; };
@@ -1332,7 +1361,10 @@ namespace LegionGUNights
 	// 1 where the painted mask says "UI", 0 on the world.
 	float UIMask(float2 uv)
 	{
-#if LEGIONGU_UI_MASK
+#if __RENDERER__ < 0xa000
+		// Direct3D 9: the interface the addon reports; the painted mask is of the Legion layout.
+		return LegionGUUIAt(uv);
+#elif LEGIONGU_UI_MASK
 		return saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x);
 #else
 		return 0.0;

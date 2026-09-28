@@ -635,7 +635,9 @@ static class WowGU
 			marker["rest"] = "1";
 			Say(T("Интерфейс остаётся чистым: туман и солнце его не трогают.", "The interface stays clean: fog and sun do not touch it."));
 		}
-		else Say(T("Для этого клиента туман ложится и на интерфейс: чистый интерфейс пока есть только для Legion 7.3.5.", "On this client the fog covers the interface too: a clean interface is currently only available for Legion 7.3.5."));
+		// Classic 1.12: the addon reports the windows and bars on screen, and the effects leave them alone.
+		else if (classic) Say(T("Интерфейс остаётся чистым: аддон сообщает эффектам, где окна и панели.", "The interface stays clean: the addon tells the effects where the windows and bars are."));
+		else Say(T("Для этого клиента туман ложится и на интерфейс: чистый интерфейс пока есть только для Legion 7.3.5 и Classic 1.12.", "On this client the fog covers the interface too: a clean interface is currently only available for Legion 7.3.5 and Classic 1.12."));
 
 		// 4. ReShade.ini: paths, the preset, the keys, the depth buffer.
 		var rs = G("ReShade.ini");

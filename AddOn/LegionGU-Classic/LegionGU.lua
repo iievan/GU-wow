@@ -106,18 +106,30 @@ local function After(seconds, f)
 	table.insert(pending, { t = seconds, f = f })
 end
 
+-- The second row of the strip carries the interface for the effects to leave alone (see UIRects below): a
+-- signature, UI_RECTS rectangles of four coordinates 0..511 in three cells each, a checksum of two cells. 972
+-- pixels long, so it fits a screen of 1024.
+local UI_RECTS = 20
+local UI_CELLS = 1 + UI_RECTS * 12 + 2
+
 -- The strip. No parent: it stays on screen with the interface hidden (Alt+Z), when the shader still needs it.
 local strip = CreateFrame("Frame", "LegionGUStrip")
 strip:SetFrameStrata("TOOLTIP")
-strip:SetWidth(CELLS * CELL)
-strip:SetHeight(CELL)
-local cells = {}
-for i = 0, CELLS - 1 do
+strip:SetWidth(UI_CELLS * CELL)
+strip:SetHeight(2 * CELL)
+local cells, uiCells = {}, {}
+local function StripCell(row, i)
 	local t = strip:CreateTexture(nil, "OVERLAY")
 	t:SetWidth(CELL)
 	t:SetHeight(CELL)
-	t:SetPoint("TOPLEFT", strip, "TOPLEFT", i * CELL, 0)
-	cells[i] = t
+	t:SetPoint("TOPLEFT", strip, "TOPLEFT", i * CELL, -row * CELL)
+	return t
+end
+for i = 0, CELLS - 1 do
+	cells[i] = StripCell(0, i)
+end
+for i = 0, UI_CELLS - 1 do
+	uiCells[i] = StripCell(1, i)
 end
 
 local function Bits(i, v)
@@ -302,6 +314,115 @@ local function Paint()
 end
 
 -- ---------------------------------------------------------------------------------------------------------------
+-- The interface the effects leave alone. 1.12 draws the windows into the same frame as the world, and REST is
+-- Legion's only, so without this the fog and the rays lay over them. The second strip row tells the shader the
+-- rectangles of what is on screen: open windows first, each of its own, then the bars in groups.
+-- ---------------------------------------------------------------------------------------------------------------
+
+local UI_GROUPS = {}
+for _, n in ipairs({ "GUWOWMenu", "GameMenuFrame", "OptionsFrame", "SoundOptionsFrame", "UIOptionsFrame",
+	"KeyBindingFrame", "StaticPopup1", "StaticPopup2", "CharacterFrame", "SpellBookFrame", "TalentFrame",
+	"QuestLogFrame", "FriendsFrame", "MacroFrame", "GossipFrame", "QuestFrame", "MerchantFrame", "TaxiFrame",
+	"MailFrame", "BankFrame", "TradeFrame", "AuctionFrame", "TradeSkillFrame", "CraftFrame", "ClassTrainerFrame",
+	"LootFrame", "HelpFrame", "DressUpFrame", "ItemTextFrame", "GameTooltip" }) do
+	table.insert(UI_GROUPS, { n })
+end
+for _, g in ipairs({
+	{ "ContainerFrame1", "ContainerFrame2", "ContainerFrame3", "ContainerFrame4", "ContainerFrame5", "ContainerFrame6",
+		"ContainerFrame7", "ContainerFrame8", "ContainerFrame9", "ContainerFrame10", "ContainerFrame11", "ContainerFrame12" },
+	{ "ChatFrame1", "ChatFrame2", "ChatFrame3", "ChatFrame4", "ChatFrame5", "ChatFrame6", "ChatFrame7", "ChatFrameEditBox" },
+	{ "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight", "PetActionBarFrame", "ShapeshiftBarFrame" },
+	{ "MultiBarRight", "MultiBarLeft" },
+	{ "PlayerFrame", "PetFrame" },
+	{ "TargetFrame", "TargetofTargetFrame" },
+	{ "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3", "PartyMemberFrame4" },
+	{ "MinimapCluster" },
+	{ "BuffFrame", "TemporaryEnchantFrame" },
+	{ "CastingBarFrame" },
+}) do
+	table.insert(UI_GROUPS, g)
+end
+
+local function UIBits(i, v)
+	uiCells[i]:SetTexture(Mod(math.floor(v / 4), 2), Mod(math.floor(v / 2), 2), Mod(v, 2), 1)
+end
+
+-- A coordinate 0..511 in three cells, the high bits first.
+local function UICell(i, v)
+	UIBits(i, math.floor(v / 64))
+	UIBits(i + 1, Mod(math.floor(v / 8), 8))
+	UIBits(i + 2, Mod(v, 8))
+end
+
+-- A visible group's rectangle in screen shares, top down, with a few pixels of margin; nil if nothing is shown.
+local UI_PAD = 3
+local function GroupRect(names)
+	local l, t, r, b
+	for _, n in ipairs(names) do
+		local f = getglobal(n)
+		if f and f:IsVisible() and f:GetLeft() then
+			local s = f:GetEffectiveScale()
+			local fl, fr, ft, fb = f:GetLeft() * s, f:GetRight() * s, f:GetTop() * s, f:GetBottom() * s
+			l, r = math.min(l or fl, fl), math.max(r or fr, fr)
+			t, b = math.max(t or ft, ft), math.min(b or fb, fb)
+		end
+	end
+	return l, t, r, b
+end
+
+local lastUI
+local function PaintUI()
+	local sw = UIParent:GetWidth() * UIParent:GetEffectiveScale()
+	local sh = UIParent:GetHeight() * UIParent:GetEffectiveScale()
+	local px = UI_PAD * sh / ScreenHeight()
+	local coords = {}
+	-- Photo mode hides the interface with alpha, so everything is still "visible": no rectangles then.
+	if not photo and sw > 0 and sh > 0 then
+		for _, g in ipairs(UI_GROUPS) do
+			if table.getn(coords) >= UI_RECTS * 4 then
+				break
+			end
+			local l, t, r, b = GroupRect(g)
+			if l and r > l and t > b then
+				table.insert(coords, math.max(0, math.floor((l - px) / sw * 511)))
+				table.insert(coords, math.max(0, math.floor((1 - (t + px) / sh) * 511)))
+				table.insert(coords, math.min(511, math.ceil((r + px) / sw * 511)))
+				table.insert(coords, math.min(511, math.ceil((1 - (b - px) / sh) * 511)))
+			end
+		end
+	end
+	for i = table.getn(coords) + 1, UI_RECTS * 4 do
+		coords[i] = 0
+	end
+	local key = table.concat(coords, ",")
+	if key == lastUI then
+		return
+	end
+	lastUI = key
+	UIBits(0, 5)
+	local sum = 0
+	for i, v in ipairs(coords) do
+		UICell(1 + 3 * (i - 1), v)
+		sum = sum + v
+	end
+	sum = Mod(sum, 64)
+	UIBits(UI_CELLS - 2, math.floor(sum / 8))
+	UIBits(UI_CELLS - 1, Mod(sum, 8))
+end
+
+-- Twenty times a second: a window opens, closes and moves without an event 1.12 is sure to have, and a quarter of a
+-- second of fog over a freshly opened window shows. The cells change only when a rectangle does.
+local uiWait = 0
+local uiWatch = CreateFrame("Frame")
+uiWatch:SetScript("OnUpdate", function()
+	uiWait = uiWait - arg1
+	if DB and uiWait <= 0 then
+		uiWait = 0.05
+		PaintUI()
+	end
+end)
+
+-- ---------------------------------------------------------------------------------------------------------------
 -- Photo mode and the clean screenshot
 -- ---------------------------------------------------------------------------------------------------------------
 
@@ -370,6 +491,7 @@ function GUWOW_ToggleMod()
 end
 
 -- The interface and the strip hide for a moment (the shader keeps the last settings), the game takes the shot.
+-- Without the strip the shader knows of no interface, so the effects cover the whole picture.
 function GUWOW_Screenshot()
 	local wasPhoto = photo
 	if not wasPhoto then
@@ -861,6 +983,28 @@ mm:SetScript("OnEnter", function()
 end)
 mm:SetScript("OnLeave", function()
 	GameTooltip:Hide()
+end)
+
+-- The game menu (Esc) gets a GUWOW! button under «Macros»: 1.12 has no options window for addons. A client that
+-- moved the buttons around gets it under «Return to game».
+local gmButton = CreateFrame("Button", "GameMenuButtonGUWOW", GameMenuFrame, "GameMenuButtonTemplate")
+gmButton:SetText("GUWOW!")
+local _, below
+if GameMenuButtonLogout then
+	_, below = GameMenuButtonLogout:GetPoint(1)
+end
+if GameMenuButtonMacros and below == GameMenuButtonMacros then
+	gmButton:SetPoint("TOP", GameMenuButtonMacros, "BOTTOM", 0, -1)
+	GameMenuButtonLogout:ClearAllPoints()
+	GameMenuButtonLogout:SetPoint("TOP", gmButton, "BOTTOM", 0, -1)
+else
+	gmButton:SetPoint("TOP", GameMenuButtonContinue, "BOTTOM", 0, -1)
+end
+GameMenuFrame:SetHeight(GameMenuFrame:GetHeight() + 22)
+gmButton:SetScript("OnClick", function()
+	PlaySound("igMainMenuOption")
+	HideUIPanel(GameMenuFrame)
+	menu:Show()
 end)
 
 -- ---------------------------------------------------------------------------------------------------------------
