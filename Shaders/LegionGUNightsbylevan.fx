@@ -225,9 +225,9 @@ float LegionGUUIAt(float2 uv)
 bool LegionGUInStrip(float2 p)
 {
 #if __RENDERER__ < 0xa000
-	// Direct3D 9: both strip rows, and the interface.
-	if (p.y < 2.0 * LEGIONGU_CTL_PITCH && p.x < float(p.y < LEGIONGU_CTL_PITCH ? LEGIONGU_CTL_CELLS : LEGIONGU_UI_CELLS) * LEGIONGU_CTL_PITCH)
-		return true;
+	// Direct3D 9: the interface only. The strip needs no guard here: with the glow the effects run before the
+	// interface draws it, without the glow LegionGUBridge stands first and has covered it already. A guarded corner
+	// stayed a band of the bare game over the covered strip, and on 3.3.5, with no second row, under it (29.09).
 	return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 #else
 	return p.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL) && p.y < float(LEGIONGU_CTL_CELL);

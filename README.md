@@ -7,13 +7,13 @@
 
 Публичное имя мода — **GUWOW!**. GU-WOW — рабочее название разработки, оно остаётся в именах файлов (`GU-WOW.exe`) и в адресе репозитория.
 
-Текущая сборка: **1.7.3-release «Мягкий свет»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **1.7.4-release «Мягкий свет»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.7.3-release
+## Что входит в сборку 1.7.4-release
 
 Всё настраивается в игре: Интерфейс > Модификации > GUWOW!, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -131,13 +131,13 @@ Please note: glitches, visual artifacts, and rendering inaccuracies may occur du
 
 The mod's public name is **GUWOW!**. GU-WOW is the working development name; it stays in the file names (`GU-WOW.exe`) and in the repository address.
 
-Current build: **1.7.3-release "Soft Light"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **1.7.4-release "Soft Light"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.7.3-release
+## What is in build 1.7.4-release
 
 Everything is set up in the game: Interface > AddOns > GUWOW!, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 

@@ -274,6 +274,14 @@ local function Layout()
 		f:ClearAllPoints()
 		f:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
 	end
+	-- The dot of the first draw hangs below its square, and on Direct3D 9 nothing covers it there: a yellow pixel
+	-- under the strip (3.3.5, 29.09). Above the top edge the game still draws it, and the player sees nothing.
+	firstText:ClearAllPoints()
+	if major < 4 then
+		firstText:SetPoint("BOTTOMLEFT", first, "TOPLEFT", 0, 0)
+	else
+		firstText:SetPoint("TOPLEFT", first, "TOPLEFT", 0, 0)
+	end
 end
 
 -- ---------------------------------------------------------------------------------------------------------------

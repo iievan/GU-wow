@@ -254,9 +254,9 @@ float LegionGUUIAt(float2 uv)
 bool LegionGUInStrip(float2 p)
 {
 #if __RENDERER__ < 0xa000
-	// Direct3D 9: both strip rows, and the interface.
-	if (p.y < 2.0 * LEGIONGU_CTL_PITCH && p.x < float(p.y < LEGIONGU_CTL_PITCH ? LEGIONGU_CTL_CELLS : LEGIONGU_UI_CELLS) * LEGIONGU_CTL_PITCH)
-		return true;
+	// Direct3D 9: the interface only. The strip needs no guard here: with the glow the effects run before the
+	// interface draws it, without the glow LegionGUBridge stands first and has covered it already. A guarded corner
+	// stayed a band of the bare game over the covered strip, and on 3.3.5, with no second row, under it (29.09).
 	return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 #else
 	return p.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL) && p.y < float(LEGIONGU_CTL_CELL);
@@ -3088,7 +3088,7 @@ namespace LegionGU
 	void BridgeHideVS(uint id : SV_VertexID, out float4 pos : SV_Position, out float2 uv : TEXCOORD0)
 	{
 #if __RENDERER__ < 0xa000
-		float2 size = float2(LEGIONGU_UI_CELLS, 2.0) * LEGIONGU_CTL_PITCH * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+		float2 size = ceil(float2(LEGIONGU_UI_CELLS, 2.0) * LEGIONGU_CTL_PITCH) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 #else
 		float2 size = float2(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL, LEGIONGU_CTL_CELL) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 #endif
@@ -3099,13 +3099,15 @@ namespace LegionGU
 	float4 BridgeHidePS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 #if __RENDERER__ < 0xa000
-		// Direct3D 9: row 0 as below, row 1 once it was read, each with the pixel row under the strip.
-		bool row0 = pos.y < LEGIONGU_CTL_PITCH && pos.x < float(LEGIONGU_CTL_CELLS) * LEGIONGU_CTL_PITCH;
-		bool row1 = pos.y >= LEGIONGU_CTL_PITCH && pos.y < 2.0 * LEGIONGU_CTL_PITCH
-			&& pos.x < float(LEGIONGU_UI_CELLS) * LEGIONGU_CTL_PITCH && tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5;
+		// Direct3D 9: row 0 as below, row 1 once it was read, each with the pixel row under the strip. The edges go up
+		// to whole pixels: the game fills a pixel a cell only touches, and at 1440 the last pixel row of the strip,
+		// 11 of 11.25, stayed a line of colours (29.09).
+		bool row0 = pos.y < ceil(LEGIONGU_CTL_PITCH) && pos.x < ceil(float(LEGIONGU_CTL_CELLS) * LEGIONGU_CTL_PITCH);
+		bool row1 = pos.y >= ceil(LEGIONGU_CTL_PITCH) && pos.y < ceil(2.0 * LEGIONGU_CTL_PITCH)
+			&& pos.x < ceil(float(LEGIONGU_UI_CELLS) * LEGIONGU_CTL_PITCH) && tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5;
 		if (tex2Dfetch(LegionGUCtl, int2(0, 0)).z < 0.5 || !(row0 || row1))
 			discard;
-		return tex2Dfetch(ColorPoint, int2(int(pos.x), int(2.0 * LEGIONGU_CTL_PITCH) + 1));
+		return tex2Dfetch(ColorPoint, int2(int(pos.x), int(ceil(2.0 * LEGIONGU_CTL_PITCH)) + 1));
 #else
 		if (tex2Dfetch(LegionGUCtl, int2(0, 0)).z < 0.5 || !LegionGUInStrip(pos.xy))
 			discard;

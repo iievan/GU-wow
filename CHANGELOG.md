@@ -1,5 +1,23 @@
 # GUWOW! (в разработке GU-WOW): история версий / Version history
 
+## 1.7.4-release «Мягкий свет» / "Soft Light"
+
+### Русский
+
+**Исправлено**
+- 1.12 и 3.3.5: верх экрана чистый. Нет разноцветной линии в 1-2 пикселя, нет ленты без эффектов у левого края и жёлтой точки в углу.
+
+**Важно для 1.12 и 3.3.5**
+- На обычном скриншоте игры в левом верхнем углу видна полоска квадратиков. В игре её нет. Снимок без неё делает кнопка «Чистый снимок» в меню мода.
+
+### English
+
+**Fixed**
+- 1.12 and 3.3.5: the top of the screen is clean. No coloured line of 1-2 pixels, no band without effects at the left edge and no yellow dot in the corner.
+
+**Good to know for 1.12 and 3.3.5**
+- The game's own screenshot shows a strip of squares in the top left corner. It is not there in the game. The "Clean screenshot" button in the mod menu takes a picture without it.
+
 ## 1.7.3-release «Мягкий свет» / "Soft Light"
 
 Одна сборка для всех клиентов: Legion 7.3.5 (внутри меню это публичная бета 1.1), WotLK 3.3.5 и Classic 1.12.
