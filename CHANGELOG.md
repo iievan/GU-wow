@@ -1,5 +1,17 @@
 # GUWOW! (в разработке GU-WOW): история версий / Version history
 
+## 1.7.5-release «Мягкий свет» / "Soft Light"
+
+### Русский
+
+**Новое**
+- Turtle WoW: скриншоты открываются в любой программе. Игра сохраняет их в формате TGA, который Windows не показывает, и мод кладёт рядом с каждым снимком копию в PNG с тем же именем. Снимки, сделанные до установки, тоже получают копию.
+
+### English
+
+**New**
+- Turtle WoW: screenshots open in any program. The game saves them as TGA, which Windows does not show, and the mod puts a PNG copy of the same name next to each shot. Shots taken before the install get a copy too.
+
 ## 1.7.4-release «Мягкий свет» / "Soft Light"
 
 ### Русский

@@ -23,9 +23,9 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("GU-WOW: fog, sun rays, night and picture for World of Warcraft. Installer and support helper.")]
 [assembly: AssemblyCompany("levan")]
 [assembly: AssemblyCopyright("© 2026 levan")]
-[assembly: AssemblyVersion("1.7.4")]
-[assembly: AssemblyFileVersion("1.7.4")]
-[assembly: AssemblyInformationalVersion("1.7.4-release")]
+[assembly: AssemblyVersion("1.7.5")]
+[assembly: AssemblyFileVersion("1.7.5")]
+[assembly: AssemblyInformationalVersion("1.7.5-release")]
 
 class ShotForm : Form
 {
@@ -35,7 +35,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.7.4-release";
+	const string Version = "1.7.5-release";
 	static readonly bool RU = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru";
 	static string T(string ru, string en) { return RU ? ru : en; }
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
@@ -218,6 +218,7 @@ static class WowGU
 				{
 					// The mod was removed from this game: the watcher goes too, without waiting for a restart.
 					if (!File.Exists(Path.Combine(current.Dir, Marker))) { timer.Stop(); Application.Exit(); return; }
+					ShotToPng();
 					var sent = File.Exists(sentFile) ? File.ReadAllLines(sentFile).ToList() : new List<string>();
 					var wtf = Path.Combine(current.Dir, "WTF");
 					if (!Directory.Exists(wtf)) return;
@@ -350,6 +351,32 @@ static class WowGU
 			}
 			return null;
 		}
+	}
+
+	// Turtle saves shots only as TGA, and Windows does not open them (1.7.5). The watcher puts a PNG of the same name
+	// next to each, one shot a tick so the tick stays short. The TGA stays: the report reads it, and it is the player's.
+	static readonly HashSet<string> shotsTried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+	static void ShotToPng()
+	{
+		try
+		{
+			var dir = Path.Combine(current.Dir, "Screenshots");
+			if (!Directory.Exists(dir)) return;
+			foreach (var f in new DirectoryInfo(dir).GetFiles("*.tga"))
+			{
+				var png = Path.ChangeExtension(f.FullName, ".png");
+				// A shot written in the last seconds may still be growing; it waits for the next tick.
+				if (!f.Extension.Equals(".tga", StringComparison.OrdinalIgnoreCase) || shotsTried.Contains(f.FullName)
+					|| File.Exists(png) || (DateTime.Now - f.LastWriteTime).TotalSeconds < 3) continue;
+				shotsTried.Add(f.FullName);
+				var bmp = ReadTga(f.FullName);
+				if (bmp == null) continue;
+				using (bmp) bmp.Save(png + ".part", System.Drawing.Imaging.ImageFormat.Png);
+				File.Move(png + ".part", png);
+				return;
+			}
+		}
+		catch { }
 	}
 
 	// A TGA as the old clients write it: true colour, 24 or 32 bits, plain or run length packed, either row order.
