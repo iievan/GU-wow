@@ -179,8 +179,15 @@
 #define LEGIONGU_CTL_CHAT_T 36
 #define LEGIONGU_CTL_CHAT_R 37
 #define LEGIONGU_CTL_CHAT_B 38
+#define LEGIONGU_CTL_LIGHT_THR 39 // which bright spots count as a light at night, 50 as before (1.7.3)
+#define LEGIONGU_CTL_LIGHT_R 40  // how far a light's glow spreads, 50 as before (1.7.3)
+#define LEGIONGU_CTL_MOTION_BLUR 41 // the smear along a camera turn, 0 off (1.7.3)
+#define LEGIONGU_CTL_PLAY_BLUR 42 // the far land softly blurred in normal play, 0 off (1.7.3)
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 81    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 89    // black, white, the signature, two cells per setting, two for the checksum
+#if __RENDERER__ < 0xa000
+#define LEGIONGU_CTL_PITCH (float(BUFFER_HEIGHT) / 256.0) // pixels per cell on Direct3D 9, see LegionGUbylevan.fx
+#endif
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -189,7 +196,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 41; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 43; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -219,7 +226,7 @@ bool LegionGUInStrip(float2 p)
 {
 #if __RENDERER__ < 0xa000
 	// Direct3D 9: both strip rows, and the interface.
-	if (p.y < float(2 * LEGIONGU_CTL_CELL) && p.x < float((p.y < float(LEGIONGU_CTL_CELL) ? LEGIONGU_CTL_CELLS : LEGIONGU_UI_CELLS) * LEGIONGU_CTL_CELL))
+	if (p.y < 2.0 * LEGIONGU_CTL_PITCH && p.x < float(p.y < LEGIONGU_CTL_PITCH ? LEGIONGU_CTL_CELLS : LEGIONGU_UI_CELLS) * LEGIONGU_CTL_PITCH)
 		return true;
 	return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 #else
@@ -413,6 +420,24 @@ namespace LegionGUNights
 		             "Днём взгляд под ноги ничего не затемняет.";
 	> = 30.0;
 
+	// The lights' own dials (1.7.3), 50 each is the old look: the threshold scales SRC_AMBIENT and SRC_MIN, the
+	// radius scales LIGHT_R, both by a factor 2^((v - 50) / 50), so 0 halves and 100 doubles.
+	uniform float LightThreshold <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Ночь";
+		ui_label = "Что считать огнём";
+		ui_tooltip = "50 как было. Больше: светятся только настоящие фонари, костры и окна.\n"
+		             "Меньше: свечение получают и тусклые светлые предметы.\n"
+		             "Если ночью светится то, что не должно, прибавьте.";
+	> = 50.0;
+
+	uniform float LightRadius <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Ночь";
+		ui_label = "Радиус свечения";
+		ui_tooltip = "50 как было. Меньше: аккуратный ореол у самого огня. Больше: широкое зарево вокруг.";
+	> = 50.0;
+
 	uniform float Sharpness <
 		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
 		ui_category = "Картинка";
@@ -461,6 +486,22 @@ namespace LegionGUNights
 		ui_label = "Размытие в фоторежиме";
 		ui_tooltip = "Насколько размыт фон в фоторежиме. В игре настраивается в меню GU-WOW.";
 	> = 35;
+
+	uniform float MotionBlur <
+		ui_type = "slider"; ui_min = 0; ui_max = 100; ui_step = 1;
+		ui_category = "Картинка";
+		ui_label = "Размытие при движении";
+		ui_tooltip = "При быстром повороте камеры картинка слегка смазывается, как в кино: 0 выключено.\n"
+		             "Интерфейс не размывается. В игре настраивается в меню GU-WOW.";
+	> = 0;
+
+	uniform float PlayBlur <
+		ui_type = "slider"; ui_min = 0; ui_max = 100; ui_step = 1;
+		ui_category = "Картинка";
+		ui_label = "Размытие дали в игре";
+		ui_tooltip = "Дальний план за персонажем слегка размыт, как в объективе: 0 выключено.\n"
+		             "Персонаж, всё рядом с ним и интерфейс остаются чёткими. В игре настраивается в меню GU-WOW.";
+	> = 0;
 
 	uniform float GUTimer < source = "timer"; >;
 
@@ -2109,7 +2150,7 @@ namespace LegionGUNights
 		if (ui <= 0.0)
 			return float4(0.0, 0.0, 0.0, 0.0);
 		float ambient = max(tex2Dfetch(FogCur, int2(5, 0)).x, AMBIENT_MIN);
-		float thr = max(SRC_AMBIENT * ambient, SRC_MIN);
+		float thr = max(SRC_AMBIENT * ambient, SRC_MIN) * exp2((LegionGUValue(LEGIONGU_CTL_LIGHT_THR, LightThreshold) - 50.0) / 50.0);
 		float2 step = float(BUFFER_HEIGHT) / float(LEGIONGU_GLOW_H) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 		float3 col[(LEGIONGU_GLOW_TAPS + 1) * (LEGIONGU_GLOW_TAPS + 1)];
 		float val[(LEGIONGU_GLOW_TAPS + 1) * (LEGIONGU_GLOW_TAPS + 1)];
@@ -2290,7 +2331,7 @@ namespace LegionGUNights
 		float p0 = log2(LIGHT_SIG0);
 		float p1 = log2(LIGHT_SIG1);
 		float p2 = log2(LIGHT_SIG2);
-		float p = clamp(log2(LIGHT_R / FOV_TAN2) - lz, p0, p2);
+		float p = clamp(log2(LIGHT_R / FOV_TAN2) + (LegionGUValue(LEGIONGU_CTL_LIGHT_R, LightRadius) - 50.0) / 50.0 - lz, p0, p2);
 		float lod = p < p1 ? (p - p0) / (p1 - p0) : 1.0 + (p - p1) / (p2 - p1);
 		float pk = k == 0 ? p0 : (k == 1 ? p1 : p2);
 		return saturate(1.0 - abs(lod - float(k))) * exp2(2.0 * (pk - p));
@@ -3576,17 +3617,26 @@ namespace LegionGUNights
 		}
 
 		// Stars twinkle (1.6.8): at night by the game clock, tiny bright points in the dark sky breathe a few
-		// percent with time. Only pixels that are sky by depth, dark around yet bright themselves, qualify: the
-		// moon is far above the threshold and stays steady.
+		// percent with time. A star is a point: brighter than all four pixels three steps away. The first kind let
+		// the whole sky between two brightness levels breathe with a phase running along the screen, and the smooth
+		// night gradient showed diagonal bands (beta-1.0). A gradient, the moon's disk and its edge all have a ring
+		// pixel as bright as the middle, so they stay steady. The phase and the pace come from the star's 4x4 cell.
 		float nightTw = LegionGUNight();
 		if (nightTw > 0.0)
 		{
 			float twU = DepthU(RawDepth(uv), EffectiveReversed(tex2Dfetch(FogCur, int2(1, 0)).w));
-			float lTw = dot(c, LUMA601);
-			if (IsSky(twU) && lTw > 0.09 && lTw < 0.55)
+			if (IsSky(twU))
 			{
-				float tw = sin(GUTimer * 0.001 * (2.0 + 3.0 * frac(dot(pos.xy, float2(0.0711, 0.0937)))) + dot(pos.xy, float2(0.31, 0.17)));
-				c *= 1.0 + 0.10 * nightTw * tw * smoothstep(0.09, 0.2, lTw);
+				float l0 = dot(c4.rgb, LUMA601);
+				float ring = max(max(dot(tex2Dfetch(ColorPoint, p + int2(3, 0)).rgb, LUMA601), dot(tex2Dfetch(ColorPoint, p - int2(3, 0)).rgb, LUMA601)),
+				                 max(dot(tex2Dfetch(ColorPoint, p + int2(0, 3)).rgb, LUMA601), dot(tex2Dfetch(ColorPoint, p - int2(0, 3)).rgb, LUMA601)));
+				float star = smoothstep(0.03, 0.10, l0 - ring);
+				if (star > 0.0)
+				{
+					float cell = frac(sin(dot(floor(pos.xy * 0.25), float2(12.9898, 78.233))) * 43758.5453);
+					float tw = sin(GUTimer * 0.001 * (2.0 + 3.0 * cell) + cell * 6.2832);
+					c *= 1.0 + 0.12 * nightTw * tw * star;
+				}
 			}
 		}
 
@@ -3616,6 +3666,68 @@ namespace LegionGUNights
 		return float4(c, c4.a);
 	}
 
+	// Distance in yards for the motion blur and the lens blur, the sky far away.
+	float DofYards(float2 uv, float4 depthState)
+	{
+		float u = DepthU(RawDepth(uv), EffectiveReversed(depthState.w));
+		return IsSky(u) ? 1e5 : Yards(u);
+	}
+
+	// The character's distance: the nearest of five taps around it, a little below the middle of the frame.
+	float CharacterYards(float4 depthState)
+	{
+		float f = min(min(DofYards(float2(0.5, 0.55), depthState), DofYards(float2(0.47, 0.62), depthState)),
+					  min(min(DofYards(float2(0.53, 0.62), depthState), DofYards(float2(0.5, 0.7), depthState)), DofYards(float2(0.5, 0.48), depthState)));
+		return clamp(f, 1.0, 500.0);
+	}
+
+	// Motion blur (1.7.3): the finished picture smeared along this frame's camera motion (LegionGUMotionUV, the fog
+	// technique measures it), MOTION_TAPS taps centred on the pixel, so a still camera or a walk straight ahead
+	// leaves it sharp. The interface, the strip, the check view and photo mode (it has its own blur) stay as they are.
+	// The camera turns around the character, so the character, its mount and the land beside them do not move on the
+	// screen: the smear grows with the distance past the character (MotionShare) and a tap counts by its own share,
+	// so the sharp character neither trembles nor bleeds into the land behind it.
+	static const int MOTION_TAPS = 8;
+	static const float MOTION_MAX = 0.04;   // the longest smear in screen heights, at the dial's 100
+	static const float MOTION_BODY = 4.0;   // yards past the character's nearest point that stay sharp: the mount's body
+
+	float MotionShare(float z, float character)
+	{
+		return saturate((z - character - MOTION_BODY) / z);
+	}
+
+	float4 PicMotionPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		float4 c4 = tex2Dfetch(ColorPoint, int2(pos.xy));
+		float k = LegionGUValue(LEGIONGU_CTL_MOTION_BLUR, MotionBlur) * 0.01;
+		if (k <= 0.0 || !LegionGUOn(1u) || LegionGUInStrip(pos.xy) || LegionGUCheckView() || LegionGUState(8u))
+			return c4;
+		float4 depthState = tex2Dfetch(FogCur, int2(1, 0));
+		if (depthState.y < 0.5)
+			return c4;
+		float character = CharacterYards(depthState);
+		float share = MotionShare(DofYards(uv, depthState), character);
+		float2 m = LegionGUMotionUV() * k;
+		float len = length(m * float2(ASPECT, 1.0));
+		if (len > MOTION_MAX)
+			m *= MOTION_MAX / len;
+		m *= share;
+		float keep = 1.0 - saturate(UIMask(uv) * 8.0);
+		if (keep <= 0.0 || len * share * float(BUFFER_HEIGHT) < 1.0)
+			return c4;
+		float3 sum = c4.rgb * 1e-3;
+		float wsum = 1e-3;
+		[unroll]
+		for (int i = 0; i < MOTION_TAPS; ++i)
+		{
+			float2 t = uv - m * (float(i) / float(MOTION_TAPS - 1) - 0.5);
+			float w = MotionShare(DofYards(t, depthState), character);
+			sum += tex2Dlod(ColorLinear, float4(t, 0.0, 0.0)).rgb * w;
+			wsum += w;
+		}
+		return float4(lerp(c4.rgb, sum / wsum, keep), c4.a);
+	}
+
 	technique LegionGUPicture <
 		ui_label = "GU-WOW: картинка";
 		ui_tooltip = "Резкость, цвет по времени суток, привыкание глаз и лёгкая виньетка.\n"
@@ -3626,6 +3738,7 @@ namespace LegionGUNights
 		pass PicEyePass { VertexShader = FullscreenVS; PixelShader = PicEyePS; RenderTarget = PicEyeCurTex; }
 		pass PicEyeSave { VertexShader = FullscreenVS; PixelShader = PicEyeSavePS; RenderTarget = PicEyePrevTex; }
 		pass PicApply { VertexShader = FullscreenVS; PixelShader = PicApplyPS; }
+		pass PicMotion { VertexShader = FullscreenVS; PixelShader = PicMotionPS; }
 	}
 
 	// ---------------------------------------------------------------------------------------------------
@@ -3650,28 +3763,39 @@ namespace LegionGUNights
 	sampler2D DofFocusCur { Texture = DofFocusCurTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 	sampler2D DofFocusPrev { Texture = DofFocusPrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
+	// The blur in normal play (1.7.3): the same lens, only the land well behind the character and softer, so the
+	// game stays easy on the eyes. Past PLAY_FROM times the character's distance it grows over PLAY_SPAN times
+	// more, up to PLAY_MAX of the photo mode's largest radius. Nothing in front of the character blurs.
+	static const float PLAY_FROM = 1.8;
+	static const float PLAY_SPAN = 4.0;
+	static const float PLAY_MAX = 0.5;
+
 	bool PhotoOn()
 	{
 		return LegionGUPanel() ? LegionGUState(8u) : PhotoMode;
 	}
 
-	float DofYards(float2 uv, float4 depthState)
+	// The strength 0..1 of the blur in normal play, 0 in photo mode (it has its own), the check view and the map.
+	float PlayBlurOn()
 	{
-		float u = DepthU(RawDepth(uv), EffectiveReversed(depthState.w));
-		return IsSky(u) ? 1e5 : Yards(u);
+		if (PhotoOn() || !LegionGUOn(1u) || LegionGUCheckView())
+			return 0.0;
+		return LegionGUValue(LEGIONGU_CTL_PLAY_BLUR, PlayBlur) * 0.01;
 	}
 
-	// x = the focus distance in yards, eased; y = seeded. The focus is the nearest of five taps around the character,
-	// a little below the middle of the frame.
+	bool DofOn()
+	{
+		return PhotoOn() || PlayBlurOn() > 0.0;
+	}
+
+	// x = the focus distance in yards, eased; y = seeded. The focus is the character (CharacterYards).
 	float4 DofFocusPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		float4 prev = tex2Dfetch(DofFocusPrev, int2(0, 0));
 		float4 depthState = tex2Dfetch(FogCur, int2(1, 0));
-		if (!PhotoOn() || depthState.y < 0.5)
+		if (!DofOn() || depthState.y < 0.5)
 			return float4(prev.x, 0.0, 0.0, 1.0);
-		float f = min(min(DofYards(float2(0.5, 0.55), depthState), DofYards(float2(0.47, 0.62), depthState)),
-					  min(min(DofYards(float2(0.53, 0.62), depthState), DofYards(float2(0.5, 0.7), depthState)), DofYards(float2(0.5, 0.48), depthState)));
-		f = clamp(f, 1.0, 500.0);
+		float f = CharacterYards(depthState);
 		return float4(prev.y > 0.5 ? lerp(prev.x, f, Rate(FrameSeconds(), DOF_FOCUS_TIME)) : f, 1.0, 0.0, 1.0);
 	}
 
@@ -3680,27 +3804,38 @@ namespace LegionGUNights
 		return tex2Dfetch(DofFocusCur, int2(0, 0));
 	}
 
-	// Half resolution: rgb = the colour, a = the blur radius 0..1 of DOF_MAX_PX.
+	// Half resolution: rgb = the colour, a = the blur radius 0..1 of DofMaxPx.
 	float4 DofPrepPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
-		if (!PhotoOn())
+		if (!DofOn())
 			return float4(0.0, 0.0, 0.0, 0.0);
 		float f = tex2Dfetch(DofFocusCur, int2(0, 0)).x;
 		float z = DofYards(uv, tex2Dfetch(FogCur, int2(1, 0)));
 		float coc = z >= f ? saturate((z - f) / (f * DOF_SPAN)) : saturate((f - z) / f * DOF_NEAR);
+		if (!PhotoOn())
+			coc = saturate((z - f * PLAY_FROM) / (f * PLAY_SPAN));
 		return float4(tex2Dlod(ColorLinear, float4(uv, 0.0, 0.0)).rgb, coc);
+	}
+
+	// The largest blur radius in half-resolution pixels: the photo mode's own dial, or the normal play one.
+	float DofMaxPx()
+	{
+		float share = PLAY_MAX * PlayBlurOn();
+		if (PhotoOn())
+			share = LegionGUValue(LEGIONGU_CTL_PHOTO_BLUR, PhotoBlur) * 0.01;
+		return DOF_MAX_PX * share;
 	}
 
 	// A disk of 24 taps. A tap counts only where its own blur reaches this pixel, so the sharp character does not
 	// bleed into the blurred land behind it.
 	float4 DofBlurPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
-		if (!PhotoOn())
+		if (!DofOn())
 			return float4(0.0, 0.0, 0.0, 0.0);
 		float4 centre = tex2Dlod(DofPoint, float4(uv, 0.0, 0.0));
 		float2 px = 2.0 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
-		float maxPx = DOF_MAX_PX * LegionGUValue(LEGIONGU_CTL_PHOTO_BLUR, PhotoBlur) * 0.01;
-		bool bokeh = LegionGUExtra(8u);
+		float maxPx = DofMaxPx();
+		bool bokeh = PhotoOn() && LegionGUExtra(8u);
 		float r = centre.a * maxPx;
 		float3 sum = centre.rgb;
 		float wsum = 1.0;
@@ -3722,9 +3857,18 @@ namespace LegionGUNights
 	float4 DofApplyPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		float4 c = tex2Dfetch(ColorPoint, int2(pos.xy));
-		if (!PhotoOn() || LegionGUInStrip(pos.xy))
+		if (!DofOn() || LegionGUInStrip(pos.xy))
 			return c;
 		float4 b = tex2Dlod(DofBlur, float4(uv, 0.0, 0.0));
+		// Normal play: the blur's share from this pixel's own distance, so the edge of a sharp tree or the character
+		// against the blurred land is as crisp as the screen, and the interface on screen stays sharp.
+		if (!PhotoOn())
+		{
+			float z = DofYards(uv, tex2Dfetch(FogCur, int2(1, 0)));
+			float f = tex2Dfetch(DofFocusCur, int2(0, 0)).x;
+			float coc = saturate((z - f * PLAY_FROM) / (f * PLAY_SPAN));
+			return float4(lerp(c.rgb, b.rgb, smoothstep(0.05, 0.3, coc) * (1.0 - saturate(UIMask(uv) * 8.0))), c.a);
+		}
 		// The cinema frame (the addon's option): black bars to 2.39 : 1 on a narrower screen, with a soft inner
 		// edge of a few pixels instead of a hard cut (1.6.8).
 		float bar = 0.5 * saturate(1.0 - float(BUFFER_WIDTH) / float(BUFFER_HEIGHT) / 2.39);

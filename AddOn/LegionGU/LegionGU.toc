@@ -3,6 +3,6 @@
 ## Notes: GUWOW! settings for the fog, the sun rays, the night and the picture, inside the game. Open: Interface > AddOns > GUWOW! or /gu.
 ## Notes-ruRU: Настройки тумана, лучей солнца, ночи и картинки GUWOW! прямо в игре. Открыть: Интерфейс > Модификации > GUWOW! или /gu.
 ## Author: levan
-## Version: public-release-beta-1.0
+## Version: public-release-beta-1.1
 ## SavedVariables: LegionGUDB
 LegionGU.lua

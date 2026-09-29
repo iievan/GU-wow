@@ -1,13 +1,13 @@
 -- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
--- The settings travel to the shader as a strip of 81 cells, 4 by 4 pixels, in the top left corner of the screen.
+-- The settings travel to the shader as a strip of 89 cells, 4 by 4 pixels, in the top left corner of the screen.
 -- The effect LegionGUBridge (LegionGUbylevan.fx) reads the strip after the interface is drawn and covers it
 -- again, so it is not seen. Each colour channel is black or white, one bit. Cell 0 is black, cell 1 white, cell 2
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "public-release-beta-1.0"
+local VERSION = "public-release-beta-1.1"
 local CELL = 4
-local CELLS = 81
+local CELLS = 89
 
 -- Russian on a Russian client, English elsewhere.
 local RU = GetLocale() == "ruRU"
@@ -15,27 +15,39 @@ local function T(ru, en)
 	return RU and ru or en
 end
 
--- The standard settings, the preset «Default»: the owner's picks, taken from the live game on 2026-09-26 evening.
+-- The standard settings, the preset «Levan Soft»: the owner's own look, neutral and soft, taken from the live
+-- Legion game on 2026-09-28 evening. The same on every client.
 local DEFAULTS = {
 	master = true, fog = true, weather = true, wet = true, rays = true, night = true, eye = true,
 	zones = true, autoQuality = false, targetFps = 45, orbit = false, hideNames = true, cinema = true, style = 0,
 	chatBack = true,
-	fogThickness = 10, fogDistance = 100, mist = 70, mistDensity = 45, raysStrength = 100,
-	nightDarkness = 80, nightDepth = 70, lightGlow = 100, caveDarkness = 75,
-	sharpness = 25, grade = 80, vignette = 55, ao = 90,
+	fogThickness = 27, fogDistance = 100, mist = 30, mistDensity = 40, raysStrength = 80,
+	nightDarkness = 25, nightDepth = 41, lightGlow = 50, caveDarkness = 6,
+	sharpness = 15, grade = 75, vignette = 55, ao = 75,
 	-- Heat haze and cinema HDR: 0 off, 50 the look of 1.5.4.
-	hazeStrength = 30, hdrStrength = 15, grain = 10, bokeh = false, photoBlur = 50,
+	hazeStrength = 24, hdrStrength = 50, grain = 29, bokeh = false, photoBlur = 30,
 	-- 1.6.0: how much of the low mist stays seen from a height, and how defined the ray shafts are.
-	mistHigh = 40, rayDefinition = 55,
+	mistHigh = 80, rayDefinition = 20,
 	-- 1.6.7: the drift of the mist; the shader caps it at 40 (beta-1.0).
 	mistFlow = 10,
 	-- 1.7.0: brightness and colour, 50 is the game's own picture.
-	bright = 60, contrast = 55, satur = 50, warmth = 50,
+	bright = 60, contrast = 40, satur = 50, warmth = 50,
 	-- 1.7.1: the rays' own dials. In the open the old fixed cut was 22; 45 makes a field twice as sunlit.
-	raysOpen = 45, raysReach = 50, sunGlow = 50,
+	raysOpen = 70, raysReach = 60, sunGlow = 60,
 	-- 1.7.1: the mist at the feet, ankle-deep in swamps. 0 keeps it off.
-	mistNear = 25,
+	mistNear = 0,
+	-- 1.7.3: which objects glow at night and how far (50 is the old look), and the motion blur (0 off). These are
+	-- the player's own taste for the screen, like the dials above: a code and a ready preset leave them alone.
+	lightThreshold = 50, lightRadius = 50, motionBlur = 0,
+	-- 1.7.3: the far land softly blurred in normal play, the photo mode lens at its own strength (0 off).
+	playBlur = 0,
+	-- 1.7.3: a panel shows whole under the mouse and the fight panels in a fight (see PanelAlpha).
+	panelWake = true,
 }
+-- 1.7.3: how much of each panel shows, 100 whole, 0 gone: ui_ in plain play, photo_ in photo mode.
+for _, k in ipairs({ "bars", "player", "target", "party", "minimap", "chat", "buffs", "quests", "castbar" }) do
+	DEFAULTS["ui_" .. k], DEFAULTS["photo_" .. k] = 100, 0
+end
 -- The order of the values in the strip, the same as LEGIONGU_CTL_* in the shaders (after the flags).
 local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDarkness", "lightGlow",
 	"caveDarkness", "sharpness", "grade", "vignette", "mistDensity" }
@@ -75,10 +87,27 @@ for _, k in ipairs(CODE_KEYS) do
 end
 local MAX_PRESETS = 10
 
--- The ready presets of the main page: «Default» with a few values changed. English names on every client, as the
--- author named them. Styles: 1 warm, 2 cold, 3 film, 5 sunset, 6 fairy tale, 7 noir.
+-- The ready presets of the main page: «Levan Soft» (the standard settings) with a few values changed. English names
+-- on every client, as the author named them. Styles: 1 warm, 2 cold, 3 film, 4 vivid, 5 sunset, 6 fairy tale, 7 noir.
 local BASE_PRESETS = {
-	{ "Default", {} },
+	{ "Levan Soft", {} },
+	-- The standard look of beta-1.0 and 1.7.x: thick mist, deep night, strong light round the lamps.
+	{ "Deep Atmosphere", { fogThickness = 10, mist = 70, mistDensity = 45, raysStrength = 100, nightDarkness = 80,
+		nightDepth = 70, lightGlow = 100, caveDarkness = 75, sharpness = 25, grade = 80, ao = 90, hazeStrength = 30,
+		hdrStrength = 15, grain = 10, mistHigh = 40, rayDefinition = 55, mistNear = 25 } },
+	-- Bright colours and crisp edges for questing by day; little mist, a light night.
+	{ "Vivid Adventure", { fogThickness = 10, mist = 20, mistDensity = 35, nightDarkness = 20, nightDepth = 25,
+		sharpness = 45, grade = 90, vignette = 30, hdrStrength = 40, grain = 0, style = 4 } },
+	-- Moonlit night: the dark is blue, the lamps glow softly.
+	{ "Moonlight", { fogThickness = 20, mist = 45, mistDensity = 45, nightDarkness = 60, nightDepth = 55, lightGlow = 80,
+		grade = 90, vignette = 50, hdrStrength = 45, grain = 20, mistHigh = 60, style = 2 } },
+	-- Low mist over the ground, soft light, a quiet dawn look.
+	{ "Misty Dawn", { fogThickness = 45, fogDistance = 80, mist = 90, mistDensity = 65, raysStrength = 90, grade = 85,
+		sharpness = 10, vignette = 35, hazeStrength = 20, hdrStrength = 30, grain = 15, mistHigh = 90, mistNear = 30, style = 1 } },
+	-- The picture close to the game's own: the effects on, but light.
+	{ "Pure Game", { fogThickness = 5, mist = 10, mistDensity = 30, raysStrength = 50, nightDarkness = 10, nightDepth = 10,
+		lightGlow = 30, caveDarkness = 0, sharpness = 10, grade = 40, vignette = 15, ao = 40, hazeStrength = 0,
+		hdrStrength = 0, grain = 0, mistHigh = 20, mistNear = 0, style = 0 } },
 	-- Clear air and little mist keep the sky open; the night is dark, not black, the colour cold.
 	{ "Starry Night", { fogThickness = 10, mist = 35, mistDensity = 50, nightDarkness = 85, nightDepth = 45, lightGlow = 100,
 		grade = 100, vignette = 45, hdrStrength = 60, grain = 35, mistHigh = 30, style = 2 } },
@@ -98,6 +127,14 @@ local BASE_PRESETS = {
 		style = 7 } },
 	-- The heavy parts off: the same that auto quality lightens, and the rays.
 	{ "More FPS", { wet = false, eye = false, rays = false, mist = 0, ao = 0, sharpness = 0, hazeStrength = 0, grain = 0, mistHigh = 0 } },
+	-- 1.7.3: three more looks. Cold clear air with a blue night; warm lamps in a dark night; a soft picture with
+	-- no sharpening and no grain, like a painting.
+	{ "Northern Frost", { fogThickness = 20, fogDistance = 90, mist = 55, mistDensity = 45, nightDarkness = 45, grade = 80,
+		sharpness = 25, vignette = 40, hdrStrength = 45, grain = 15, mistHigh = 60, style = 2 } },
+	{ "Warm Night Lamps", { nightDarkness = 55, nightDepth = 50, lightGlow = 100, caveDarkness = 30, grade = 90,
+		vignette = 55, hdrStrength = 50, grain = 25, style = 1 } },
+	{ "Soft Watercolor", { fogThickness = 35, fogDistance = 85, mist = 50, mistDensity = 35, sharpness = 0, grade = 70,
+		vignette = 25, hdrStrength = 20, grain = 0, style = 6 } },
 }
 for _, p in ipairs(BASE_PRESETS) do
 	local full = {}
@@ -123,6 +160,8 @@ local lowQuality = false
 local zoneKind
 local cells = {}
 local widgets = {}
+-- Declared here: the mod key (GUWOW_ToggleMod) and the photo mode above the menu call it.
+local Refresh
 
 -- A small timer that works on every client (C_Timer is 6.0 and later).
 local timers = CreateFrame("Frame")
@@ -226,7 +265,10 @@ local function ScreenHeight()
 end
 
 local function Layout()
-	local scale = 768 / ScreenHeight()
+	-- Direct3D 9 (WotLK 3.3.5 and older): a cell of 3 units, read by the shader as BUFFER_HEIGHT / 256 pixels. A
+	-- maximized window is shorter than the resolution, and a strip scaled to the resolution was not read there.
+	local major = tonumber(string.match(GetBuildInfo() or "", "^(%d+)")) or 7
+	local scale = major < 4 and 0.75 or 768 / ScreenHeight()
 	for _, f in ipairs({ strip, first }) do
 		f:SetScale(scale)
 		f:ClearAllPoints()
@@ -386,7 +428,9 @@ local function Paint()
 		Code(V("mistHigh") or 0), Code(V("rayDefinition") or 0), Code(V("mistFlow") or 0),
 		Code(V("bright") or 50), Code(V("contrast") or 50), Code(V("satur") or 50), Code(V("warmth") or 50),
 		Code(V("raysOpen") or 45), Code(V("raysReach") or 50), Code(V("sunGlow") or 50), Code(V("mistNear") or 0),
-		chatL, chatT, chatR, chatB }
+		chatL, chatT, chatR, chatB,
+		Code(V("lightThreshold") or 50), Code(V("lightRadius") or 50), Code(V("motionBlur") or 0),
+		Code(V("playBlur") or 0) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v
@@ -442,6 +486,199 @@ local function CloseOptions()
 	StaticPopup_Hide("GUWOW_CONFIRM")
 end
 
+-- The minimap draws its blips past the interface transparency, so the icons stayed on a clean screen: the map
+-- itself hides for photo mode and the shot, and comes back only if it was shown.
+local mmHidden = false
+local function MinimapOff()
+	if Minimap and Minimap:IsShown() and not InCombatLockdown() then
+		Minimap:Hide()
+		mmHidden = true
+	end
+end
+local function MinimapBack()
+	if mmHidden and Minimap and not InCombatLockdown() then
+		Minimap:Show()
+		mmHidden = false
+	end
+end
+
+-- The panels the player hides in plain play (1.7.3), each on its own, from the page «Дополнительно». A hidden panel
+-- goes transparent, as the whole interface does in photo mode: transparency is allowed in combat and taints
+-- nothing, and the panel keeps its place, so a click on it still works.
+local function ChatFrames()
+	local list = { "GeneralDockManager", "ChatFrameMenuButton", "FriendsMicroButton", "QuickJoinToastButton",
+		"ChatFrameChannelButton" }
+	for i = 1, NUM_CHAT_WINDOWS or 10 do
+		list[#list + 1] = "ChatFrame" .. i
+		list[#list + 1] = "ChatFrame" .. i .. "Tab"
+	end
+	return list
+end
+local HIDE_GROUPS = {
+	{ "bars", T("Панели заклинаний", "Action bars"), { "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight",
+		"MultiBarRight", "MultiBarLeft" } },
+	{ "player", T("Портрет персонажа и питомца", "Player and pet frames"), { "PlayerFrame", "PetFrame" } },
+	{ "target", T("Портрет цели и фокуса", "Target and focus frames"), { "TargetFrame", "FocusFrame" } },
+	{ "party", T("Группа и рейд", "Party and raid"), { "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3",
+		"PartyMemberFrame4", "CompactRaidFrameManager", "CompactRaidFrameContainer" } },
+	{ "minimap", T("Миникарта", "Minimap"), { "MinimapCluster" } },
+	{ "chat", T("Чат", "Chat"), ChatFrames() },
+	{ "buffs", T("Эффекты на персонаже", "Buffs and debuffs"), { "BuffFrame", "TemporaryEnchantFrame", "ConsolidatedBuffs" } },
+	{ "quests", T("Список заданий", "Quest tracker"), { "ObjectiveTrackerFrame", "WatchFrame", "QuestWatchFrame" } },
+	{ "castbar", T("Полоса заклинания", "Cast bar"), { "CastingBarFrame" } },
+}
+local mmByPanel = false
+local chatTyping = false
+-- The panels that matter in a fight: with «wake» on they show whole while the player fights.
+local FIGHT = { bars = true, player = true, target = true, party = true, castbar = true }
+-- A group's frames under the mouse: the frame's own rectangle, so a see-through panel still answers.
+local function MouseOver(names)
+	local cx, cy = GetCursorPosition()
+	for _, n in ipairs(names) do
+		local f = _G[n]
+		if f and f.IsVisible and f:IsVisible() and f:GetLeft() then
+			local s = f:GetEffectiveScale()
+			local x, y = cx / s, cy / s
+			if x >= f:GetLeft() and x <= f:GetRight() and y >= f:GetBottom() and y <= f:GetTop() then
+				return true
+			end
+		end
+	end
+	return false
+end
+-- How much of a group shows now, 0..1: its dial in plain play or in photo mode, whole when the player types in the
+-- chat, points at the panel or fights (the fight panels).
+local function PanelAlpha(g)
+	local key = g[1]
+	local a = (photo and DB["photo_" .. key] or DB["ui_" .. key] or 100) / 100
+	if a >= 1 then
+		return 1
+	end
+	if key == "chat" and (chatTyping or (ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow())) then
+		return 1
+	end
+	if DB.panelWake and ((FIGHT[key] and InCombatLockdown()) or MouseOver(g[3])) then
+		return 1
+	end
+	return a
+end
+-- The frames see-through now, each with its cap. The game sets some alphas itself (the chat tabs fade, the party
+-- frames on range, the cast bar at every cast): a hook on SetAlpha puts such a frame back under its cap at once, so
+-- it never blinks. A frame the player keeps whole is never touched, only given back its alpha once.
+local hiddenFrames, hooked, reasserting = {}, {}, false
+local function KeepHidden(self, a)
+	local cap = hiddenFrames[self]
+	if cap and not reasserting and a and a > cap then
+		reasserting = true
+		self:SetAlpha(cap)
+		reasserting = false
+	end
+end
+-- Each group's alpha on screen and the one it goes to: under the mouse or in a fight a panel comes up softly and
+-- goes back slower still, the eye follows it. A dial, photo mode or the chat set it at once.
+local panelGoal, panelNow = {}, {}
+local FADE_IN, FADE_OUT = 3, 1.25
+local function PanelGoals()
+	for _, g in ipairs(HIDE_GROUPS) do
+		panelGoal[g[1]] = PanelAlpha(g)
+	end
+	-- The minimap blips draw past the transparency (see MinimapOff), so a map faded to 0 hides itself, out of
+	-- combat only.
+	if Minimap and not InCombatLockdown() and not photo then
+		local mmOff = panelGoal.minimap == 0 and (panelNow.minimap or 0) == 0
+		if mmOff and Minimap:IsShown() then
+			Minimap:Hide()
+			mmByPanel = true
+		elseif panelGoal.minimap > 0 and mmByPanel then
+			Minimap:Show()
+			mmByPanel = false
+		end
+	end
+end
+-- dt moves each group toward its goal (nil: straight there); all sets every frame, so frames that appeared later
+-- (the raid) get their alpha too.
+local function PanelFade(dt, all)
+	for _, g in ipairs(HIDE_GROUPS) do
+		local key = g[1]
+		local goal, a = panelGoal[key] or 1, panelNow[key]
+		if not dt or not a then
+			a = goal
+		elseif a < goal then
+			a = math.min(goal, a + dt * FADE_IN)
+		elseif a > goal then
+			a = math.max(goal, a - dt * FADE_OUT)
+		end
+		if all or a ~= panelNow[key] then
+			panelNow[key] = a
+			for _, name in ipairs(g[3]) do
+				local f = _G[name]
+				if f and f.SetAlpha then
+					if a < 1 then
+						if not hooked[f] then
+							hooked[f] = true
+							hooksecurefunc(f, "SetAlpha", KeepHidden)
+						end
+						if hiddenFrames[f] ~= a then
+							hiddenFrames[f] = a
+							f:SetAlpha(a)
+						end
+					elseif hiddenFrames[f] then
+						hiddenFrames[f] = nil
+						f:SetAlpha(1)
+					end
+				end
+			end
+		end
+	end
+end
+local function ApplyHide()
+	if not DB then
+		return
+	end
+	PanelGoals()
+	PanelFade(nil, true)
+end
+-- Photo mode shows what the photo dials ask: all at 0 hides the whole interface at once, as before.
+local function PhotoShowsPanels()
+	for _, g in ipairs(HIDE_GROUPS) do
+		if (DB["photo_" .. g[1]] or 0) > 0 then
+			return true
+		end
+	end
+	return false
+end
+-- With panels kept, every other window on UIParent goes to 0 and back as it was: UIParent at 0 would take the kept
+-- panels with it. A panel inside another window keeps that window too.
+local panelFrame, dimmed = nil, {}
+local function PhotoDim(on)
+	if on then
+		if not panelFrame then
+			panelFrame = {}
+			for _, g in ipairs(HIDE_GROUPS) do
+				for _, n in ipairs(g[3]) do
+					local f = _G[n]
+					while f and f ~= UIParent and not panelFrame[f] do
+						panelFrame[f] = true
+						f = f.GetParent and f:GetParent()
+					end
+				end
+			end
+		end
+		for _, f in ipairs({ UIParent:GetChildren() }) do
+			if not panelFrame[f] and f.GetAlpha and not dimmed[f] then
+				dimmed[f] = f:GetAlpha()
+				f:SetAlpha(0)
+			end
+		end
+	else
+		for f, a in pairs(dimmed) do
+			f:SetAlpha(a)
+		end
+		dimmed = {}
+	end
+end
+local photoPanels = false
+
 local function Photo(on)
 	if on == photo then
 		return
@@ -454,7 +691,17 @@ local function Photo(on)
 	DropKeyboard()
 	if on then
 		CloseOptions()
-		UIParent:SetAlpha(0)
+		photoPanels = PhotoShowsPanels()
+		if photoPanels then
+			PhotoDim(true)
+			ApplyHide()
+			if PanelAlpha(HIDE_GROUPS[5]) == 0 then
+				MinimapOff()
+			end
+		else
+			UIParent:SetAlpha(0)
+			MinimapOff()
+		end
 		if DB.hideNames then
 			Names(false)
 		end
@@ -466,7 +713,13 @@ local function Photo(on)
 			MoveViewRightStop()
 		end
 		Names(true)
+		if photoPanels then
+			PhotoDim(false)
+			photoPanels = false
+		end
 		UIParent:SetAlpha(1)
+		MinimapBack()
+		ApplyHide()
 	end
 	Paint()
 end
@@ -496,6 +749,7 @@ function GUWOW_Screenshot()
 	local wasPhoto = photo
 	if not wasPhoto then
 		UIParent:SetAlpha(0)
+		MinimapOff()
 	end
 	-- The first-draw square goes too: with the strip gone nothing covers it, and it would stay on the shot.
 	strip:Hide()
@@ -507,6 +761,7 @@ function GUWOW_Screenshot()
 			first:Show()
 			if not wasPhoto and not photo then
 				UIParent:SetAlpha(1)
+				MinimapBack()
 			end
 		end)
 	end)
@@ -522,7 +777,15 @@ hooksecurefunc("ChatEdit_ActivateChat", function()
 	if photo then
 		Photo(false)
 	end
+	chatTyping = true
+	ApplyHide()
 end)
+if ChatEdit_DeactivateChat then
+	hooksecurefunc("ChatEdit_DeactivateChat", function()
+		chatTyping = false
+		ApplyHide()
+	end)
+end
 UIParent:HookScript("OnShow", function()
 	if photo then
 		Photo(false)
@@ -576,7 +839,8 @@ local function ParseCode(code)
 	local t = {}
 	for i, k in ipairs(CODE_KEYS) do
 		t[k] = k == "style" and math.min(nums[i], 7) or math.min(nums[i], 100)
-	end	local f = nums[n1]
+	end
+	local f = nums[n1]
 	for i, k in ipairs(CODE_FLAGS) do
 		t[k] = math.floor(f / 2 ^ (i - 1)) % 2 == 1
 	end
@@ -611,7 +875,7 @@ end
 
 -- The widgets show what is on screen, a preview too. Setting a slider there is not a change by the player.
 local refreshing = false
-local function Refresh()
+Refresh = function()
 	refreshing = true
 	for _, w in pairs(widgets) do
 		w:Refresh()
@@ -626,8 +890,36 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GUWOW! обновлён: публичная бета 1.0.\n\nК отчёту об ошибке теперь прикладывается снимок экрана: наведите камеру на баг, нажмите «Приложить снимок» в окне /gu report — и картинка уйдёт вместе с отчётом. У лучей свои ручки и пресеты на странице «Лучи», яркость и цвет — на «Картинке», туман у ног — на «Атмосфере». Настройки по умолчанию обновлены на авторские.\n\nМеню: /gu или кнопка у миникарты.",
-		"GUWOW! is updated: public beta 1.0.\n\nThe bug report now carries a screenshot: aim the camera at the bug, press Attach a shot in the /gu report window — and the picture goes with the report. The rays have their own dials and presets on the Rays page, brightness and colour live on Picture, the mist at the feet on Atmosphere. The defaults are refreshed to the author's picks.\n\nMenu: /gu or the minimap button."),
+	text = T("GUWOW! обновлён: публичная бета 1.1.\n\nНаписать в поддержку теперь можно из отдельной страницы «Сообщение в поддержку» в меню или по Ctrl + щелчок по кнопке у миникарты. Клавишу фоторежима можно назначить прямо на странице «Фоторежим», там же мягкое размытие дали для обычной игры. На странице «Панели» у каждой панели свой ползунок прозрачности: под мышью и в бою панель плавно проявляется целиком. На «Ночи» новые ручки: что считать огнём и радиус свечения. На «Картинке» размытие при движении. У каждого ползунка подсказка простыми словами, готовых пресетов стало больше.\n\nМеню: /gu или кнопка у миникарты.",
+		"GUWOW! is updated: public beta 1.1.\n\nWriting to support now has its own page, Message to support, in the menu, or Ctrl + click on the minimap button. The photo mode key is set right on the Photo mode page, and so is a soft far blur for normal play. On the Panels page each panel has its own transparency slider: under the mouse and in a fight the panel fades in whole. Night has new dials: what counts as a light and the glow radius. Picture has motion blur. Every slider has a tip in plain words, and there are more ready presets.\n\nMenu: /gu or the minimap button."),
+	button1 = OKAY or "OK",
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+	preferredIndex = 3,
+}
+
+-- The full screen glow off on WotLK 3.3.5 (see PLAYER_ENTERING_WORLD): one click turns it on.
+StaticPopupDialogs["GUWOW_GLOW"] = {
+	text = T("GUWOW!: в настройках графики выключено полноэкранное свечение. Без него туман и ночь ложатся и на окна игры.\n\nВключить свечение сейчас?",
+		"GUWOW!: the full screen glow is off in the video settings. Without it the fog and the night cover the game's windows too.\n\nTurn the glow on now?"),
+	button1 = T("Включить", "Turn on"),
+	button2 = CANCEL or "Cancel",
+	OnAccept = function()
+		SetCVar("ffxGlow", "1")
+		Say(T("свечение включено. Если окна остались в тумане, перезапустите игру.", "the glow is on. If the windows stay in the fog, restart the game."))
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+	preferredIndex = 3,
+}
+
+-- After «Send» and the reload (1.7.3): players saw no answer at all. The game cannot hear the helper, so the window
+-- says where the report is now and what the Windows notice means.
+StaticPopupDialogs["GUWOW_SENT"] = {
+	text = T("GUWOW!: отчёт сохранён и передан программе GU-WOW.\n\nЧерез несколько секунд Windows покажет уведомление «Спасибо. Сообщение об ошибке доставлено разработчику».\n\nЕсли уведомления нет, программа GU-WOW не запущена. Запустите её, и отчёт уйдёт сам.",
+		"GUWOW!: the report is saved and handed to the GU-WOW program.\n\nIn a few seconds Windows shows the notice «Thank you. The error report has been delivered to the developer».\n\nIf no notice shows, the GU-WOW program is not running. Start it, and the report goes on its own."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -875,8 +1167,8 @@ homeText:SetPoint("TOPLEFT", 16, -52)
 homeText:SetWidth(600)
 homeText:SetJustifyH("LEFT")
 homeText:SetSpacing(4)
-homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Основные» — включатель мода и готовые пресеты.\n«Атмосфера» — туман, погода, мокрая земля, тени и марево.\n«Лучи» — лучи солнца и свечение в тумане, со своими пресетами.\n«Ночь» — темнота, свет огней и подземелья.\n«Картинка» — резкость, цвет, яркость и плёночные эффекты, со своими пресетами.\n«Дополнительно» — стили, коды, свои пресеты и поведение.\n«Фоторежим» — снимки и всё, что нужно только для них.\n\nПодсказки:\nF11 включает и выключает весь мод. Своя клавиша: Меню → Управление → GUWOW!.\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
-	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMain — the mod switch and the ready presets.\nAtmosphere — fog, weather, wet ground, shadows and heat haze.\nRays — the sun rays and the glow in the fog, with their own presets.\nNight — darkness, firelight and dungeons.\nPicture — sharpness, colour, brightness and the film effects, with their own presets.\nExtras — styles, codes, your presets and behaviour.\nPhoto mode — screenshots and what only they need.\n\nHints:\nF11 toggles the whole mod. Your own key: Menu → Key Bindings → GUWOW!.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode.\nChat commands: /gu menu · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
+homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Сообщение в поддержку» — написать автору об ошибке, со снимком экрана.\n«Основные» — включатель мода и готовые пресеты.\n«Атмосфера» — туман, погода, мокрая земля, тени и марево.\n«Лучи» — лучи солнца и свечение в тумане, со своими пресетами.\n«Ночь» — темнота, свет огней и подземелья.\n«Картинка» — резкость, цвет, яркость, размытие при движении и плёночные эффекты.\n«Дополнительно» — стили, коды, свои пресеты, поведение и видимость панелей.\n«Фоторежим» — снимки, своя клавиша и всё, что нужно только для них.\n\nПодсказки:\nНаведите мышь на ползунок, и появится подсказка простыми словами.\nF11 включает и выключает весь мод. Клавишу фоторежима можно назначить на странице «Фоторежим».\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
+	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMessage to support — tell the author about a bug, with a screenshot.\nMain — the mod switch and the ready presets.\nAtmosphere — fog, weather, wet ground, shadows and heat haze.\nRays — the sun rays and the glow in the fog, with their own presets.\nNight — darkness, firelight and dungeons.\nPicture — sharpness, colour, brightness, motion blur and the film effects.\nExtras — styles, codes, your presets, behaviour and the panels you see.\nPhoto mode — screenshots, its own key and what only they need.\n\nHints:\nHover a slider for a tip in plain words.\nF11 toggles the whole mod. The photo mode key is set on the Photo mode page.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode.\nChat commands: /gu menu · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
 
 local panel = CreateFrame("Frame", "LegionGUPanel", UIParent)
 panel.name = T("Основные", "Main")
@@ -1074,45 +1366,73 @@ end }
 
 Header(panelAtmo, T("Туман", "Fog"), L, -60)
 Check(panelAtmo, "fog", T("Туман", "Fog"), L, -74)
-Slider(panelAtmo, "fogThickness", T("Густота тумана", "Fog density"), L + 6, -110)
-Slider(panelAtmo, "fogDistance", T("Дальность тумана", "Fog distance"), L + 6, -152)
-Slider(panelAtmo, "mist", T("Низовой туман", "Ground mist"), L + 6, -194)
-Slider(panelAtmo, "mistDensity", T("Плотность низового тумана", "Ground mist thickness"), L + 6, -236, nil, nil, 86)
-Slider(panelAtmo, "mistHigh", T("Туман с высоты: с гор и в полёте", "Mist from a height: hills and flight"), L + 6, -278)
+Slider(panelAtmo, "fogThickness", T("Густота тумана", "Fog density"), L + 6, -110, nil, nil, nil,
+	T("Сколько тумана в воздухе. 0 — воздух чистый, 100 — дали почти не видно", "How much fog hangs in the air. 0 is clear air, 100 hides the distance"))
+Slider(panelAtmo, "fogDistance", T("Дальность тумана", "Fog distance"), L + 6, -152, nil, nil, nil,
+	T("Где туман становится стеной. Меньше — стена ближе к вам, больше — дальше", "Where the fog turns into a wall. Lower brings it closer, higher pushes it away"))
+Slider(panelAtmo, "mist", T("Низовой туман", "Ground mist"), L + 6, -194, nil, nil, nil,
+	T("Дымка, которая лежит в низинах, над водой и под деревьями", "The haze lying in hollows, over water and under the trees"))
+Slider(panelAtmo, "mistDensity", T("Плотность низового тумана", "Ground mist thickness"), L + 6, -236, nil, nil, 86,
+	T("Насколько эта дымка непрозрачная. Выше — как вата", "How solid that haze is. Higher looks like cotton wool"))
+Slider(panelAtmo, "mistHigh", T("Туман с высоты: с гор и в полёте", "Mist from a height: hills and flight"), L + 6, -278, nil, nil, nil,
+	T("Сколько дымки видно внизу, когда вы на горе или летите. 0 — сверху всё чисто", "How much haze you see below from a hill or in flight. 0 keeps the view clear"))
 -- The mist at the feet (1.7.1): ankle-deep, with no clear circle around the player. Swamps ask for it.
 Slider(panelAtmo, "mistNear", T("Туман у ног: по щиколотку", "Mist at the feet: ankle-deep"), L + 6, -320, nil, nil, 71,
 	T("Стелется прямо под персонажем, без чистого круга. 0 выключает — как раньше", "Lies right under the character, no clear circle. 0 turns it off — as before"))
 Header(panelAtmo, T("Погода и земля", "Weather and ground"), R, -60)
 Check(panelAtmo, "weather", T("Погодное настроение", "Weather mood"), R, -74)
 Check(panelAtmo, "wet", T("Мокрая земля в дождь", "Wet ground in rain"), R, -98)
-Slider(panelAtmo, "ao", T("Тени в щелях", "Contact shadows"), R + 6, -140)
-Slider(panelAtmo, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), R + 6, -182, nil, nil, 71)
+Slider(panelAtmo, "ao", T("Тени в щелях", "Contact shadows"), R + 6, -140, nil, nil, nil,
+	T("Мягкие тени под камнями, травой и у стен: предметы стоят на земле, а не парят. Немного нагружает видеокарту", "Soft shadows under stones, grass and by walls: things sit on the ground. Costs a little GPU"))
+Slider(panelAtmo, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), R + 6, -182, nil, nil, 71,
+	T("Воздух дрожит от жары в пустынях и у лавы. В других местах его нет", "The air shimmers with heat in deserts and by lava. Nowhere else"))
 
 Check(panelRays, "rays", T("Лучи солнца", "Sun rays"), L, -60)
-Slider(panelRays, "raysStrength", T("Сила лучей", "Ray strength"), L + 6, -100)
-Slider(panelRays, "rayDefinition", T("Чёткость лучей: от свечения до снопов", "Ray definition: a glow or shafts"), L + 6, -142, nil, nil, 71)
+Slider(panelRays, "raysStrength", T("Сила лучей", "Ray strength"), L + 6, -100, nil, nil, nil,
+	T("Насколько ярко светят лучи солнца сквозь кроны и облака. 0 — без лучей", "How bright the sun shafts through trees and clouds are. 0 turns them off"))
+Slider(panelRays, "rayDefinition", T("Чёткость лучей: от свечения до снопов", "Ray definition: a glow or shafts"), L + 6, -142, nil, nil, 71,
+	T("0 — мягкое свечение в воздухе. Выше — отдельные снопы света с тенью между ними", "0 is a soft glow in the air. Higher gives separate shafts with shade between them"))
 -- The rays' own dials (1.7.1): the open-sky strength, the length and the sun's glow in the fog.
 Slider(panelRays, "raysOpen", T("Лучи в открытом небе", "Rays in the open"), L + 6, -184, nil, nil, 71,
 	T("Сила лучей в поле и на снегу, где нет крон. 22 — как в 1.7.0, выше — заметнее", "Ray strength over fields and snow, with no canopy. 22 is the 1.7.0 look, higher is bolder"))
-Slider(panelRays, "raysReach", T("Длина лучей (50 — как было)", "Ray length (50 — as before)"), R + 6, -100, nil, nil, 81)
-Slider(panelRays, "sunGlow", T("Свечение солнца в тумане (50 — как было)", "Sun glow in the fog (50 — as before)"), R + 6, -142, nil, nil, 76)
+Slider(panelRays, "raysReach", T("Длина лучей (50 — как было)", "Ray length (50 — as before)"), R + 6, -100, nil, nil, 81,
+	T("Как далеко от солнца тянутся лучи. Меньше — короткие, больше — через весь экран", "How far the shafts reach from the sun. Lower is short, higher crosses the screen"))
+Slider(panelRays, "sunGlow", T("Свечение солнца в тумане (50 — как было)", "Sun glow in the fog (50 — as before)"), R + 6, -142, nil, nil, 76,
+	T("Светлое пятно вокруг солнца, когда оно в тумане", "The bright patch round the sun when it is in the fog"))
 
 Header(panelNight, T("Ночь", "Night"), L, -60)
 Check(panelNight, "night", T("Ночь и огни", "Night and lights"), L, -76)
-Slider(panelNight, "nightDarkness", T("Темнота ночи", "Night darkness"), L + 6, -116)
+Slider(panelNight, "nightDarkness", T("Темнота ночи", "Night darkness"), L + 6, -116, nil, nil, nil,
+	T("Насколько темнеет мир ночью по игровым часам. 0 — ночь как в игре", "How dark the world gets at night by the game clock. 0 keeps the game's own night"))
 Slider(panelNight, "nightDepth", T("Глубина ночи", "Night depth"), L + 6, -158, nil, nil, nil,
 	T("Дополнительная тьма поверх «Темноты ночи»: 0 обычная ночь, 100 глухая", "Extra darkness over the night darkness: 0 a plain night, 100 pitch dark"))
-Slider(panelNight, "lightGlow", T("Свет огней", "Light glow"), R + 6, -116)
-Slider(panelNight, "caveDarkness", T("Темнота подземелий", "Dungeon darkness"), R + 6, -158)
+Slider(panelNight, "lightGlow", T("Свет огней", "Light glow"), R + 6, -116, nil, nil, nil,
+	T("Насколько ярко ночью светят фонари, костры и окна. 0 — огни не светят сверх игры", "How bright lamps, fires and windows glow at night. 0 adds no glow"))
+Slider(panelNight, "caveDarkness", T("Темнота подземелий", "Dungeon darkness"), R + 6, -158, nil, nil, nil,
+	T("Насколько темно в пещерах и подземельях. 0 — как в игре", "How dark caves and dungeons are. 0 keeps the game's look"))
+-- The lights' own dials (1.7.3): which objects glow and how far the glow spreads. 50 is the old look.
+Header(panelNight, T("Огни ночью", "Lights at night"), L, -210)
+Slider(panelNight, "lightThreshold", T("Что считать огнём (50 — как было)", "What counts as a light (50 — as before)"), L + 6, -250, nil, nil, nil,
+	T("Больше — светятся только настоящие фонари и костры. Меньше — светятся и тусклые предметы. Если ночью светится то, что не должно, прибавьте", "Higher: only real lamps and fires glow. Lower: dim things glow too. If wrong things glow at night, raise it"))
+Slider(panelNight, "lightRadius", T("Радиус свечения (50 — как было)", "Glow radius (50 — as before)"), R + 6, -250, nil, nil, 86,
+	T("Как далеко вокруг огня разливается свет. Меньше — аккуратный ореол, больше — широкое зарево", "How far the light spreads round a flame. Lower is a tight halo, higher a wide glow"))
 
 Header(panelPic, T("Картинка", "Picture"), L, -60)
 Check(panelPic, "eye", T("Привыкание глаз", "Eye adaptation"), L, -76)
-Slider(panelPic, "sharpness", T("Резкость", "Sharpness"), L + 6, -116, nil, nil, 61)
+Slider(panelPic, "sharpness", T("Резкость", "Sharpness"), L + 6, -116, nil, nil, 61,
+	T("Чётче края и мелкие детали: листва, камни, броня. Слишком много — появляется рябь", "Crisper edges and fine detail: leaves, stones, armour. Too much adds shimmer"))
 Slider(panelPic, "grade", T("Цвет по времени суток", "Time of day colour"), L + 6, -158, nil, nil, nil,
 	T("Золото вечера и утра, холод ночи: сила окраски по игровым часам", "The gold of the evening and the cool of the night, by the game clock"))
-Slider(panelPic, "vignette", T("Виньетка", "Vignette"), L + 6, -200)
-Slider(panelPic, "hdrStrength", T("Кино-HDR: глубже тени, мягче блики", "Cinema HDR: deeper shadows, softer highlights"), R + 6, -116)
-Slider(panelPic, "grain", T("Плёночное зерно", "Film grain"), R + 6, -158, nil, nil, 71)
+Slider(panelPic, "vignette", T("Виньетка", "Vignette"), L + 6, -200, nil, nil, nil,
+	T("Лёгкое затемнение по углам экрана, как на фото. 0 — без него", "A light darkening in the screen corners, as on a photo. 0 turns it off"))
+Slider(panelPic, "hdrStrength", T("Кино-HDR: глубже тени, мягче блики", "Cinema HDR: deeper shadows, softer highlights"), R + 6, -116, nil, nil, nil,
+	T("Картинка как в кино: тени глубже, яркое небо и блики не выгорают в белое", "A film look: deeper shadows, bright sky and highlights keep their detail"))
+Slider(panelPic, "grain", T("Плёночное зерно", "Film grain"), R + 6, -158, nil, nil, 71,
+	T("Мелкий шум как на плёнке. 0 — картинка чистая", "A fine noise as on film. 0 keeps the picture clean"))
+-- Motion blur (1.7.3): the picture smears along the camera turn, not the player's habit of a look, so a preset
+-- leaves it alone. 0 keeps it off.
+Slider(panelPic, "motionBlur", T("Размытие при движении", "Motion blur"), R + 6, -200, nil, nil, 71,
+	T("При быстром повороте камеры картинка слегка смазывается, как в кино. 0 — выключено. Интерфейс не размывается", "The picture smears a little on a fast camera turn, as in films. 0 is off. The interface stays sharp"))
 
 -- A preset carousel (1.7.1): the ready looks and, when saved, the player's own one («Мой») at the end. «<» and
 -- «>» page with a preview, «+» saves the on-screen values into the own slot, «-» deletes it. One factory serves
@@ -1195,10 +1515,14 @@ end
 -- Brightness and colour (1.7.0): the game has no brightness control of its own, so GU-WOW carries one. 50 on
 -- every dial is the game's own picture.
 Header(panelPic, T("Яркость и цвет", "Brightness and colour"), L, -240)
-Slider(panelPic, "bright", T("Яркость (50 — как в игре)", "Brightness (50 — the game's own)"), L + 6, -280, nil, nil, 76)
-Slider(panelPic, "satur", T("Сочность цвета", "Colour richness"), L + 6, -322, nil, nil, 81)
-Slider(panelPic, "contrast", T("Контрастность", "Contrast"), R + 6, -280, nil, nil, 76)
-Slider(panelPic, "warmth", T("Тепло картинки: холоднее или теплее", "Picture warmth: colder or warmer"), R + 6, -322)
+Slider(panelPic, "bright", T("Яркость (50 — как в игре)", "Brightness (50 — the game's own)"), L + 6, -280, nil, nil, 76,
+	T("Общая яркость картинки. Если ночью слишком темно, прибавьте", "The overall brightness. If the night is too dark, raise it"))
+Slider(panelPic, "satur", T("Сочность цвета", "Colour richness"), L + 6, -322, nil, nil, 81,
+	T("Меньше — цвета спокойнее и ближе к серому, больше — ярче и насыщеннее", "Lower calms the colours towards grey, higher makes them richer"))
+Slider(panelPic, "contrast", T("Контрастность", "Contrast"), R + 6, -280, nil, nil, 76,
+	T("Разница между светлым и тёмным. Больше — картинка резче, меньше — мягче", "The gap between light and dark. Higher is punchier, lower is softer"))
+Slider(panelPic, "warmth", T("Тепло картинки: холоднее или теплее", "Picture warmth: colder or warmer"), R + 6, -322, nil, nil, nil,
+	T("Меньше 50 — оттенок холодный, синеватый. Больше 50 — тёплый, золотистый", "Below 50 is a cold bluish tint, above 50 a warm golden one"))
 Header(panelRays, T("Пресет лучей", "Rays preset"), L, -230)
 Carousel({
 	keys = { "raysStrength", "rayDefinition", "raysOpen", "raysReach", "sunGlow" },
@@ -1440,6 +1764,7 @@ local function OpenReport()
 			win = GetCVar and GetCVar("gxWindow") or "?", build = tostring(build) .. "/" .. tostring(iface),
 			shot = shotAt,
 		}
+		DB.reportPending = true
 		fr:Hide()
 		-- The game writes saved variables to disk only on logout or a UI reload, and the support helper reads
 		-- the disk: the reload hands the report over at once. The helper tells the outcome in a Windows balloon.
@@ -1454,8 +1779,23 @@ end
 
 
 -- The welcome page buttons, created here so SelfHeal and OpenReport already exist.
-Button(home, T("Самолечение", "Self-heal"), 16, -300, 170, function() SelfHeal() end)
-Button(home, T("Сообщить об ошибке", "Report a bug"), 196, -300, 170, function() OpenReport() end)
+Button(home, T("Самолечение", "Self-heal"), 16, -350, 170, function() SelfHeal() end)
+Button(home, T("Сообщить об ошибке", "Report a bug"), 196, -350, 170, function() OpenReport() end)
+
+-- The support page (1.7.3): players did not find the report behind a button on the welcome page, so it has its own
+-- line in the list of pages, the first one, with one big button.
+local panelSupport = NewPage("LegionGUPanelSupport", "Сообщение в поддержку", "Message to support",
+	"Что-то не так с картинкой или меню? Напишите автору, это пара минут.", "Something wrong with the picture or the menu? Write to the author, it takes a couple of minutes.")
+local supportText = panelSupport:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+supportText:SetPoint("TOPLEFT", 16, -70)
+supportText:SetWidth(600)
+supportText:SetJustifyH("LEFT")
+supportText:SetSpacing(4)
+supportText:SetText(T("Как написать:\n1. Встаньте так, чтобы ошибка была видна на экране.\n2. Нажмите «Написать в поддержку».\n3. Коротко назовите ошибку и опишите, что вы делали.\n4. Нажмите «Приложить снимок», если ошибку видно глазами.\n5. Нажмите «Отправить». Интерфейс перезагрузится на пару секунд.\n\nВерсия игры, настройки GUWOW! и журналы прикладываются сами. Отчёт отправляет программа GU-WOW, она должна быть запущена.\n\nЕсли эффекты пропали совсем, сначала нажмите «Самолечение».",
+	"How to write:\n1. Stand so that the bug is on the screen.\n2. Press «Write to support».\n3. Name the bug in a few words and describe what you were doing.\n4. Press «Attach a shot» if the bug can be seen.\n5. Press «Send». The interface reloads for a couple of seconds.\n\nThe game version, the GUWOW! settings and the logs go with it on their own. The GU-WOW program sends the report, so keep it running.\n\nIf the effects are gone completely, press «Self-heal» first."))
+local supportButton = Button(panelSupport, T("Написать в поддержку", "Write to support"), 16, -300, 260, function() OpenReport() end)
+supportButton:SetHeight(32)
+Button(panelSupport, T("Самолечение", "Self-heal"), 290, -305, 170, function() SelfHeal() end)
 
 -- The extras page.
 local page = CreateFrame("Frame", "LegionGUPanel2", UIParent)
@@ -1650,9 +1990,75 @@ Check(pagePhoto, "orbit", T("Медленный облёт камеры", "Slow 
 Check(pagePhoto, "hideNames", T("Прятать имена над головами", "Hide names above heads"), 16, -96)
 Check(pagePhoto, "cinema", T("Кинорамка", "Cinema bars"), 16, -122)
 Check(pagePhoto, "bokeh", T("Боке огней на размытом фоне", "Bokeh of lights in the blur"), 16, -148)
-Slider(pagePhoto, "photoBlur", T("Сила размытия", "Blur strength"), 336, -146)
+Slider(pagePhoto, "photoBlur", T("Сила размытия", "Blur strength"), 336, -146, nil, nil, nil,
+	T("Насколько размыт фон за персонажем в фоторежиме. 0 — фон резкий", "How blurred the background behind your character is in photo mode. 0 keeps it sharp"))
+Slider(pagePhoto, "playBlur", T("Размытие дали в обычной игре", "Far blur in normal play"), 336, -200, nil, nil, nil,
+	T("Дальний план за персонажем слегка размыт, как в объективе, и глазу спокойнее. Персонаж, всё рядом с ним и интерфейс остаются чёткими. 0 — выключено", "The far land behind your character is a little blurred, as through a lens, easier on the eyes. Your character, everything near and the interface stay sharp. 0 is off"))
 Button(pagePhoto, T("Фоторежим", "Photo mode"), 330, -74, 150, GUWOW_TogglePhoto)
 Button(pagePhoto, T("Чистый снимок", "Clean screenshot"), 330, -102, 150, GUWOW_Screenshot)
+local photoPanelsNote = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+photoPanelsNote:SetPoint("TOPLEFT", 16, -250)
+photoPanelsNote:SetWidth(590)
+photoPanelsNote:SetJustifyH("LEFT")
+photoPanelsNote:SetText(T("Какие панели оставить в фоторежиме и насколько прозрачными, задаётся на странице «Панели», кнопка «Фоторежим».",
+	"Which panels stay in photo mode and how see-through, is set on the «Panels» page, button «Photo mode»."))
+
+-- The photo key right here (1.7.3): the player presses the button, then the key, and the game's own binding is set,
+-- the same one as in Menu → Key Bindings. Esc cancels. A key that had another action loses it, the speech says which.
+local keyLabel = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+keyLabel:SetPoint("TOPLEFT", 16, -196)
+keyLabel:SetWidth(300)
+keyLabel:SetJustifyH("LEFT")
+local function ShowPhotoKey()
+	local k = GetBindingKey and GetBindingKey("GUWOW_PHOTO")
+	keyLabel:SetText(T("Клавиша фоторежима: ", "Photo mode key: ") .. (k and (GetBindingText and GetBindingText(k, "KEY_") or k) or T("не назначена", "none")))
+end
+widgets.photoKey = { Refresh = ShowPhotoKey }
+local catcher = CreateFrame("Button", "LegionGUKeyCatcher", pagePhoto, "UIPanelButtonTemplate")
+catcher:SetWidth(220)
+catcher:SetHeight(22)
+catcher:SetPoint("TOPLEFT", 16, -212)
+catcher:SetText(T("Назначить клавишу фоторежима", "Set the photo mode key"))
+local MODIFIERS = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true, UNKNOWN = true }
+local function StopCatch()
+	catcher:EnableKeyboard(false)
+	catcher:SetScript("OnKeyDown", nil)
+	catcher:SetText(T("Назначить клавишу фоторежима", "Set the photo mode key"))
+end
+catcher:SetScript("OnClick", function(self)
+	if InCombatLockdown() then
+		Say(T("клавиши нельзя менять в бою.", "keys cannot be changed in combat."))
+		return
+	end
+	self:SetText(T("Нажмите клавишу… (Esc — отмена)", "Press a key… (Esc cancels)"))
+	self:EnableKeyboard(true)
+	self:SetScript("OnKeyDown", function(_, key)
+		if MODIFIERS[key] then
+			return
+		end
+		StopCatch()
+		if key == "ESCAPE" then
+			return
+		end
+		local full = (IsAltKeyDown() and "ALT-" or "") .. (IsControlKeyDown() and "CTRL-" or "") .. (IsShiftKeyDown() and "SHIFT-" or "") .. key
+		local old = GetBindingAction and GetBindingAction(full)
+		local was = GetBindingKey and GetBindingKey("GUWOW_PHOTO")
+		if SetBinding(full, "GUWOW_PHOTO") then
+			-- One key for photo mode: the old one is freed only after the new one is set.
+			if was and was ~= full then
+				SetBinding(was)
+			end
+			SaveBindings(GetCurrentBindingSet and GetCurrentBindingSet() or 1)
+			local lost = (old and old ~= "" and old ~= "GUWOW_PHOTO") and (T(" Прежнее действие этой клавиши снято: ", " The key's old action is cleared: ")
+				.. (_G["BINDING_NAME_" .. old] or old) .. ".") or ""
+			Say(T("фоторежим теперь на клавише ", "photo mode is now on ") .. full .. "." .. lost)
+		else
+			Say(T("эту клавишу игра назначить не дала.", "the game did not allow this key."))
+		end
+		ShowPhotoKey()
+	end)
+end)
+catcher:SetScript("OnHide", StopCatch)
 pagePhoto:SetScript("OnShow", function()
 	GrowOptions()
 	Refresh()
@@ -1682,6 +2088,56 @@ Slider(page, "targetFps", T("Держать кадров не ниже", "Keep F
 Slider(page, "mistFlow", T("Движение тумана: дымка плывёт", "Fog motion: the mist drifts"), 336, -320, nil, nil, 81,
 	T("Низовой туман медленно течёт и дышит. 0 — неподвижный туман, как раньше", "The ground mist slowly flows and breathes. 0 keeps it still, as before"))
 
+-- The panels page (1.7.3): how much of each game panel shows, in plain play and in photo mode, 100 whole, 0 gone.
+local panelPanels = NewPage("LegionGUPanelPanels", "Панели", "Panels",
+	"Прозрачная панель работает: клавиши и щелчки по её месту действуют. Чат виден целиком, пока вы пишете.",
+	"A see-through panel works: its keys and clicks on its place still act. The chat shows whole while you type.")
+local panelSliders = { ui_ = {}, photo_ = {} }
+local panelMode = "ui_"
+local modeNote = panelPanels:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+modeNote:SetPoint("TOPLEFT", 330, -74)
+local function ShowPanelMode(mode)
+	panelMode = mode
+	for m, list in pairs(panelSliders) do
+		for _, s in ipairs(list) do
+			if m == mode then
+				s:Show()
+			else
+				s:Hide()
+			end
+		end
+	end
+	modeNote:SetText(mode == "ui_" and T("Сейчас: обычная игра", "Now: plain play") or T("Сейчас: фоторежим", "Now: photo mode"))
+end
+Button(panelPanels, T("Обычная игра", "Plain play"), 16, -70, 150, function()
+	ShowPanelMode("ui_")
+end)
+Button(panelPanels, T("Фоторежим", "Photo mode"), 172, -70, 150, function()
+	ShowPanelMode("photo_")
+end)
+for mode in pairs(panelSliders) do
+	for i, g in ipairs(HIDE_GROUPS) do
+		local s = Slider(panelPanels, mode .. g[1], g[2], i <= 5 and 20 or 340, -120 - ((i - 1) % 5) * 48, 0, 100, nil,
+			mode == "ui_" and T("Сколько видно панели в обычной игре. 100 — целиком, 0 — не видно совсем",
+				"How much of the panel shows in plain play. 100 whole, 0 not at all")
+			or T("Сколько видно панели в фоторежиме. Все панели на 0 — интерфейс прячется целиком",
+				"How much of the panel shows in photo mode. All panels at 0 hide the whole interface"),
+			function()
+				ApplyHide()
+			end)
+		table.insert(panelSliders[mode], s)
+	end
+end
+ShowPanelMode("ui_")
+Check(panelPanels, "panelWake", T("Под мышью панель видна целиком, в бою — панели боя", "A panel shows whole under the mouse, the fight panels in a fight"), 16, -366, ApplyHide)
+Button(panelPanels, T("Показать все панели", "Show all panels"), 16, -400, 200, function()
+	for _, g in ipairs(HIDE_GROUPS) do
+		DB[panelMode .. g[1]] = panelMode == "ui_" and 100 or 0
+	end
+	ApplyHide()
+	Refresh()
+end)
+
 
 page:SetScript("OnShow", function()
 	GrowOptions()
@@ -1691,7 +2147,8 @@ page:SetScript("OnHide", ShrinkOptions)
 page.refresh = Refresh
 guPages[1], guPages[2], guPages[3], guPages[4] = home, panel, page, pagePhoto
 guPages[5], guPages[6], guPages[7], guPages[8] = panelAtmo, panelRays, panelNight, panelPic
-for _, f in ipairs({ panelAtmo, panelRays, panelNight, panelPic }) do
+guPages[9], guPages[10] = panelSupport, panelPanels
+for _, f in ipairs({ panelAtmo, panelRays, panelNight, panelPic, panelSupport, panelPanels }) do
 	f:SetScript("OnShow", function()
 		GrowOptions()
 		Refresh()
@@ -1710,12 +2167,14 @@ home:SetScript("OnHide", ShrinkOptions)
 local category
 if InterfaceOptions_AddCategory then
 	InterfaceOptions_AddCategory(home)
+	InterfaceOptions_AddCategory(panelSupport)
 	InterfaceOptions_AddCategory(panel)
 	InterfaceOptions_AddCategory(panelAtmo)
 	InterfaceOptions_AddCategory(panelRays)
 	InterfaceOptions_AddCategory(panelNight)
 	InterfaceOptions_AddCategory(panelPic)
 	InterfaceOptions_AddCategory(page)
+	InterfaceOptions_AddCategory(panelPanels)
 	InterfaceOptions_AddCategory(pagePhoto)
 elseif Settings and Settings.RegisterCanvasLayoutCategory then
 	category = Settings.RegisterCanvasLayoutCategory(home, home.name)
@@ -1753,11 +2212,12 @@ SlashCmdList["LEGIONGU"] = function(msg)
 		StaticPopup_Show("GUWOW_NEWS")
 	elseif msg == "fix" or msg == "лечение" then
 		SelfHeal()
-	elseif msg == "report" or msg == "ошибка" then
+	elseif msg == "report" or msg == "ошибка" or msg == "support" or msg == "поддержка" then
 		OpenReport()
-	elseif msg == "help" or msg == "помощь" then
-		Say(T("/gu меню · /gu photo фоторежим · /gu shot чистый снимок · /gu check проверка глубины · /gu fix самолечение · /gu report сообщить об ошибке · /gu news что нового",
-			"/gu menu · /gu photo photo mode · /gu shot clean screenshot · /gu check depth check · /gu fix self-heal · /gu report a bug · /gu news what is new"))
+	elseif msg ~= "" and msg ~= "menu" and msg ~= "меню" then
+		-- «help» and any word the addon does not know: the list, so a mistyped command still shows the way.
+		Say(T("/gu меню · /gu photo фоторежим · /gu shot чистый снимок · /gu check проверка глубины · /gu fix самолечение · /gu report написать в поддержку · /gu news что нового",
+			"/gu menu · /gu photo photo mode · /gu shot clean screenshot · /gu check depth check · /gu fix self-heal · /gu report write to support · /gu news what is new"))
 	else
 		OpenPanel()
 	end
@@ -1810,6 +2270,8 @@ mm:SetScript("OnClick", function(self, button)
 		GUWOW_ToggleMod()
 	elseif button == "MiddleButton" or IsShiftKeyDown() then
 		GUWOW_TogglePhoto()
+	elseif IsControlKeyDown() then
+		OpenReport()
 	else
 		OpenPanel()
 	end
@@ -1820,6 +2282,7 @@ mm:SetScript("OnEnter", function(self)
 	GameTooltip:AddLine(T("Левая кнопка: меню", "Left click: menu"), 1, 1, 1)
 	GameTooltip:AddLine(T("Правая кнопка: включить или выключить", "Right click: on or off"), 1, 1, 1)
 	GameTooltip:AddLine(T("Shift + левая или средняя: фоторежим", "Shift + left or middle click: photo mode"), 1, 1, 1)
+	GameTooltip:AddLine(T("Ctrl + левая: написать в поддержку", "Ctrl + left click: write to support"), 0.4, 1, 0.4)
 	GameTooltip:Show()
 end)
 mm:SetScript("OnLeave", function()
@@ -1831,8 +2294,19 @@ end)
 -- ---------------------------------------------------------------------------------------------------------------
 
 local ticker = CreateFrame("Frame")
-local elapsed, slowFor, fastFor = 0, 0, 0
+local elapsed, slowFor, fastFor, panelWait = 0, 0, 0, 0
 ticker:SetScript("OnUpdate", function(self, dt)
+	-- The panels' goals ten times a second: the mouse comes and goes without an event, the raid frames appear only in
+	-- a raid, and the minimap waits for the end of a fight. The fade itself runs every frame, a steady panel costs
+	-- nothing.
+	panelWait = panelWait - dt
+	if DB and panelWait <= 0 then
+		panelWait = 0.1
+		PanelGoals()
+		PanelFade(dt, true)
+	elseif DB then
+		PanelFade(dt, false)
+	end
 	elapsed = elapsed + dt
 	if elapsed < 0.25 or not DB then
 		return
@@ -1874,6 +2348,7 @@ if WorldMapFrame then
 end
 
 local events = CreateFrame("Frame")
+local greeted
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("ZONE_CHANGED_NEW_AREA")
@@ -1909,6 +2384,15 @@ events:SetScript("OnEvent", function(self, event, arg1)
 		end
 		-- The three slots of 1.5.0 become the first presets, so nothing saved in them is lost.
 		DB.presets = DB.presets or {}
+		-- The ticked panels of the first 1.7.3 builds become panels at 0.
+		if type(DB.hide) == "table" then
+			for k, v in pairs(DB.hide) do
+				if v == true and DEFAULTS["ui_" .. k] then
+					DB["ui_" .. k] = 0
+				end
+			end
+		end
+		DB.hide = nil
 		-- The player's own preset slots (1.7.0, 1.7.1): a broken save is dropped, not clamped, it is one button to remake.
 		local SLOT_KEYS = { lookMy = { "bright", "contrast", "satur", "warmth" },
 			raysMy = { "raysStrength", "rayDefinition", "raysOpen", "raysReach", "sunGlow" } }
@@ -1937,6 +2421,7 @@ events:SetScript("OnEvent", function(self, event, arg1)
 		UpdateZone()
 	end
 	if event == "PLAYER_ENTERING_WORLD" then
+		ApplyHide()
 		-- The chat shade, when it is on: the game keeps the alpha per window, this only reasserts the choice.
 		-- A moment later too: the chat settings cache can land after this event and overwrite the alpha.
 		if DB.chatBack then
@@ -1953,6 +2438,22 @@ events:SetScript("OnEvent", function(self, event, arg1)
 		After(6, function()
 			StaticPopup_Show("GUWOW_NEWS")
 		end)
+	end
+	-- Once a session, the way to support in the chat: players of the old clients did not find it in the menu.
+	if event == "PLAYER_ENTERING_WORLD" and not greeted then
+		greeted = true
+		Say(T("меню: /gu или кнопка у миникарты. Написать в поддержку: /gu report или Ctrl + щелчок по кнопке у миникарты.",
+			"menu: /gu or the minimap button. Write to support: /gu report or Ctrl + click on the minimap button."))
+		-- WotLK 3.3.5: GU-WOW.addon32 finds the interface by the full screen glow's own pass. With the glow off the
+		-- effects run over the finished picture, windows too (1.7.3). The player hears it at once, in the game.
+		local major = tonumber(string.match(GetBuildInfo() or "", "^(%d+)")) or 7
+		if major < 4 and GetCVar("ffxGlow") == "0" then
+			StaticPopup_Show("GUWOW_GLOW")
+		end
+		if DB.reportPending then
+			DB.reportPending = nil
+			StaticPopup_Show("GUWOW_SENT")
+		end
 	end
 	Layout()
 	Paint()

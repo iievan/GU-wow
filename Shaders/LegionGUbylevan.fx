@@ -198,8 +198,19 @@
 #define LEGIONGU_CTL_CHAT_T 36
 #define LEGIONGU_CTL_CHAT_R 37
 #define LEGIONGU_CTL_CHAT_B 38
+#define LEGIONGU_CTL_LIGHT_THR 39 // which bright spots count as a light at night, 50 as before (1.7.3)
+#define LEGIONGU_CTL_LIGHT_R 40  // how far a light's glow spreads, 50 as before (1.7.3)
+#define LEGIONGU_CTL_MOTION_BLUR 41 // the smear along a camera turn, 0 off (1.7.3)
+#define LEGIONGU_CTL_PLAY_BLUR 42 // the far land softly blurred in normal play, 0 off (1.7.3)
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 81    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 89    // black, white, the signature, two cells per setting, two for the checksum
+#if __RENDERER__ < 0xa000
+// Direct3D 9 (1.12, 3.3.5): the addons lay a cell out as 3 interface units, and the screen is 768 units high
+// whatever its pixels, so a cell is BUFFER_HEIGHT / 256 pixels. The addons cannot know the pixels of a maximized
+// window (the title bar and the taskbar take their share): a strip of 4 pixels for a guessed height drifted off the
+// cells there, and the effects never started.
+#define LEGIONGU_CTL_PITCH (float(BUFFER_HEIGHT) / 256.0)
+#endif
 
 // 1: the effects run only while the addon's strip is seen, that is in the game world. The login and character screens
 // and the loading screens have their own scenes the effects are not made for. The installer sets 0 for clients
@@ -208,7 +219,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 41; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 43; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -244,7 +255,7 @@ bool LegionGUInStrip(float2 p)
 {
 #if __RENDERER__ < 0xa000
 	// Direct3D 9: both strip rows, and the interface.
-	if (p.y < float(2 * LEGIONGU_CTL_CELL) && p.x < float((p.y < float(LEGIONGU_CTL_CELL) ? LEGIONGU_CTL_CELLS : LEGIONGU_UI_CELLS) * LEGIONGU_CTL_CELL))
+	if (p.y < 2.0 * LEGIONGU_CTL_PITCH && p.x < float(p.y < LEGIONGU_CTL_PITCH ? LEGIONGU_CTL_CELLS : LEGIONGU_UI_CELLS) * LEGIONGU_CTL_PITCH)
 		return true;
 	return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 #else
@@ -3010,12 +3021,16 @@ namespace LegionGU
 	static const float BRIDGE_GAP = 0.3;    // smallest step between black and white in each channel
 	static const float BRIDGE_HOLD = 2.0;   // seconds the last values stay after the strip is gone
 
-	texture2D BridgePrevTex { Width = 41; Height = 1; Format = RGBA32F; };
+	texture2D BridgePrevTex { Width = 43; Height = 1; Format = RGBA32F; };
 	sampler2D BridgePrev { Texture = BridgePrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 	float3 BridgeCell(int i)
 	{
+#if __RENDERER__ < 0xa000
+		return tex2Dfetch(ColorPoint, int2((float(i) + 0.5) * LEGIONGU_CTL_PITCH, 0.5 * LEGIONGU_CTL_PITCH)).rgb;
+#else
 		return tex2Dfetch(ColorPoint, int2(i * LEGIONGU_CTL_CELL + LEGIONGU_CTL_CELL / 2, LEGIONGU_CTL_CELL / 2)).rgb;
+#endif
 	}
 
 	// The 3 bits of cell i against the per-channel thresholds th.
@@ -3059,7 +3074,7 @@ namespace LegionGU
 			bool live = seen || (prev0.x > 0.5 && since <= BRIDGE_HOLD);
 			return float4(live ? 1.0 : 0.0, since, seen ? 1.0 : 0.0, 1.0);
 		}
-		if (seen && texel <= 40)
+		if (seen && texel <= 42)
 			return float4(BridgeValue(1 + 2 * texel, th) / 63.0, 0.0, 0.0, 1.0);
 		return tex2Dfetch(BridgePrev, int2(texel, 0));
 	}
@@ -3073,7 +3088,7 @@ namespace LegionGU
 	void BridgeHideVS(uint id : SV_VertexID, out float4 pos : SV_Position, out float2 uv : TEXCOORD0)
 	{
 #if __RENDERER__ < 0xa000
-		float2 size = float2(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL, 2 * LEGIONGU_CTL_CELL) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+		float2 size = float2(LEGIONGU_UI_CELLS, 2.0) * LEGIONGU_CTL_PITCH * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 #else
 		float2 size = float2(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL, LEGIONGU_CTL_CELL) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 #endif
@@ -3085,12 +3100,12 @@ namespace LegionGU
 	{
 #if __RENDERER__ < 0xa000
 		// Direct3D 9: row 0 as below, row 1 once it was read, each with the pixel row under the strip.
-		bool row0 = pos.y < float(LEGIONGU_CTL_CELL) && pos.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL);
-		bool row1 = pos.y >= float(LEGIONGU_CTL_CELL) && pos.y < float(2 * LEGIONGU_CTL_CELL)
-			&& pos.x < float(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL) && tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5;
+		bool row0 = pos.y < LEGIONGU_CTL_PITCH && pos.x < float(LEGIONGU_CTL_CELLS) * LEGIONGU_CTL_PITCH;
+		bool row1 = pos.y >= LEGIONGU_CTL_PITCH && pos.y < 2.0 * LEGIONGU_CTL_PITCH
+			&& pos.x < float(LEGIONGU_UI_CELLS) * LEGIONGU_CTL_PITCH && tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5;
 		if (tex2Dfetch(LegionGUCtl, int2(0, 0)).z < 0.5 || !(row0 || row1))
 			discard;
-		return tex2Dfetch(ColorPoint, int2(int(pos.x), 2 * LEGIONGU_CTL_CELL + 1));
+		return tex2Dfetch(ColorPoint, int2(int(pos.x), int(2.0 * LEGIONGU_CTL_PITCH) + 1));
 #else
 		if (tex2Dfetch(LegionGUCtl, int2(0, 0)).z < 0.5 || !LegionGUInStrip(pos.xy))
 			discard;
@@ -3104,7 +3119,7 @@ namespace LegionGU
 	// coordinates modulo 64. The thresholds are row 0's.
 	float BridgeUIBits(int i, float3 th)
 	{
-		float3 b = step(th, tex2Dfetch(ColorPoint, int2(i * LEGIONGU_CTL_CELL + LEGIONGU_CTL_CELL / 2, LEGIONGU_CTL_CELL + LEGIONGU_CTL_CELL / 2)).rgb);
+		float3 b = step(th, tex2Dfetch(ColorPoint, int2((float(i) + 0.5) * LEGIONGU_CTL_PITCH, 1.5 * LEGIONGU_CTL_PITCH)).rgb);
 		return b.r * 4.0 + b.g * 2.0 + b.b;
 	}
 

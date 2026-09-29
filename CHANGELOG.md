@@ -1,5 +1,57 @@
 # GUWOW! (в разработке GU-WOW): история версий / Version history
 
+## 1.7.3-release «Мягкий свет» / "Soft Light"
+
+Одна сборка для всех клиентов: Legion 7.3.5 (внутри меню это публичная бета 1.1), WotLK 3.3.5 и Classic 1.12.
+
+### Русский
+
+**Новое**
+- Простое скачивание: в архиве один `GU-WOW.exe` и лицензии. Всё остальное установщик несёт в себе.
+- Стандартная картинка «Levan Soft»: нейтральная и мягкая, подобрана автором в живой игре. Прежний стандарт остался готовым фильтром «Deep Atmosphere».
+- Восемь новых готовых фильтров: Deep Atmosphere, Vivid Adventure, Moonlight, Misty Dawn, Pure Game, Northern Frost, Warm Night Lamps, Soft Watercolor.
+- Страница «Панели»: у каждой панели интерфейса свой ползунок прозрачности, отдельно для обычной игры и для фоторежима. 100 — панель видна целиком, 0 — панели нет.
+- Полупрозрачная панель плавно проявляется, когда на неё наводишь мышь, и так же плавно гаснет, когда уводишь. В бою панели заклинаний, портреты, группа и полоса заклинания проявляются целиком сами.
+- Мягкое размытие дали в обычной игре: ползунок «Размытие дали в обычной игре» на странице «Фоторежим». Персонаж, ближние деревья и окна игры остаются резкими. По умолчанию выключено.
+- Размытие при движении на странице «Картинка»: картинка смазывается только на быстром повороте камеры. Персонаж и маунт, даже летающий, остаются чёткими и не дрожат. По умолчанию выключено.
+- Две новые ручки на странице «Ночь»: «Что считать огнём» и «Радиус свечения». 50 у обеих даёт привычный вид.
+- Клавиша фоторежима назначается прямо на странице «Фоторежим»: нажмите кнопку, затем нужную клавишу.
+- Своя страница «Сообщение в поддержку» во всех клиентах. Ctrl + щелчок по кнопке у миникарты открывает её сразу. После отправки игра говорит, что сообщение ушло. Снимок экрана прикладывается и в Turtle WoW.
+- У каждого ползунка подсказка простыми словами.
+
+**Исправлено**
+- Ночное небо чистое, без полос. Мерцают только звёзды.
+- 1.12 и 3.3.5 в развёрнутом окне: эффекты работают, полосы квадратиков в углу нет.
+- 3.3.5: эффекты ложатся по живой картинке. Нет полупрозрачных силуэтов гор и деревьев после открытия карты на бегу и после рывка при сборе добычи.
+- В фоторежиме значки у миникарты прячутся вместе с ней.
+
+**Важно для 1.12 и 3.3.5**
+- Если в настройках графики выключено полноэкранное свечение, игра сразу скажет об этом и предложит включить его одной кнопкой. Без свечения туман ложится и на окна игры, вокруг них видны тёмные рамки.
+
+### English
+
+**New**
+- A simpler download: the archive holds one `GU-WOW.exe` and the licences. The installer carries everything else inside.
+- The standard look "Levan Soft": neutral and soft, picked by the author in the live game. The old standard stays as the ready filter "Deep Atmosphere".
+- Eight new ready filters: Deep Atmosphere, Vivid Adventure, Moonlight, Misty Dawn, Pure Game, Northern Frost, Warm Night Lamps, Soft Watercolor.
+- The Panels page: each interface panel has its own transparency slider, one for normal play and one for photo mode. 100 shows the panel whole, 0 hides it.
+- A semi-transparent panel fades in smoothly when the mouse is over it and fades out just as smoothly when the mouse leaves. In a fight the action bars, portraits, party and cast bar fade in whole on their own.
+- A soft far blur in normal play: the slider "Far blur in normal play" on the Photo mode page. The character, near trees and the game's windows stay sharp. Off by default.
+- Motion blur on the Picture page: the picture smears only on a fast camera turn. The character and the mount, a flying one too, stay crisp and do not shake. Off by default.
+- Two new dials on the Night page: "What counts as a light" and "Glow radius". 50 on both gives the familiar look.
+- The photo mode key is set right on the Photo mode page: press the button, then the key you want.
+- A "Message to support" page of its own on every client. Ctrl + click on the minimap button opens it at once. After sending, the game says the message is gone. The screenshot goes along on Turtle WoW too.
+- Every slider has a tip in plain words.
+
+**Fixed**
+- The night sky is clean, with no bands. Only the stars twinkle.
+- 1.12 and 3.3.5 in a maximized window: the effects work, and there is no strip of squares in the corner.
+- 3.3.5: the effects follow the live picture. No see-through ghosts of hills and trees after opening the map on the run or after a hitch while looting.
+- In photo mode the minimap icons hide together with the minimap.
+
+**Good to know for 1.12 and 3.3.5**
+- If the full screen glow is off in the video settings, the game says so at once and offers to turn it on with one button. Without the glow the fog covers the game's windows too, and dark frames show round them.
+
 ## 1.7.2-release «Адаптация 1.12 · Живой огонь» / "1.12 adaptation · Living Flame"
 
 ### Русский

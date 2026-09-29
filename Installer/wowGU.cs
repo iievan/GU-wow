@@ -23,9 +23,9 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("GU-WOW: fog, sun rays, night and picture for World of Warcraft. Installer and support helper.")]
 [assembly: AssemblyCompany("levan")]
 [assembly: AssemblyCopyright("© 2026 levan")]
-[assembly: AssemblyVersion("1.7.2")]
-[assembly: AssemblyFileVersion("1.7.2")]
-[assembly: AssemblyInformationalVersion("1.7.2-release")]
+[assembly: AssemblyVersion("1.7.3")]
+[assembly: AssemblyFileVersion("1.7.3")]
+[assembly: AssemblyInformationalVersion("1.7.3-release")]
 
 class ShotForm : Form
 {
@@ -35,7 +35,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.7.2-release";
+	const string Version = "1.7.3-release";
 	static readonly bool RU = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru";
 	static string T(string ru, string en) { return RU ? ru : en; }
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
@@ -288,9 +288,10 @@ static class WowGU
 		catch { return false; }
 	}
 
-	// The report's screenshot: the newest JPEG in the game's Screenshots folder taken within a couple of minutes
+	// The report's screenshot: the newest shot in the game's Screenshots folder taken within a couple of minutes
 	// of the remembered moment. It goes into the repo as reports/<stamp>.jpg through the contents API (the issues
-	// API cannot attach files); the raw URL then shows inline in the issue. Capped at 3 MB.
+	// API cannot attach files); the raw URL then shows inline in the issue. Capped at 3 MB. Turtle writes a TGA
+	// whatever the format setting says (1.7.3: 19.8 MB at 3440x1440), so a TGA or a large JPEG is encoded anew.
 	static string UploadShot(string shotWhen)
 	{
 		try
@@ -299,10 +300,13 @@ static class WowGU
 			if (!DateTime.TryParseExact(shotWhen, "yyyy-MM-dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None, out at)) return null;
 			var dir = Path.Combine(current.Dir, "Screenshots");
 			if (!Directory.Exists(dir)) return null;
-			var shot = new DirectoryInfo(dir).GetFiles("*.jpg")
-				.Where(f => Math.Abs((f.LastWriteTime - at).TotalSeconds) < 150)
+			var shot = new DirectoryInfo(dir).GetFiles()
+				.Where(f => (f.Extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) || f.Extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+					&& Math.Abs((f.LastWriteTime - at).TotalSeconds) < 150)
 				.OrderByDescending(f => f.LastWriteTime).FirstOrDefault();
-			if (shot == null || shot.Length > 3 * 1024 * 1024) return null;
+			if (shot == null) return null;
+			var bytes = ShotJpeg(shot.FullName);
+			if (bytes == null) return null;
 			var tokenFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"GU-WOW\github_token.txt");
 			var token = File.Exists(tokenFile) ? File.ReadAllText(tokenFile).Trim() : ReportToken();
 			if (token.Length < 10) return null;
@@ -313,12 +317,75 @@ static class WowGU
 				w.Headers.Add("Authorization", "token " + token);
 				w.Headers.Add("Accept", "application/vnd.github+json");
 				w.Encoding = Encoding.UTF8;
-				var json = "{\"message\":\"report screenshot\",\"content\":\"" + Convert.ToBase64String(File.ReadAllBytes(shot.FullName)) + "\"}";
+				var json = "{\"message\":\"report screenshot\",\"content\":\"" + Convert.ToBase64String(bytes) + "\"}";
 				w.UploadString("https://api.github.com/repos/iievan/GU-wow/contents/" + name, "PUT", json);
 			}
 			return "https://raw.githubusercontent.com/iievan/GU-wow/main/" + name;
 		}
 		catch { return null; }
+	}
+
+	// The shot as a JPEG of at most 3 MB: a small JPEG goes as it is, anything else is encoded at quality 85 and
+	// halved in size until it fits.
+	static byte[] ShotJpeg(string path)
+	{
+		const int cap = 3 * 1024 * 1024;
+		bool tga = path.EndsWith(".tga", StringComparison.OrdinalIgnoreCase);
+		if (!tga && new FileInfo(path).Length <= cap) return File.ReadAllBytes(path);
+		Bitmap src = tga ? ReadTga(path) : new Bitmap(path);
+		if (src == null) return null;
+		using (src)
+		{
+			var codec = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders().First(c => c.MimeType == "image/jpeg");
+			var args = new System.Drawing.Imaging.EncoderParameters(1);
+			args.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 85L);
+			for (int w = src.Width, h = src.Height; w >= 320; w /= 2, h /= 2)
+			{
+				using (var b = new Bitmap(src, w, h))
+				using (var m = new MemoryStream())
+				{
+					b.Save(m, codec, args);
+					if (m.Length <= cap) return m.ToArray();
+				}
+			}
+			return null;
+		}
+	}
+
+	// A TGA as the old clients write it: true colour, 24 or 32 bits, plain or run length packed, either row order.
+	static Bitmap ReadTga(string path)
+	{
+		var d = File.ReadAllBytes(path);
+		if (d.Length < 18) return null;
+		int type = d[2], w = d[12] | d[13] << 8, h = d[14] | d[15] << 8, bpp = d[16] / 8;
+		bool top = (d[17] & 0x20) != 0;
+		if ((type != 2 && type != 10) || (bpp != 3 && bpp != 4) || w == 0 || h == 0) return null;
+		var px = new byte[w * h * bpp];
+		int at = 18 + d[0], o = 0;
+		if (type == 2) Buffer.BlockCopy(d, at, px, 0, Math.Min(px.Length, d.Length - at));
+		else
+			while (o < px.Length && at < d.Length)
+			{
+				int head = d[at++], n = (head & 0x7F) + 1;
+				if ((head & 0x80) != 0)
+				{
+					for (int i = 0; i < n && o < px.Length; i++, o += bpp) Buffer.BlockCopy(d, at, px, o, bpp);
+					at += bpp;
+				}
+				else
+				{
+					int len = Math.Min(n * bpp, px.Length - o);
+					Buffer.BlockCopy(d, at, px, o, len);
+					at += n * bpp;
+					o += len;
+				}
+			}
+		var bmp = new Bitmap(w, h, bpp == 4 ? System.Drawing.Imaging.PixelFormat.Format32bppRgb : System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+		var bits = bmp.LockBits(new Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.WriteOnly, bmp.PixelFormat);
+		for (int y = 0; y < h; y++)
+			Marshal.Copy(px, (top ? y : h - 1 - y) * w * bpp, bits.Scan0 + y * bits.Stride, w * bpp);
+		bmp.UnlockBits(bits);
+		return bmp;
 	}
 
 	static string Js(string v)
@@ -616,6 +683,8 @@ static class WowGU
 		// 2. Effects, textures, the in-game panel. Classic 1.12 runs Lua 5.0 and gets its own addon (c~), with the
 		// same key bindings; TBC 2.4.3 has none yet.
 		bool classic = current.Major == 1;
+		// The DirectX 9 clients, 1.12 and 3.3.5 (32 bit): the same depth range, the same glow pass, the same module.
+		bool dx9 = (current.Major == 1 || current.Major == 3) && !current.X64 && current.Api == "d3d9";
 		foreach (var name in Assembly.GetExecutingAssembly().GetManifestResourceNames())
 		{
 			if (!name.StartsWith("p~") && !(classic && name.StartsWith("c~"))) continue;
@@ -655,9 +724,9 @@ static class WowGU
 			marker["rest"] = "1";
 			Say(T("Интерфейс остаётся чистым: туман и солнце его не трогают.", "The interface stays clean: fog and sun do not touch it."));
 		}
-		// Classic 1.12 on DirectX 9: GU-WOW.addon32 runs the effects before the interface is drawn. Without it (or
-		// on the frames it does not catch) the addon reports the windows and bars, and the effects leave them alone.
-		else if (classic && !current.X64 && current.Api == "d3d9")
+		// 1.12 and 3.3.5 on DirectX 9: GU-WOW.addon32 runs the effects before the interface is drawn. Without it (or
+		// on the frames it does not catch) the 1.12 addon reports the windows and bars, and the effects leave them alone.
+		else if (dx9)
 		{
 			File.WriteAllBytes(G("GU-WOW.addon32"), Resource("a~GU-WOW.addon32"));
 			marker["addon32"] = "1";
@@ -667,7 +736,7 @@ static class WowGU
 				Say(T("В настройках графики выключено полноэкранное свечение. Включите его, иначе туман ляжет и на окна игры.", "The full screen glow is off in the video settings. Turn it on, or the fog covers the game's windows too."));
 		}
 		else if (classic) Say(T("Интерфейс остаётся чистым: аддон сообщает эффектам, где окна и панели.", "The interface stays clean: the addon tells the effects where the windows and bars are."));
-		else Say(T("Для этого клиента туман ложится и на интерфейс: чистый интерфейс пока есть только для Legion 7.3.5 и Classic 1.12.", "On this client the fog covers the interface too: a clean interface is currently only available for Legion 7.3.5 and Classic 1.12."));
+		else Say(T("Для этого клиента туман ложится и на интерфейс: чистый интерфейс пока есть только для Legion 7.3.5, WotLK 3.3.5 и Classic 1.12.", "On this client the fog covers the interface too: a clean interface is currently only available for Legion 7.3.5, WotLK 3.3.5 and Classic 1.12."));
 
 		// 4. ReShade.ini: paths, the preset, the keys, the depth buffer.
 		var rs = G("ReShade.ini");
@@ -723,11 +792,14 @@ static class WowGU
 				IniSet(rs, "GENERAL", "PreprocessorDefinitions", defs.Replace("LEGIONGU_NEED_PANEL=0", need).Replace("LEGIONGU_NEED_PANEL=1", need), true);
 			else if (!defs.Contains("LEGIONGU_NEED_PANEL"))
 				IniSet(rs, "GENERAL", "PreprocessorDefinitions", (defs.Length > 0 ? defs + "," : "") + need, true);
-			// The 1.12 client draws the world into depth 0..0.94 and the sky at 1: read as it is, everything lies a
-			// few yards off and the fog never shows. The multiplier stretches 0.94 to 1.
-			defs = IniGet(rs, "GENERAL", "PreprocessorDefinitions") ?? "";
-			if (classic && !defs.Contains("RESHADE_DEPTH_MULTIPLIER"))
-				IniSet(rs, "GENERAL", "PreprocessorDefinitions", defs + ",RESHADE_DEPTH_MULTIPLIER=1.0638298", true);
+		}
+		// The 1.12 and 3.3.5 clients draw the world into depth 0..0.94 and the sky at 1: read as it is, everything
+		// lies a few yards off, the fog never shows and the lights take mobs for lamps. The multiplier stretches 0.94 to 1.
+		if (dx9)
+		{
+			var defs = IniGet(rs, "GENERAL", "PreprocessorDefinitions") ?? "";
+			if (!defs.Contains("RESHADE_DEPTH_MULTIPLIER"))
+				IniSet(rs, "GENERAL", "PreprocessorDefinitions", (defs.Length > 0 ? defs + "," : "") + "RESHADE_DEPTH_MULTIPLIER=1.0638298", true);
 		}
 		if (Legion)
 		{
@@ -739,8 +811,9 @@ static class WowGU
 			Say(T("Буфер глубины: ", "Depth buffer: ") + size.Width + "x" + size.Height + T(". Если поменяете разрешение или масштаб отрисовки, запустите GU-WOW снова.", ". If you change the resolution or the render scale, run GU-WOW again."));
 		}
 		// The 1.12 client never clears its depth buffer, so a copy taken at the clears is never made and the effects
-		// see an empty buffer (ReShade: "No clear operations were found for the selected depth buffer").
-		else if (classic)
+		// see an empty buffer (ReShade: "No clear operations were found for the selected depth buffer"). 3.3.5 clears
+		// it before the last part of the interface, and a copy from there holds no world either.
+		else if (dx9)
 			IniSet(rs, "DEPTH", "DepthCopyBeforeClears", "0", true);
 
 		// 5. Config.wtf: MSAA off, the effects need the depth buffer.
@@ -804,6 +877,9 @@ static class WowGU
 		if (IniGet(rs, "INPUT", "KeyEffects") == "122,0,0,0") done += T(" F11 включает и выключает весь мод.", " F11 turns the whole mod on and off.");
 		if (IniGet(rs, "INPUT", "KeyOverlay") == OverlayKey) done += T(" F5 открывает окно ReShade.", " F5 opens the ReShade window.");
 		Say(done);
+		// Players of the old clients kept asking how to reach support: the way is told at the end of every install.
+		Say(T("Что-то не так? Нажмите «Сообщить об ошибке» в этом окне, игра для этого не нужна. В игре: " + (classic ? "/guwow report" : "/gu report") + " или Ctrl + щелчок по кнопке у миникарты.",
+			"Something wrong? Press «Report a problem» in this window, no game needed. In the game: " + (classic ? "/guwow report" : "/gu report") + " or Ctrl + click on the minimap button."));
 	}
 
 	static void Uninstall()

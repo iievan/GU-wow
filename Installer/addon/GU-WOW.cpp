@@ -1,23 +1,24 @@
-// GU-WOW for the 1.12 client (Direct3D 9): runs the effects before the interface is drawn, so the fog, the rays,
-// the night and the picture lie under the game's windows and never over them.
+// GU-WOW for the Direct3D 9 clients (1.12 and 3.3.5): runs the effects before the interface is drawn, so the fog, the
+// rays, the night and the picture lie under the game's windows and never over them.
 //
-// The client with the full screen glow draws the world into a texture of its own, blurs it at a quarter of the
-// screen and draws it onto the back buffer in one quad; the interface follows on the back buffer. The effects run
-// right before the first draw after that quad. The panel's strip is part of the interface, so LegionGUBridge,
+// The client with the full screen glow blurs the world at a quarter of the screen and lays the glow over it in one
+// quad onto the back buffer: no lighting, no blending, the whole screen, the fixed function vertex format 0x242. The
+// interface follows on the back buffer. The effects run right before the first draw after that quad. 1.12 draws the
+// world into a texture of its own and 3.3.5 straight onto the back buffer, so the quad is the one mark both share
+// (the probes of 28.09); a count of the draws before it held for 1.12 only. The minimap of 3.3.5 is the same format,
+// yet blended and in a corner, so it never passes. The panel's strip is part of the interface, so LegionGUBridge,
 // which reads it, runs once more at the end of the frame over the finished picture; the effects of the next frame
 // take the settings from there, one frame late. A frame without that quad (the glow off, the login screen) keeps
 // ReShade's own order: every effect at the end of the frame, around the interface rectangles the addon reports.
 #include <reshade.hpp>
+#include <d3d9.h>
 
 using namespace reshade::api;
 
-// Draws into other targets before the world counts as drawn: the world takes some fifty, the glow three.
-static const unsigned WORLD_DRAWS = 8;
 
 static effect_runtime *runtime = nullptr;
 static effect_technique bridge = {};
 static bool onBack = false;
-static unsigned offDraws = 0;
 static bool copied = false;
 static bool rendered = false;
 
@@ -49,21 +50,36 @@ static void OnBindTargets(command_list *, uint32_t count, const resource_view *r
 	onBack = runtime != nullptr && count > 0 && (rtvs[0].handle & ~1ull) == runtime->get_current_back_buffer().handle;
 }
 
+// The glow quad: the format 0x242 (position, colour, two texture sets), no blending, the viewport over the whole
+// target.
+static bool IsGlowQuad(command_list *cmd_list)
+{
+	auto dev = reinterpret_cast<IDirect3DDevice9 *>(cmd_list->get_device()->get_native());
+	DWORD fvf = 0, blend = 1;
+	dev->GetFVF(&fvf);
+	if (fvf != (D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX2))
+		return false;
+	dev->GetRenderState(D3DRS_ALPHABLENDENABLE, &blend);
+	if (blend != 0)
+		return false;
+	D3DVIEWPORT9 vp = {};
+	dev->GetViewport(&vp);
+	IDirect3DSurface9 *rt = nullptr;
+	if (FAILED(dev->GetRenderTarget(0, &rt)) || rt == nullptr)
+		return false;
+	D3DSURFACE_DESC rd = {};
+	rt->GetDesc(&rd);
+	rt->Release();
+	return vp.X == 0 && vp.Y == 0 && vp.Width == rd.Width && vp.Height == rd.Height;
+}
+
 static void BeforeDraw(command_list *cmd_list)
 {
-	if (runtime == nullptr || rendered)
-		return;
-	if (!onBack)
-	{
-		offDraws++;
-		return;
-	}
-	if (offDraws < WORLD_DRAWS)
+	if (runtime == nullptr || rendered || !onBack)
 		return;
 	if (!copied)
 	{
-		// This draw is the world onto the back buffer.
-		copied = true;
+		copied = IsGlowQuad(cmd_list);
 		return;
 	}
 	rendered = true;
@@ -92,13 +108,12 @@ static void OnPresent(command_queue *queue, swapchain *, const rect *, const rec
 		const resource_view rtv = BackBufferView();
 		runtime->render_technique(bridge, queue->get_immediate_command_list(), rtv, rtv);
 	}
-	offDraws = 0;
 	copied = false;
 	rendered = false;
 }
 
 extern "C" __declspec(dllexport) const char *NAME = "GU-WOW";
-extern "C" __declspec(dllexport) const char *DESCRIPTION = "Runs the GU-WOW effects under the game's interface in the 1.12 client.";
+extern "C" __declspec(dllexport) const char *DESCRIPTION = "Runs the GU-WOW effects under the game's interface in the 1.12 and 3.3.5 clients.";
 
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID)
 {
