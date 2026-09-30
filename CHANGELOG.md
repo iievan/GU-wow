@@ -1,5 +1,29 @@
 # GUWOW! (в разработке GU-WOW): история версий / Version history
 
+## 1.7.6-release «Мягкий свет» / "Soft Light"
+
+### Русский
+
+**Новое**
+- Игровой фоторежим: интерфейс прячется, а игра идёт дальше, в том числе в бою. Какие панели остаются, игрок выбирает сам на странице «Панели», по умолчанию остаётся только чат. Вид на выбор: обычная картинка или размытие фона с кинорамкой. Включается командой `/gu game`, Alt + щелчок по кнопке у миникарты, а в Legion ещё своей клавишей.
+
+**Исправлено**
+- Туман у ног лежит вокруг персонажа, по щиколотку. Полосы тумана в середине экрана нет.
+- Legion: карта не выключает фоторежим.
+- После закрытия карты на экране нет полупрозрачного призрака прошлого кадра.
+- В пещерах и подземельях окно чата не светится светлым прямоугольником.
+
+### English
+
+**New**
+- Play photo mode: the interface hides and the game goes on, in a fight too. The player picks the panels that stay on the Panels page; by default only the chat stays. Two looks to choose from: the plain picture, or the background blur with cinema bars. Turn it on with `/gu game`, Alt + click on the minimap button, and in Legion with its own key.
+
+**Fixed**
+- The mist at the feet lies around the character, ankle-deep. There is no band of mist in the middle of the screen.
+- Legion: the map keeps photo mode on.
+- After the map closes there is no see-through ghost of the old frame.
+- In caves and dungeons the chat window does not glow as a light rectangle.
+
 ## 1.7.5-release «Мягкий свет» / "Soft Light"
 
 ### Русский

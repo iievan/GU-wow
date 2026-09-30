@@ -5,6 +5,9 @@
 	<Binding name="GUWOW_SHOT">
 		GUWOW_Screenshot()
 	</Binding>
+	<Binding name="GUWOW_GAME">
+		GUWOW_ToggleGame()
+	</Binding>
 	<Binding name="GUWOW_TOGGLE">
 		GUWOW_ToggleMod()
 	</Binding>

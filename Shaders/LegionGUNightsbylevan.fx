@@ -204,21 +204,38 @@ sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter =
 texture2D LegionGUMotionTex { Width = 1; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUMotionS { Texture = LegionGUMotionTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
-#if __RENDERER__ < 0xa000
-// Direct3D 9: the interface on screen, from the addon's second strip row (see LegionGUbylevan.fx). The same
-// textures as there, shared by name.
+// The camera's motion eased over a few frames, for the motion blur (see MotionSmoothPS in LegionGUbylevan.fx):
+// xy = the shift in uv, w = the frame it was written in.
+texture2D LegionGUMoSmoothTex { Width = 1; Height = 1; Format = RGBA32F; };
+sampler2D LegionGUMoSmoothS { Texture = LegionGUMoSmoothTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+
+// The interface on screen, from the addon's second strip row (see LegionGUbylevan.fx). The same textures as
+// there, shared by name.
 #define LEGIONGU_UI_RECTS 20
 #define LEGIONGU_UI_CELLS 243
 
+texture2D LegionGUUIRectTex { Width = LEGIONGU_UI_RECTS + 1; Height = 1; Format = RGBA32F; };
+sampler2D LegionGUUIRect { Texture = LegionGUUIRectTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 texture2D LegionGUUITex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = R8; };
 sampler2D LegionGUUI { Texture = LegionGUUITex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+uniform uint LegionGUFrame < source = "framecount"; >;
 
-// 1 on the interface, 0 on the world.
+// Whether LegionGUBridge has run this frame (see LegionGUbylevan.fx).
+bool LegionGUBridgeDone()
+{
+	return abs(tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).y - float(LegionGUFrame % 8388608u)) <= 0.5;
+}
+
+// 1 on the interface, 0 on the world. Direct3D 11: only once the bridge has run this frame (see
+// LegionGUbylevan.fx).
 float LegionGUUIAt(float2 uv)
 {
+#if __RENDERER__ >= 0xa000
+	if (!LegionGUBridgeDone())
+		return 0.0;
+#endif
 	return tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x;
 }
-#endif
 
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
 // whatever runs before it.
@@ -230,7 +247,14 @@ bool LegionGUInStrip(float2 p)
 	// stayed a band of the bare game over the covered strip, and on 3.3.5, with no second row, under it (29.09).
 	return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 #else
-	return p.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL) && p.y < float(LEGIONGU_CTL_CELL);
+	// Direct3D 11: the interface, and until the bridge has run row 0 and row 1 while the addon paints it (see
+	// LegionGUbylevan.fx).
+	if (LegionGUBridgeDone())
+		return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
+	return (p.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL) && p.y < float(LEGIONGU_CTL_CELL))
+		|| (p.x < float(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL) && p.y < float(2 * LEGIONGU_CTL_CELL)
+			&& tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5)
+		|| LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 #endif
 }
 
@@ -915,6 +939,23 @@ namespace LegionGUNights
 		return age <= 2.0 ? m.xy * m.z : float2(0.0, 0.0);
 	}
 
+	// The shift a trusted estimate measured this frame, whole (the confidence only decides whether to trust it):
+	// scaled by the confidence it came out half as long as the true one or less.
+	float2 LegionGUMotionRawUV()
+	{
+		float4 m = tex2Dfetch(LegionGUMotionS, int2(0, 0));
+		float age = float((FrameCount % 8388608u + 8388608u - uint(m.w + 0.5) % 8388608u) % 8388608u);
+		return age <= 2.0 && m.z >= 0.12 ? m.xy : float2(0.0, 0.0);
+	}
+
+	// The shift eased over a few frames (MotionSmoothPS in LegionGUbylevan.fx), for the motion blur.
+	float2 LegionGUMotionSmoothUV()
+	{
+		float4 m = tex2Dfetch(LegionGUMoSmoothS, int2(0, 0));
+		float age = float((FrameCount % 8388608u + 8388608u - uint(m.w + 0.5) % 8388608u) % 8388608u);
+		return age <= 2.0 ? m.xy : float2(0.0, 0.0);
+	}
+
 	// ---------------------------------------------------------------------------------------------------
 	// Constants
 	// ---------------------------------------------------------------------------------------------------
@@ -1406,9 +1447,9 @@ namespace LegionGUNights
 		// Direct3D 9: the interface the addon reports; the painted mask is of the Legion layout.
 		return LegionGUUIAt(uv);
 #elif LEGIONGU_UI_MASK
-		return saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x);
+		return max(LegionGUUIAt(uv), saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x));
 #else
-		return 0.0;
+		return LegionGUUIAt(uv);
 #endif
 	}
 
@@ -2120,20 +2161,21 @@ namespace LegionGUNights
 	{
 		float4 now = tex2Dfetch(LightRaw, int2(pos.xy));
 		// Last frame's field rides with the camera, so the pools and the halos stay on their lamps in a turn
-		// instead of trailing behind them.
-		float4 prev = tex2Dlod(LightPrevLin, float4(uv - LegionGUMotionUV(), 0.0, 0.0));
+		// instead of trailing behind them. The shift is the whole trusted one: the confidence-scaled one fell short
+		// by half, the field slid off its lamps, and a red lamp's block stayed a red square beside it (29.09).
+		float4 prev = tex2Dlod(LightPrevLin, float4(uv - LegionGUMotionRawUV(), 0.0, 0.0));
 		float ln = dot(now.rgb, LUMA601);
 		float lp = dot(prev.rgb, LUMA601);
 		float yards = max(ln > 1e-5 ? exp2(now.a / ln) : 0.0, lp > 1e-5 ? exp2(prev.a / lp) : 0.0);
 		float tau = lerp(LIGHT_HOLD_NEAR, LIGHT_HOLD_FAR, smoothstep(LIGHT_HOLD_YD.x, LIGHT_HOLD_YD.y, yards));
-		// While the camera turns, the hold nearly dies (beta-1.0): the shift compensation is exact only to a pixel
-		// or two, and the quarter-second ease smeared every window into a comet tail behind the turn. The raw
-		// shift is read before the confidence weighting: a dark night scene matches poorly, the confidence drops,
-		// and it is exactly then that the trails showed.
+		// While the camera turns, the hold dies (beta-1.0, whole since 29.09): the shift compensation is exact only
+		// to a pixel or two, and the quarter-second ease smeared every window into a comet tail behind the turn.
+		// The raw shift is read before the confidence weighting: a dark night scene matches poorly, the confidence
+		// drops, and it is exactly then that the trails showed.
 		float4 mo = tex2Dfetch(LegionGUMotionS, int2(0, 0));
 		float moAge = float((FrameCount % 8388608u + 8388608u - uint(mo.w + 0.5) % 8388608u) % 8388608u);
 		float turning = moAge <= 2.0 ? saturate(length(mo.xy) * 50.0) : 1.0;
-		tau *= 1.0 - 0.9 * turning;
+		tau *= 1.0 - turning;
 		return lerp(prev, now, Rate(FrameSeconds(), ln > lp ? 0.5 * tau : tau));
 	}
 
@@ -2445,12 +2487,14 @@ namespace LegionGUNights
 		// (CTL 35..38, see the heat haze) protects the text at night too. Only the text: the whole rectangle as
 		// UI left the world behind the chat's clear back bright (a box of daylight), and a bar four times the
 		// mask's cleared just the yellow icons and sank the plain white lines. Twice the mask's bar splits it:
-		// letters ride well above it, the land and the horizon behind the clear back stay below.
+		// letters ride well above it, the land and the horizon behind the clear back stay below. In a dark cave the
+		// ambient is so low that the dim floor too passed twice the bar and the chat stood as a light box (30.09): the
+		// letters are also bright by themselves (0.75 and up), the floor behind them is not.
 		float keepUI = 1.0 - UIMask(uv) * smoothstep(UI_KEEP_FROM, UI_KEEP_FULL, v / ambient);
 		float4 chat = float4(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_L, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_T, 0)).x,
 		                     tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_R, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_B, 0)).x);
 		if (chat.z > chat.x && uv.x >= chat.x && uv.x <= chat.z && uv.y >= chat.y && uv.y <= chat.w)
-			keepUI = min(keepUI, 1.0 - smoothstep(2.0 * UI_KEEP_FROM, 2.0 * UI_KEEP_FULL, v / ambient));
+			keepUI = min(keepUI, 1.0 - smoothstep(2.0 * UI_KEEP_FROM, 2.0 * UI_KEEP_FULL, v / ambient) * smoothstep(0.5, 0.75, v));
 		float s = nt.y * keepUI;
 		float m = lerp(1.0, nt.w, keepUI);
 		float u = DepthU(RawDepth(uv), EffectiveReversed(depthState.w));
@@ -3681,7 +3725,7 @@ namespace LegionGUNights
 		return clamp(f, 1.0, 500.0);
 	}
 
-	// Motion blur (1.7.3): the finished picture smeared along this frame's camera motion (LegionGUMotionUV, the fog
+	// Motion blur (1.7.3): the finished picture smeared along the camera motion (LegionGUMotionSmoothUV, the fog
 	// technique measures it), MOTION_TAPS taps centred on the pixel, so a still camera or a walk straight ahead
 	// leaves it sharp. The interface, the strip, the check view and photo mode (it has its own blur) stay as they are.
 	// The camera turns around the character, so the character, its mount and the land beside them do not move on the
@@ -3707,7 +3751,7 @@ namespace LegionGUNights
 			return c4;
 		float character = CharacterYards(depthState);
 		float share = MotionShare(DofYards(uv, depthState), character);
-		float2 m = LegionGUMotionUV() * k;
+		float2 m = LegionGUMotionSmoothUV() * k;
 		float len = length(m * float2(ASPECT, 1.0));
 		if (len > MOTION_MAX)
 			m *= MOTION_MAX / len;
@@ -3715,12 +3759,26 @@ namespace LegionGUNights
 		float keep = 1.0 - saturate(UIMask(uv) * 8.0);
 		if (keep <= 0.0 || len * share * float(BUFFER_HEIGHT) < 1.0)
 			return c4;
+		// The taps start at a random point of their step, new per pixel and frame: at a long smear eight fixed taps
+		// drew eight copies of every bright edge, the steps showed on a turn (29.09); jittered they blend into grain
+		// the eye does not follow.
+#if __RENDERER__ < 0xa000
+		float3 jp = frac(float3(pos.xy, float(FrameCount % 1024u)) * 0.1031);
+		jp += dot(jp, jp.zyx + 31.32);
+		float jitter = frac((jp.x + jp.y) * jp.z);
+#else
+		uint jh = uint(pos.x) + uint(pos.y) * 65521u + FrameCount * 26699u;
+		jh = jh * 747796405u + 2891336453u;
+		jh = ((jh >> ((jh >> 28u) + 4u)) ^ jh) * 277803737u;
+		jh = (jh >> 22u) ^ jh;
+		float jitter = float(jh & 65535u) / 65535.0;
+#endif
 		float3 sum = c4.rgb * 1e-3;
 		float wsum = 1e-3;
 		[unroll]
 		for (int i = 0; i < MOTION_TAPS; ++i)
 		{
-			float2 t = uv - m * (float(i) / float(MOTION_TAPS - 1) - 0.5);
+			float2 t = uv - m * ((float(i) + jitter) / float(MOTION_TAPS) - 0.5);
 			float w = MotionShare(DofYards(t, depthState), character);
 			sum += tex2Dlod(ColorLinear, float4(t, 0.0, 0.0)).rgb * w;
 			wsum += w;

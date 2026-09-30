@@ -7,13 +7,13 @@
 
 Публичное имя мода — **GUWOW!**. GU-WOW — рабочее название разработки, оно остаётся в именах файлов (`GU-WOW.exe`) и в адресе репозитория.
 
-Текущая сборка: **1.7.5-release «Мягкий свет»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **1.7.6-release «Мягкий свет»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.7.5-release
+## Что входит в сборку 1.7.6-release
 
 Всё настраивается в игре: Интерфейс > Модификации > GUWOW!, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -44,6 +44,7 @@
 | Фото | Сила размытия и боке | Ползунок силы размытия фона. По умолчанию размытие втрое мягче, чем в 1.5.3. Боке превращает огни на размытом фоне в мягкие кружки | 1.5.4 |
 | Фото | Размытие дали в игре | Мягкое размытие дальнего плана в обычной игре, персонаж и окна игры резкие. Ползунок на странице «Фоторежим», по умолчанию выключено | 1.7.3 |
 | Фото | Клавиша фоторежима | Назначается прямо на странице «Фоторежим» | 1.7.3 |
+| Фото | Игровой фоторежим | Интерфейс прячется, игра идёт дальше, и в бою тоже. Видимые панели выбирает игрок, по умолчанию остаётся только чат. Команда `/gu game` или Alt + щелчок по кнопке у миникарты | 1.7.6 |
 | Фото | Облёт, имена, кинорамка | В фоторежиме: медленный облёт камеры вокруг персонажа, скрытие имён над головами, кинорамка. На экранах 21:9 кинорамки почти не видно | 1.5 |
 | Фото | Чистый снимок | Вне боя интерфейс прячется на мгновение, игра делает снимок, всё возвращается. В бою снимок будет с интерфейсом | 1.5 |
 | Удобство | Меню в игре | Все переключатели и ползунки, изменения видны сразу | 1.3 |
@@ -131,13 +132,13 @@ Please note: glitches, visual artifacts, and rendering inaccuracies may occur du
 
 The mod's public name is **GUWOW!**. GU-WOW is the working development name; it stays in the file names (`GU-WOW.exe`) and in the repository address.
 
-Current build: **1.7.5-release "Soft Light"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **1.7.6-release "Soft Light"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.7.5-release
+## What is in build 1.7.6-release
 
 Everything is set up in the game: Interface > AddOns > GUWOW!, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -168,6 +169,7 @@ Everything is set up in the game: Interface > AddOns > GUWOW!, the minimap butto
 | Photo | Blur strength and bokeh | A slider for the background blur. By default the blur is three times softer than in 1.5.3. Bokeh turns lights in the blur into soft discs | 1.5.4 |
 | Photo | Far blur in play | A soft blur of the far land in normal play; the character and the game windows stay sharp. A slider on the Photo mode page, off by default | 1.7.3 |
 | Photo | Photo mode key | Set right on the Photo mode page | 1.7.3 |
+| Photo | Play photo mode | The interface hides and the game goes on, in a fight too. The player picks the panels that stay, by default only the chat. The command `/gu game` or Alt + click on the minimap button | 1.7.6 |
 | Photo | Orbit, names, cinema bars | In photo mode: a slow camera orbit around your character, names above heads hidden, cinema bars. On 21:9 screens the bars barely show | 1.5 |
 | Photo | Clean screenshot | Out of combat the interface hides for a moment, the game takes the shot, everything comes back. In combat the shot includes the interface | 1.5 |
 | Convenience | In-game menu | All switches and sliders, changes show at once | 1.3 |

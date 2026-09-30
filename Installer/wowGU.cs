@@ -23,9 +23,9 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("GU-WOW: fog, sun rays, night and picture for World of Warcraft. Installer and support helper.")]
 [assembly: AssemblyCompany("levan")]
 [assembly: AssemblyCopyright("© 2026 levan")]
-[assembly: AssemblyVersion("1.7.5")]
-[assembly: AssemblyFileVersion("1.7.5")]
-[assembly: AssemblyInformationalVersion("1.7.5-release")]
+[assembly: AssemblyVersion("1.7.6")]
+[assembly: AssemblyFileVersion("1.7.6")]
+[assembly: AssemblyInformationalVersion("1.7.6-release")]
 
 class ShotForm : Form
 {
@@ -35,7 +35,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.7.5-release";
+	const string Version = "1.7.6-release";
 	static readonly bool RU = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru";
 	static string T(string ru, string en) { return RU ? ru : en; }
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)

@@ -1,4 +1,4 @@
-GUWOW! 1.7.5-release «Мягкий свет»: туман, лучи солнца, ночь, огни и картинка для World of Warcraft (проверено на Tauri, Legion 7.3.5, на Isengard, WotLK 3.3.5, и на Turtle WoW, Classic 1.12).
+GUWOW! 1.7.6-release «Мягкий свет»: туман, лучи солнца, ночь, огни и картинка для World of Warcraft (проверено на Tauri, Legion 7.3.5, на Isengard, WotLK 3.3.5, и на Turtle WoW, Classic 1.12).
 В архиве только GU-WOW.exe и лицензии: эффекты, аддон и настройки установщик несёт в себе.
 
 Установка

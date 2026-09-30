@@ -43,10 +43,13 @@ local DEFAULTS = {
 	playBlur = 0,
 	-- 1.7.3: a panel shows whole under the mouse and the fight panels in a fight (see PanelAlpha).
 	panelWake = true,
+	-- 1.7.6: the look of the play photo mode: plain play (false) or the photo blur and the cinema bars (true).
+	gamePhoto = false,
 }
--- 1.7.3: how much of each panel shows, 100 whole, 0 gone: ui_ in plain play, photo_ in photo mode.
+-- 1.7.3: how much of each panel shows, 100 whole, 0 gone: ui_ in plain play, photo_ in photo mode, game_ in the
+-- play photo mode (1.7.6), where only the chat stays by default.
 for _, k in ipairs({ "bars", "player", "target", "party", "minimap", "chat", "buffs", "quests", "castbar" }) do
-	DEFAULTS["ui_" .. k], DEFAULTS["photo_" .. k] = 100, 0
+	DEFAULTS["ui_" .. k], DEFAULTS["photo_" .. k], DEFAULTS["game_" .. k] = 100, 0, k == "chat" and 100 or 0
 end
 -- The order of the values in the strip, the same as LEGIONGU_CTL_* in the shaders (after the flags).
 local VALUES = { "fogThickness", "fogDistance", "mist", "raysStrength", "nightDarkness", "lightGlow",
@@ -154,6 +157,9 @@ local DB
 -- experiments do not touch the player's own settings. Gone after /reload.
 local preview, previewBase, previewStyle
 local photo = false
+-- The play photo mode (1.7.6): only the panels hide, to the player's own dials, and the game goes on, in a fight
+-- too. The map, Esc and the chat leave it on.
+local game = false
 -- The depth check view (/gu check): the shaders draw the depth instead of the picture, bit 16 of the switches.
 local checkView = false
 local lowQuality = false
@@ -180,17 +186,29 @@ local function After(seconds, f)
 	pending[#pending + 1] = { t = seconds, f = f }
 end
 
+-- The second row of the strip carries the interface for the effects to leave alone (see PaintUI): a signature,
+-- UI_RECTS rectangles of four coordinates 0..511 in three cells each, a checksum of two cells. 972 pixels long.
+local UI_RECTS = 20
+local UI_CELLS = 1 + UI_RECTS * 12 + 2
+local uiCells = {}
+
 -- The strip. No parent: it stays on screen with the interface hidden (Alt+Z), when the shader still needs it.
 local strip = CreateFrame("Frame", "LegionGUStrip")
 strip:SetFrameStrata("TOOLTIP")
-strip:SetWidth(CELLS * CELL)
-strip:SetHeight(CELL)
-for i = 0, CELLS - 1 do
+strip:SetWidth(UI_CELLS * CELL)
+strip:SetHeight(2 * CELL)
+local function StripCell(row, i)
 	local t = strip:CreateTexture(nil, "OVERLAY")
 	t:SetWidth(CELL)
 	t:SetHeight(CELL)
-	t:SetPoint("TOPLEFT", strip, "TOPLEFT", i * CELL, 0)
-	cells[i] = t
+	t:SetPoint("TOPLEFT", strip, "TOPLEFT", i * CELL, -row * CELL)
+	return t
+end
+for i = 0, CELLS - 1 do
+	cells[i] = StripCell(0, i)
+end
+for i = 0, UI_CELLS - 1 do
+	uiCells[i] = StripCell(1, i)
 end
 
 -- The first thing the interface draws each frame, in the lowest strata, under cell 0: REST starts the effects at the
@@ -225,13 +243,16 @@ local firstText = first:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 firstText:SetPoint("TOPLEFT", first, "TOPLEFT", 0, 0)
 firstText:SetText(".")
 
-local function Colour(i, r, g, b)
-	local t = cells[i]
+local function Tint(t, r, g, b)
 	if t.SetColorTexture then
 		t:SetColorTexture(r, g, b, 1)
 	else
 		t:SetTexture(r, g, b, 1)
 	end
+end
+
+local function Colour(i, r, g, b)
+	Tint(cells[i], r, g, b)
 end
 
 local function Bits(i, v)
@@ -360,6 +381,9 @@ end
 -- What only the game knows: 1 live, 2 indoors, 4 flying, 8 photo mode, 16 wet ground on, 32 world map open;
 -- the time of day 0..63 for 0..24 h; the player's facing 0..63 for a full turn (0 north, counterclockwise).
 local lastState, lastTime, lastFacing
+-- The map stays "open" for the effects half a second after it closes: the first frames of the world after it
+-- still carry the depth and the light of the frame before the map, and the land showed a ghost of it (29.09).
+local mapUntil = 0
 local function GameState()
 	local s = 1
 	if IsIndoors and IsIndoors() then
@@ -368,7 +392,7 @@ local function GameState()
 	if IsFlying and IsFlying() then
 		s = s + 4
 	end
-	if photo then
+	if photo or (game and DB.gamePhoto) then
 		s = s + 8
 	end
 	if V("wet") and not lowQuality then
@@ -376,7 +400,8 @@ local function GameState()
 	end
 	-- Only the fullscreen map: part of it is drawn before the effects start, and the night darkened it. The
 	-- windowed map covers a piece of the screen, and the world around it keeps the effects.
-	if WorldMapFrame and WorldMapFrame:IsShown() and not (WorldMapFrame_InWindowedMode and WorldMapFrame_InWindowedMode()) then
+	if (WorldMapFrame and WorldMapFrame:IsShown() and not (WorldMapFrame_InWindowedMode and WorldMapFrame_InWindowedMode()))
+		or GetTime() < mapUntil then
 		s = s + 32
 	end
 	local h, m = GetGameTime()
@@ -431,7 +456,7 @@ local function Paint()
 	local switches = (haze > 0 and 1 or 0) + (hot and 2 or 0) + (hdr > 0 and 4 or 0) + (DB.bokeh and 8 or 0)
 		+ (checkView and 16 or 0)
 	local chatL, chatT, chatR, chatB = ChatRect()
-	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + (DB.cinema and 8 or 0),
+	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + ((DB.cinema or (game and DB.gamePhoto)) and 8 or 0),
 		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches, Code(haze), Code(hdr), facing,
 		Code(V("mistHigh") or 0), Code(V("rayDefinition") or 0), Code(V("mistFlow") or 0),
 		Code(V("bright") or 50), Code(V("contrast") or 50), Code(V("satur") or 50), Code(V("warmth") or 50),
@@ -554,11 +579,11 @@ local function MouseOver(names)
 	end
 	return false
 end
--- How much of a group shows now, 0..1: its dial in plain play or in photo mode, whole when the player types in the
--- chat, points at the panel or fights (the fight panels).
+-- How much of a group shows now, 0..1: its dial in plain play, in photo mode or in the play photo mode, whole when
+-- the player types in the chat, points at the panel or fights (the fight panels).
 local function PanelAlpha(g)
 	local key = g[1]
-	local a = (photo and DB["photo_" .. key] or DB["ui_" .. key] or 100) / 100
+	local a = ((photo and DB["photo_" .. key]) or (game and DB["game_" .. key]) or DB["ui_" .. key] or 100) / 100
 	if a >= 1 then
 		return 1
 	end
@@ -687,6 +712,190 @@ local function PhotoDim(on)
 end
 local photoPanels = false
 
+-- ---------------------------------------------------------------------------------------------------------------
+-- The interface for the effects to leave alone: the rectangles of the open windows and panels, in the second row of
+-- the strip. On Direct3D 11 the effects run after the interface is drawn, and the blur of distance and of motion
+-- smeared the panels with the world (29.09).
+-- In its own block: the file is at the limit of 200 locals of one Lua function, and one more broke the whole addon.
+-- ---------------------------------------------------------------------------------------------------------------
+
+do
+local UI_GROUPS = {}
+for _, n in ipairs({ "GameMenuFrame", "InterfaceOptionsFrame", "VideoOptionsFrame", "AudioOptionsFrame", "AddonList",
+	"KeyBindingFrame", "MacroFrame", "StaticPopup1", "StaticPopup2", "StaticPopup3", "CharacterFrame", "SpellBookFrame",
+	"PlayerTalentFrame", "WorldMapFrame", "FriendsFrame", "GuildFrame", "PVEFrame", "EncounterJournal",
+	"AchievementFrame", "CollectionsJournal", "WardrobeFrame", "CalendarFrame", "GossipFrame", "QuestFrame",
+	"MerchantFrame", "MailFrame", "OpenMailFrame", "BankFrame", "TradeFrame", "AuctionFrame", "TradeSkillFrame",
+	"ClassTrainerFrame", "LootFrame", "HelpFrame", "DressUpFrame", "ItemTextFrame", "GarrisonLandingPage",
+	"OrderHallMissionFrame", "GUWOWPreviewBar", "LegionGUReport", "GameTooltip", "ItemRefTooltip",
+	"DropDownList1", "DropDownList2" }) do
+	UI_GROUPS[#UI_GROUPS + 1] = { n }
+end
+local bags = {}
+for i = 1, 13 do
+	bags[i] = "ContainerFrame" .. i
+end
+UI_GROUPS[#UI_GROUPS + 1] = bags
+-- The quest tracker stands over the whole right side, blocks or not: its rectangle is what it shows now.
+local function TrackerParts()
+	local list = { ObjectiveTrackerFrame and ObjectiveTrackerFrame.HeaderMenu }
+	local blocks = ObjectiveTrackerFrame and ObjectiveTrackerFrame.BlocksFrame
+	if blocks then
+		for _, f in ipairs({ blocks:GetChildren() }) do
+			list[#list + 1] = f
+		end
+	elseif ObjectiveTrackerFrame then
+		list[#list + 1] = ObjectiveTrackerFrame
+	end
+	return list
+end
+for _, g in ipairs(HIDE_GROUPS) do
+	if g[1] == "quests" then
+		UI_GROUPS[#UI_GROUPS + 1] = { "WatchFrame", "QuestWatchFrame", parts = TrackerParts }
+	elseif g[1] == "chat" then
+		local names = { "ChatFrame1EditBox" }
+		for _, n in ipairs(g[3]) do
+			names[#names + 1] = n
+		end
+		UI_GROUPS[#UI_GROUPS + 1] = names
+	elseif g[1] == "bars" then
+		UI_GROUPS[#UI_GROUPS + 1] = { "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight" }
+		UI_GROUPS[#UI_GROUPS + 1] = { "MultiBarRight", "MultiBarLeft" }
+	elseif g[1] == "party" or g[1] == "target" then
+		for _, n in ipairs(g[3]) do
+			UI_GROUPS[#UI_GROUPS + 1] = { n }
+		end
+	elseif g[1] == "buffs" then
+		-- The buttons stand outside the small BuffFrame, in rows to the left and down.
+		local names = { "BuffFrame" }
+		for i = 1, 32 do
+			names[#names + 1] = "BuffButton" .. i
+		end
+		for i = 1, 16 do
+			names[#names + 1] = "DebuffButton" .. i
+		end
+		for i = 1, 3 do
+			names[#names + 1] = "TempEnchant" .. i
+		end
+		UI_GROUPS[#UI_GROUPS + 1] = names
+	else
+		UI_GROUPS[#UI_GROUPS + 1] = g[3]
+	end
+end
+
+local function UIBits(i, v)
+	Tint(uiCells[i], math.floor(v / 4) % 2, math.floor(v / 2) % 2, v % 2)
+end
+
+-- A coordinate 0..511 in three cells, the high bits first.
+local function UICell(i, v)
+	UIBits(i, math.floor(v / 64))
+	UIBits(i + 1, math.floor(v / 8) % 8)
+	UIBits(i + 2, v % 8)
+end
+
+-- A panel the player made see-through (the dials) or photo mode dimmed: below half its alpha the effects go over
+-- its place.
+local function PanelHidden(f)
+	while f and f ~= UIParent do
+		if (hiddenFrames[f] and hiddenFrames[f] < 0.5) or dimmed[f] then
+			return true
+		end
+		f = f.GetParent and f:GetParent()
+	end
+	return false
+end
+-- A visible group's rectangle in the units of UIParent; nil if nothing is shown.
+local function GroupRect(g)
+	local l, t, r, b
+	local function Add(f)
+		if type(f) == "string" then
+			f = _G[f]
+		end
+		if f and f.GetLeft and f.IsVisible and f:IsVisible() and f:GetLeft() and f:GetTop() and not PanelHidden(f) then
+			local s = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
+			local fl, fr, ft, fb = f:GetLeft() * s, f:GetRight() * s, f:GetTop() * s, f:GetBottom() * s
+			if fr > fl and ft > fb then
+				l, r = math.min(l or fl, fl), math.max(r or fr, fr)
+				t, b = math.max(t or ft, ft), math.min(b or fb, fb)
+			end
+		end
+	end
+	for _, n in ipairs(g) do
+		Add(n)
+	end
+	if g.parts then
+		for _, f in ipairs(g.parts()) do
+			Add(f)
+		end
+	end
+	return l, t, r, b
+end
+
+-- A group over 60% of the screen is no window (the full screen world map, another addon's frame over the world):
+-- it is skipped, else the effects would leave the whole picture alone. DB.uiSeen keeps what was sent last, each group
+-- by its first frame in screen percent, for a report from a live game.
+local UI_PAD = 3
+local UI_MAX_SHARE = 0.6
+local function Clamp511(v)
+	return math.max(0, math.min(511, v))
+end
+local lastUI
+local function PaintUI()
+	local sw, sh = UIParent:GetWidth() or 0, UIParent:GetHeight() or 0
+	local px = UI_PAD * sh / ScreenHeight()
+	local coords, seen = {}, {}
+	-- Photo mode hides the interface with alpha, so everything is still "visible": no rectangles then, unless the
+	-- player keeps some panels in photo mode (their see-through ones drop out in GroupRect).
+	if (not photo or photoPanels) and UIParent:IsVisible() and UIParent:GetAlpha() > 0.5 and sw > 0 and sh > 0 then
+		for _, g in ipairs(UI_GROUPS) do
+			if #coords >= UI_RECTS * 4 then
+				break
+			end
+			local l, t, r, b = GroupRect(g)
+			if l and (r - l) * (t - b) <= UI_MAX_SHARE * sw * sh then
+				seen[#seen + 1] = string.format("%s %d,%d-%d,%d", tostring(g[1] or "tracker"), math.floor(l / sw * 100),
+					math.floor((1 - t / sh) * 100), math.floor(r / sw * 100), math.floor((1 - b / sh) * 100))
+				coords[#coords + 1] = Clamp511(math.floor((l - px) / sw * 511))
+				coords[#coords + 1] = Clamp511(math.floor((1 - (t + px) / sh) * 511))
+				coords[#coords + 1] = Clamp511(math.ceil((r + px) / sw * 511))
+				coords[#coords + 1] = Clamp511(math.ceil((1 - (b - px) / sh) * 511))
+			end
+		end
+	end
+	for i = #coords + 1, UI_RECTS * 4 do
+		coords[i] = 0
+	end
+	local key = table.concat(coords, ",")
+	if key == lastUI then
+		return
+	end
+	lastUI = key
+	DB.uiSeen = table.concat(seen, "; ")
+	UIBits(0, 5)
+	local sum = 0
+	for i, v in ipairs(coords) do
+		UICell(1 + 3 * (i - 1), v)
+		sum = sum + v
+	end
+	sum = sum % 64
+	UIBits(UI_CELLS - 2, math.floor(sum / 8))
+	UIBits(UI_CELLS - 1, sum % 8)
+end
+
+-- Twenty times a second: a quarter of a second of blur over a freshly opened window shows. The cells change only
+-- when a rectangle does.
+local uiWait = 0
+local uiWatch = CreateFrame("Frame")
+uiWatch:SetScript("OnUpdate", function(self, dt)
+	uiWait = uiWait - dt
+	if DB and uiWait <= 0 then
+		uiWait = 0.05
+		PaintUI()
+	end
+end)
+end
+
 local function Photo(on)
 	if on == photo then
 		return
@@ -736,6 +945,20 @@ function GUWOW_TogglePhoto()
 	Photo(not photo)
 end
 
+-- The play photo mode: the panels go to their game_ dials, nothing else changes, so bags, windows, the map and the
+-- fight work as always. The look with the photo blur rides on bit 8 of the state (see GameState).
+function GUWOW_ToggleGame()
+	if not DB then
+		return
+	end
+	game = not game
+	ApplyHide()
+	Paint()
+	print("|cffffd200GUWOW!:|r " .. (game and T("игровой фоторежим включён. Выход: та же клавиша, /gu game или Alt + щелчок по кнопке у миникарты.",
+		"play photo mode on. Leave with the same key, /gu game or Alt + click on the minimap button.")
+		or T("игровой фоторежим выключен.", "play photo mode off.")))
+end
+
 -- The mod on and off, for the key the player picks in the game's key bindings and for the minimap button.
 function GUWOW_ToggleMod()
 	if not DB then
@@ -775,7 +998,8 @@ function GUWOW_Screenshot()
 	end)
 end
 
--- Esc, Enter to chat and Alt+Z end photo mode: the Esc menu shows over the picture, chat is not typed blind.
+-- Esc and Enter to chat end photo mode: the Esc menu shows over the picture, chat is not typed blind. The play
+-- photo mode stays on through both.
 GameMenuFrame:HookScript("OnShow", function()
 	if photo then
 		Photo(false)
@@ -794,16 +1018,27 @@ if ChatEdit_DeactivateChat then
 		ApplyHide()
 	end)
 end
+-- The fullscreen map hides UIParent and shows it again on closing: photo mode stays and hides the interface anew
+-- (1.7.6; the map used to throw the player out of photo mode).
 UIParent:HookScript("OnShow", function()
-	if photo then
-		Photo(false)
+	if not photo then
+		return
 	end
+	if photoPanels then
+		PhotoDim(true)
+		ApplyHide()
+	else
+		UIParent:SetAlpha(0)
+	end
+	MinimapOff()
+	Paint()
 end)
 
 BINDING_HEADER_GUWOW = "GUWOW!"
 BINDING_NAME_GUWOW_TOGGLE = T("Включить или выключить GUWOW!", "Turn GUWOW! on or off")
 BINDING_NAME_GUWOW_PHOTO = T("Фоторежим (прячет интерфейс, размывает фон)", "Photo mode (hides the interface, blurs the background)")
 BINDING_NAME_GUWOW_SHOT = T("Чистый снимок экрана", "Clean screenshot")
+BINDING_NAME_GUWOW_GAME = T("Игровой фоторежим (прячет панели, игра идёт)", "Play photo mode (hides the panels, the game goes on)")
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Share codes: all the values in one line to paste into another player's panel.
@@ -1175,8 +1410,8 @@ homeText:SetPoint("TOPLEFT", 16, -52)
 homeText:SetWidth(600)
 homeText:SetJustifyH("LEFT")
 homeText:SetSpacing(4)
-homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Сообщение в поддержку» — написать автору об ошибке, со снимком экрана.\n«Основные» — включатель мода и готовые пресеты.\n«Атмосфера» — туман, погода, мокрая земля, тени и марево.\n«Лучи» — лучи солнца и свечение в тумане, со своими пресетами.\n«Ночь» — темнота, свет огней и подземелья.\n«Картинка» — резкость, цвет, яркость, размытие при движении и плёночные эффекты.\n«Дополнительно» — стили, коды, свои пресеты, поведение и видимость панелей.\n«Фоторежим» — снимки, своя клавиша и всё, что нужно только для них.\n\nПодсказки:\nНаведите мышь на ползунок, и появится подсказка простыми словами.\nF11 включает и выключает весь мод. Клавишу фоторежима можно назначить на странице «Фоторежим».\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
-	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMessage to support — tell the author about a bug, with a screenshot.\nMain — the mod switch and the ready presets.\nAtmosphere — fog, weather, wet ground, shadows and heat haze.\nRays — the sun rays and the glow in the fog, with their own presets.\nNight — darkness, firelight and dungeons.\nPicture — sharpness, colour, brightness, motion blur and the film effects.\nExtras — styles, codes, your presets, behaviour and the panels you see.\nPhoto mode — screenshots, its own key and what only they need.\n\nHints:\nHover a slider for a tip in plain words.\nF11 toggles the whole mod. The photo mode key is set on the Photo mode page.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode.\nChat commands: /gu menu · /gu photo · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
+homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Сообщение в поддержку» — написать автору об ошибке, со снимком экрана.\n«Основные» — включатель мода и готовые пресеты.\n«Атмосфера» — туман, погода, мокрая земля, тени и марево.\n«Лучи» — лучи солнца и свечение в тумане, со своими пресетами.\n«Ночь» — темнота, свет огней и подземелья.\n«Картинка» — резкость, цвет, яркость, размытие при движении и плёночные эффекты.\n«Дополнительно» — стили, коды, свои пресеты, поведение и видимость панелей.\n«Фоторежим» — снимки, своя клавиша и всё, что нужно только для них.\n\nПодсказки:\nНаведите мышь на ползунок, и появится подсказка простыми словами.\nF11 включает и выключает весь мод. Клавишу фоторежима можно назначить на странице «Фоторежим».\nИгровой фоторежим прячет выбранные панели, играть в нём можно как обычно, и в бою тоже. Его панели и вид задаются на странице «Панели».\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим, Alt + левая — игровой фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu game · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
+	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMessage to support — tell the author about a bug, with a screenshot.\nMain — the mod switch and the ready presets.\nAtmosphere — fog, weather, wet ground, shadows and heat haze.\nRays — the sun rays and the glow in the fog, with their own presets.\nNight — darkness, firelight and dungeons.\nPicture — sharpness, colour, brightness, motion blur and the film effects.\nExtras — styles, codes, your presets, behaviour and the panels you see.\nPhoto mode — screenshots, its own key and what only they need.\n\nHints:\nHover a slider for a tip in plain words.\nF11 toggles the whole mod. The photo mode key is set on the Photo mode page.\nThe play photo mode hides the panels you pick, and you play in it as usual, in a fight too. Its panels and look are set on the Panels page.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode, Alt + left the play photo mode.\nChat commands: /gu menu · /gu photo · /gu game · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
 
 local panel = CreateFrame("Frame", "LegionGUPanel", UIParent)
 panel.name = T("Основные", "Main")
@@ -2100,10 +2335,10 @@ Slider(page, "mistFlow", T("Движение тумана: дымка плывё
 local panelPanels = NewPage("LegionGUPanelPanels", "Панели", "Panels",
 	"Прозрачная панель работает: клавиши и щелчки по её месту действуют. Чат виден целиком, пока вы пишете.",
 	"A see-through panel works: its keys and clicks on its place still act. The chat shows whole while you type.")
-local panelSliders = { ui_ = {}, photo_ = {} }
+local panelSliders = { ui_ = {}, photo_ = {}, game_ = {} }
 local panelMode = "ui_"
 local modeNote = panelPanels:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-modeNote:SetPoint("TOPLEFT", 330, -74)
+modeNote:SetPoint("TOPLEFT", 490, -74)
 local function ShowPanelMode(mode)
 	panelMode = mode
 	for m, list in pairs(panelSliders) do
@@ -2115,7 +2350,8 @@ local function ShowPanelMode(mode)
 			end
 		end
 	end
-	modeNote:SetText(mode == "ui_" and T("Сейчас: обычная игра", "Now: plain play") or T("Сейчас: фоторежим", "Now: photo mode"))
+	modeNote:SetText(mode == "ui_" and T("Сейчас: обычная игра", "Now: plain play")
+		or mode == "game_" and T("Сейчас: игровой", "Now: play photo") or T("Сейчас: фоторежим", "Now: photo mode"))
 end
 Button(panelPanels, T("Обычная игра", "Plain play"), 16, -70, 150, function()
 	ShowPanelMode("ui_")
@@ -2123,11 +2359,16 @@ end)
 Button(panelPanels, T("Фоторежим", "Photo mode"), 172, -70, 150, function()
 	ShowPanelMode("photo_")
 end)
+Button(panelPanels, T("Игровой фоторежим", "Play photo mode"), 328, -70, 150, function()
+	ShowPanelMode("game_")
+end)
 for mode in pairs(panelSliders) do
 	for i, g in ipairs(HIDE_GROUPS) do
 		local s = Slider(panelPanels, mode .. g[1], g[2], i <= 5 and 20 or 340, -120 - ((i - 1) % 5) * 48, 0, 100, nil,
 			mode == "ui_" and T("Сколько видно панели в обычной игре. 100 — целиком, 0 — не видно совсем",
 				"How much of the panel shows in plain play. 100 whole, 0 not at all")
+			or mode == "game_" and T("Сколько видно панели в игровом фоторежиме. Играть можно как обычно, прозрачная панель работает",
+				"How much of the panel shows in the play photo mode. You play as usual, a see-through panel still works")
 			or T("Сколько видно панели в фоторежиме. Все панели на 0 — интерфейс прячется целиком",
 				"How much of the panel shows in photo mode. All panels at 0 hide the whole interface"),
 			function()
@@ -2140,11 +2381,13 @@ ShowPanelMode("ui_")
 Check(panelPanels, "panelWake", T("Под мышью панель видна целиком, в бою — панели боя", "A panel shows whole under the mouse, the fight panels in a fight"), 16, -366, ApplyHide)
 Button(panelPanels, T("Показать все панели", "Show all panels"), 16, -400, 200, function()
 	for _, g in ipairs(HIDE_GROUPS) do
-		DB[panelMode .. g[1]] = panelMode == "ui_" and 100 or 0
+		DB[panelMode .. g[1]] = panelMode == "photo_" and 0 or 100
 	end
 	ApplyHide()
 	Refresh()
 end)
+Button(panelPanels, T("Игровой фоторежим: вкл/выкл", "Play photo mode: on/off"), 230, -400, 220, GUWOW_ToggleGame)
+Check(panelPanels, "gamePhoto", T("Игровой фоторежим с размытием фона и кинорамкой", "Play photo mode with the background blur and the cinema bars"), 16, -430)
 
 
 page:SetScript("OnShow", function()
@@ -2205,6 +2448,8 @@ SlashCmdList["LEGIONGU"] = function(msg)
 	msg = string.lower(msg or "")
 	if msg == "photo" or msg == "фото" then
 		GUWOW_TogglePhoto()
+	elseif msg == "game" or msg == "игра" then
+		GUWOW_ToggleGame()
 	elseif msg == "shot" or msg == "снимок" then
 		GUWOW_Screenshot()
 	elseif msg == "check" or msg == "проверка" then
@@ -2224,8 +2469,8 @@ SlashCmdList["LEGIONGU"] = function(msg)
 		OpenReport()
 	elseif msg ~= "" and msg ~= "menu" and msg ~= "меню" then
 		-- «help» and any word the addon does not know: the list, so a mistyped command still shows the way.
-		Say(T("/gu меню · /gu photo фоторежим · /gu shot чистый снимок · /gu check проверка глубины · /gu fix самолечение · /gu report написать в поддержку · /gu news что нового",
-			"/gu menu · /gu photo photo mode · /gu shot clean screenshot · /gu check depth check · /gu fix self-heal · /gu report write to support · /gu news what is new"))
+		Say(T("/gu меню · /gu photo фоторежим · /gu game игровой фоторежим · /gu shot чистый снимок · /gu check проверка глубины · /gu fix самолечение · /gu report написать в поддержку · /gu news что нового",
+			"/gu menu · /gu photo photo mode · /gu game play photo mode · /gu shot clean screenshot · /gu check depth check · /gu fix self-heal · /gu report write to support · /gu news what is new"))
 	else
 		OpenPanel()
 	end
@@ -2278,6 +2523,8 @@ mm:SetScript("OnClick", function(self, button)
 		GUWOW_ToggleMod()
 	elseif button == "MiddleButton" or IsShiftKeyDown() then
 		GUWOW_TogglePhoto()
+	elseif IsAltKeyDown() then
+		GUWOW_ToggleGame()
 	elseif IsControlKeyDown() then
 		OpenReport()
 	else
@@ -2290,6 +2537,7 @@ mm:SetScript("OnEnter", function(self)
 	GameTooltip:AddLine(T("Левая кнопка: меню", "Left click: menu"), 1, 1, 1)
 	GameTooltip:AddLine(T("Правая кнопка: включить или выключить", "Right click: on or off"), 1, 1, 1)
 	GameTooltip:AddLine(T("Shift + левая или средняя: фоторежим", "Shift + left or middle click: photo mode"), 1, 1, 1)
+	GameTooltip:AddLine(T("Alt + левая: игровой фоторежим", "Alt + left click: play photo mode"), 1, 1, 1)
 	GameTooltip:AddLine(T("Ctrl + левая: написать в поддержку", "Ctrl + left click: write to support"), 0.4, 1, 0.4)
 	GameTooltip:Show()
 end)
@@ -2350,8 +2598,10 @@ end)
 if WorldMapFrame then
 	WorldMapFrame:HookScript("OnShow", function() Paint() end)
 	WorldMapFrame:HookScript("OnHide", function()
+		mapUntil = GetTime() + 0.5
 		UpdateZone()
 		Paint()
+		After(0.55, Paint)
 	end)
 end
 

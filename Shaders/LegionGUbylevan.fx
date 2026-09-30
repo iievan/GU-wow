@@ -227,27 +227,45 @@ sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter =
 texture2D LegionGUMotionTex { Width = 1; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUMotionS { Texture = LegionGUMotionTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
-#if __RENDERER__ < 0xa000
-// Direct3D 9 (the 1.12 to 3.3.5 clients) has no REST, so the effects run over the drawn interface. The 1.12 addon
-// paints a second strip row with the rectangles of the interface on screen (see BridgeUIReadPS), the bridge draws
-// them into LegionGUUITex at a quarter of the screen, and every effect leaves those pixels as they are, like the
-// strip's. Both effect files declare the textures with the same names, so ReShade shares them.
+// The camera's motion eased over a few frames, for the motion blur (see MotionSmoothPS): xy = the shift in uv,
+// w = the frame it was written in.
+texture2D LegionGUMoSmoothTex { Width = 1; Height = 1; Format = RGBA32F; };
+sampler2D LegionGUMoSmoothS { Texture = LegionGUMoSmoothTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+
+// The addon paints a second strip row with the rectangles of the interface on screen (see BridgeUIReadPS), the
+// bridge draws them into LegionGUUITex at a quarter of the screen, and every effect leaves those pixels as they
+// are, like the strip's. Direct3D 9 (the 1.12 to 3.3.5 clients) has no REST, so the effects always run over the
+// drawn interface. On Direct3D 11 REST starts them before the interface in most frames and misses in some, and then
+// the blur of distance and of motion smeared the panels with the world (Legion, 29.09). Both effect files declare
+// the textures with the same names, so ReShade shares them.
 #define LEGIONGU_UI_RECTS 20
 #define LEGIONGU_UI_CELLS 243    // the signature, three cells per coordinate 0..511, two for the checksum
 
-// Rectangle i in texel i (left, top, right, bottom in uv), texel LEGIONGU_UI_RECTS: x = 1 if the row was read
-// this frame.
+// Rectangle i in texel i (left, top, right, bottom in uv), texel LEGIONGU_UI_RECTS: x = 1 if the row was read,
+// y = the frame the bridge read it in.
 texture2D LegionGUUIRectTex { Width = LEGIONGU_UI_RECTS + 1; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUUIRect { Texture = LegionGUUIRectTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 texture2D LegionGUUITex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = R8; };
 sampler2D LegionGUUI { Texture = LegionGUUITex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+uniform uint LegionGUFrame < source = "framecount"; >;
 
-// 1 on the interface, 0 on the world.
+// Whether LegionGUBridge has run this frame, that is the strip is read and covered and the interface drawn.
+bool LegionGUBridgeDone()
+{
+	return abs(tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).y - float(LegionGUFrame % 8388608u)) <= 0.5;
+}
+
+// 1 on the interface, 0 on the world. Direct3D 11: only once the bridge has run this frame. Before it (REST caught
+// the start of the interface) the effects run on the bare world, and a kept rectangle would stay a clear patch
+// behind the see-through quest tracker.
 float LegionGUUIAt(float2 uv)
 {
+#if __RENDERER__ >= 0xa000
+	if (!LegionGUBridgeDone())
+		return 0.0;
+#endif
 	return tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x;
 }
-#endif
 
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
 // whatever runs before it.
@@ -259,7 +277,15 @@ bool LegionGUInStrip(float2 p)
 	// stayed a band of the bare game over the covered strip, and on 3.3.5, with no second row, under it (29.09).
 	return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 #else
-	return p.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL) && p.y < float(LEGIONGU_CTL_CELL);
+	// Direct3D 11: the interface, and until the bridge has run row 0 and row 1 while the addon paints it. REST runs
+	// the bridge after the effects. When REST misses, the bridge stands first and has covered the strip with the
+	// pixel row under it, and a guarded strip stayed a band of the bare game 8 pixels high (29.09).
+	if (LegionGUBridgeDone())
+		return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
+	return (p.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL) && p.y < float(LEGIONGU_CTL_CELL))
+		|| (p.x < float(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL) && p.y < float(2 * LEGIONGU_CTL_CELL)
+			&& tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5)
+		|| LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 #endif
 }
 
@@ -1081,6 +1107,7 @@ namespace LegionGU
 	// INSIDE_OUT seconds, so walking out of a tavern fades the effects in instead of snapping them.
 	// Texel 8: the facing, eased (1.7.1). The strip carries it in 64 steps updated a few times a second, and the
 	// mist's drift pattern is anchored to it: raw, every step moved the mist in visible chunks on a camera turn.
+	// Its z is the character's distance in yards, eased, for the mist at the feet (1.7.6).
 	texture2D FogCurTex { Width = 9; Height = 1; Format = RGBA32F; };
 	texture2D FogPrevTex { Width = 9; Height = 1; Format = RGBA32F; };
 	sampler2D FogCur { Texture = FogCurTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
@@ -1158,9 +1185,9 @@ namespace LegionGU
 		// Direct3D 9: the interface the addon reports; the painted mask is of the Legion layout.
 		return LegionGUUIAt(uv);
 #elif LEGIONGU_UI_MASK
-		return saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x);
+		return max(LegionGUUIAt(uv), saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x));
 #else
-		return 0.0;
+		return LegionGUUIAt(uv);
 #endif
 	}
 
@@ -1813,9 +1840,57 @@ namespace LegionGU
 		return float4(-best, conf, float(FrameCount % 8388608u));
 	}
 
+	// The shift for the motion blur. The estimate is right to a texel or two but its confidence swings 0.2..0.6
+	// from frame to frame, and the blur scaled by it pumped its smear length on a steady turn (29.09). Here a
+	// trusted shift (MO_TRUST) is taken whole and eased in over MO_SMOOTH_TIME; an untrusted one or a one-texel
+	// jitter of a still camera eases toward zero. On a replay of a recorded turn the smear follows the true
+	// shift within 1.3 texels of 192, against 5.8 before.
+	static const float MO_TRUST = 0.12;
+	static const float MO_SMOOTH_TIME = 0.048;   // seconds: half the way per frame at 30 frames a second
+
+	texture2D MoSmoothPrevTex { Width = 1; Height = 1; Format = RGBA32F; };
+	sampler2D MoSmoothPrev { Texture = MoSmoothPrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
+
+	float4 MotionSmoothPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		float4 m = tex2Dfetch(LegionGUMotionS, int2(0, 0));
+		float4 s = tex2Dfetch(MoSmoothPrev, int2(0, 0));
+		float age = float((FrameCount % 8388608u + 8388608u - uint(s.w + 0.5) % 8388608u) % 8388608u);
+		float2 prev = age <= 2.0 ? s.xy : float2(0.0, 0.0);
+		bool trusted = m.z >= MO_TRUST && length(m.xy * float2(192.0, 108.0)) > 1.01;
+		float2 target = trusted ? m.xy : float2(0.0, 0.0);
+		return float4(lerp(prev, target, Rate(FrameSeconds(), MO_SMOOTH_TIME)), 0.0, float(FrameCount % 8388608u));
+	}
+
+	float4 MotionSmoothSavePS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		return tex2Dfetch(LegionGUMoSmoothS, int2(0, 0));
+	}
+
 	float4 MotionSavePS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		return tex2Dfetch(MoScenePoint, int2(pos.xy));
+	}
+
+	// The mist at the feet (1.7.6) lies in a pool around the character. Lit along the line of sight like the low mist,
+	// it thickened with the distance and stood as a band in the middle of the frame, on the land far past the player.
+	static const float MIST_FEET_CHAR_MAX = 40.0;       // yards: nothing nearer in the middle means first person, the pool is at the camera
+	static const float2 MIST_FEET_REACH = float2(4.0, 9.0); // yards from the character where the pool is down to a third, dial 0 and 100
+	static const float2 MIST_FEET_DEPTH = float2(0.9, 1.8); // plane units it reaches up, about 0.6 to 1.2 yards: the boots
+
+	// The character's distance: the nearest of five taps around it, a little below the middle of the frame
+	// (the same taps as CharacterYards in LegionGUNightsbylevan.fx).
+	float TapYards(float2 uv, float reversed)
+	{
+		float u = DepthU(RawDepth(uv), reversed);
+		return IsSky(u) ? 1e5 : Yards(u);
+	}
+
+	float CharacterYards(float reversed)
+	{
+		float f = min(min(TapYards(float2(0.5, 0.55), reversed), TapYards(float2(0.47, 0.62), reversed)),
+		              min(min(TapYards(float2(0.53, 0.62), reversed), TapYards(float2(0.5, 0.7), reversed)), TapYards(float2(0.5, 0.48), reversed)));
+		return clamp(f, 1.0, 500.0);
 	}
 
 	float4 FogStatePS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
@@ -1881,9 +1956,15 @@ namespace LegionGU
 			// land a few times a second; raw, each step shifted the mist drift sideways in a visible chunk.
 			float raw = LegionGUFacingRad();
 			float2 now8 = float2(cos(raw), sin(raw));
-			float2 v8 = seeded ? lerp(tex2Dfetch(FogPrev, int2(8, 0)).xy, now8, Rate(dt, 0.4)) : now8;
+			float4 p8 = tex2Dfetch(FogPrev, int2(8, 0));
+			float2 v8 = seeded ? lerp(p8.xy, now8, Rate(dt, 0.4)) : now8;
 			float l8 = length(v8);
-			return float4(l8 > 1e-4 ? v8 / l8 : now8, 0.0, 1.0);
+			// z: the character's distance for the mist at the feet (1.7.6), eased so a tap slipping off the legs
+			// onto the land behind does not move the pool.
+			float zc = CharacterYards(reversed);
+			zc = zc > MIST_FEET_CHAR_MAX ? 0.0 : zc;
+			zc = seeded ? lerp(p8.z, zc, Rate(dt, 0.3)) : zc;
+			return float4(l8 > 1e-4 ? v8 / l8 : now8, zc, 1.0);
 		}
 
 		// The frame's average; the far land weighted by distance and by the square of its brightness, so the
@@ -2164,12 +2245,36 @@ namespace LegionGU
 		float density = abs(b - a) > 1e-3 ? (exp(-a) - exp(-b)) / (b - a) : exp(-a);
 		// The drift is anchored to the eased facing (texel 8), not the raw strip value: the strip's 64 steps land
 		// a few times a second, and raw, every step tore the mist into visible chunks on a camera turn (1.7.1).
-		// flowScale mutes the drift: the dense band at the feet turned the breathing rings into fat waves that
-		// stood on the screen while the character ran, so it takes the pattern barely at all.
 		float2 f8 = tex2Dfetch(FogCur, int2(8, 0)).xy;
 		float ax = uv.x + atan2(f8.y, f8.x) / (2.0 * atan(0.57735 * ASPECT));
 		float tau = m.z * max(z - m.y, 0.0) * density * lerp(1.0, MistFlow(ax, log2(max(z, 1.0))), flowScale);
 		return m.w * (1.0 - exp(-tau)) * (1.0 - sky) * ground.z;
+	}
+
+	// The mist at the feet: a pool around the character (texel 8 z, CharacterYards), thickest at the feet and thinning
+	// out with the distance from them (MIST_FEET_REACH), as high as the boots over the ground plane. The distance to the character is taken on
+	// the screen's width and the depth; the height over the ground is the low mist's own (see MistAt). The drift
+	// pattern rides at half strength: enough to live, too little to roll waves around the legs.
+	float MistFeetAt(float2 uv, float reversed, float4 ground, float nearAmt)
+	{
+		float u = DepthU(RawDepth(uv), reversed);
+		float sky = SkyShare(u);
+		if (sky >= 1.0)
+			return 0.0;
+		float z = Yards(u);
+		float4 f8 = tex2Dfetch(FogCur, int2(8, 0));
+		float dx = z * (2.0 * uv.x - 1.0) * 0.57735 * ASPECT;
+		float r = length(float2(dx, z - f8.z));
+		float k = r / lerp(MIST_FEET_REACH.x, MIST_FEET_REACH.y, nearAmt);
+		if (k >= 3.0)
+			return 0.0;
+		float qc = 1.0 / max(ground.y, 1e-4);
+		float qp = min(z, MIST_FAR) * ((1.0 - 2.0 * uv.y) - ground.x + qc / max(z, 1e-3));
+		float w = exp(-k * k) * (1.0 - smoothstep(2.0, 3.0, k));
+		float h = exp(-max(qp, 0.0) / lerp(MIST_FEET_DEPTH.x, MIST_FEET_DEPTH.y, nearAmt));
+		float ax = uv.x + atan2(f8.y, f8.x) / (2.0 * atan(0.57735 * ASPECT));
+		float flow = lerp(1.0, MistFlow(ax, log2(max(z, 1.0))), 0.5);
+		return saturate(w * h * flow) * (1.0 - sky) * ground.z;
 	}
 
 	float4 FogApplyPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
@@ -2225,20 +2330,15 @@ namespace LegionGU
 			mist = 0.5 * (MistAt(uv - o, reversed, ground, m, 1.0) + MistAt(uv + o, reversed, ground, m, 1.0));
 			mist *= depthState.x * (1.0 - smoothstep(0.6, 0.95, view.y)) * (1.0 - UIMask(uv));
 		}
-		// The mist at the feet (1.7.1): a second, ankle-deep band with no clear circle around the player — the
-		// main mist starts 6 to 25 yards out, which is why a swamp never lapped at the boots. The eye stands
-		// above such a low band, and the height falloff ate three quarters of it (the first cut read as nothing
-		// at 100): the density makes up for exp(-MIST_EYE / height) up front, so the dial's percent is what the
-		// player actually sees at the ground. The drift pattern rides at half strength: enough to live, too
-		// little to roll waves.
+		// The mist at the feet (1.7.1, a pool around the character since 1.7.6, see MistFeetAt): the main mist starts
+		// 6 to 25 yards out, which is why a swamp never lapped at the boots.
 		float nearAmt = LegionGUValue(LEGIONGU_CTL_MIST_NEAR, 0.0) * 0.01;
 		if (nearAmt > 0.0 && ground.z > 0.0 && depthState.y > 0.5 && depthState.x > 0.0)
 		{
-			float nearH = MIST_HEIGHT * 0.45;
-			float4 mn = float4(nearH, 0.0, MIST_DENSITY * 6.0 * nearAmt * exp(MIST_EYE / nearH), lerp(0.3, 0.65, nearAmt) * (1.0 - inside.x));
 			float reversed = EffectiveReversed(depthState.w);
 			float2 o = 0.45 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
-			float near = 0.5 * (MistAt(uv - o, reversed, ground, mn, 0.5) + MistAt(uv + o, reversed, ground, mn, 0.5));
+			float near = 0.5 * (MistFeetAt(uv - o, reversed, ground, nearAmt) + MistFeetAt(uv + o, reversed, ground, nearAmt));
+			near *= lerp(0.3, 0.65, nearAmt) * (1.0 - inside.x);
 			mist = max(mist, near * depthState.x * (1.0 - smoothstep(0.6, 0.95, view.y)) * (1.0 - UIMask(uv)));
 		}
 		if (a.x + a.y <= 0.0 && mist <= 0.0 && weather <= 0.0)
@@ -3090,7 +3190,7 @@ namespace LegionGU
 #if __RENDERER__ < 0xa000
 		float2 size = ceil(float2(LEGIONGU_UI_CELLS, 2.0) * LEGIONGU_CTL_PITCH) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 #else
-		float2 size = float2(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL, LEGIONGU_CTL_CELL) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+		float2 size = float2(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL, 2 * LEGIONGU_CTL_CELL) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 #endif
 		uv = float2(id == 2 ? 2.0 : 0.0, id == 1 ? 2.0 : 0.0) * size;
 		pos = float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
@@ -3109,19 +3209,26 @@ namespace LegionGU
 			discard;
 		return tex2Dfetch(ColorPoint, int2(int(pos.x), int(ceil(2.0 * LEGIONGU_CTL_PITCH)) + 1));
 #else
-		if (tex2Dfetch(LegionGUCtl, int2(0, 0)).z < 0.5 || !LegionGUInStrip(pos.xy))
+		// Direct3D 11: the cells are whole pixels, row 1 once it was read.
+		bool row0 = pos.y < float(LEGIONGU_CTL_CELL) && pos.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL);
+		bool row1 = pos.y >= float(LEGIONGU_CTL_CELL) && pos.y < float(2 * LEGIONGU_CTL_CELL)
+			&& pos.x < float(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL) && tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5;
+		if (tex2Dfetch(LegionGUCtl, int2(0, 0)).z < 0.5 || !(row0 || row1))
 			discard;
-		return tex2Dfetch(ColorPoint, int2(int(pos.x), LEGIONGU_CTL_CELL + 1));
+		return tex2Dfetch(ColorPoint, int2(int(pos.x), 2 * LEGIONGU_CTL_CELL + 1));
 #endif
 	}
 
-#if __RENDERER__ < 0xa000
-	// The second row (Direct3D 9, the 1.12 addon): cell 0 the signature 5, then per rectangle left, top, right and
-	// bottom, 0..511 of the screen each in three cells, the high bits first, the last two cells the sum of the
-	// coordinates modulo 64. The thresholds are row 0's.
+	// The second row: cell 0 the signature 5, then per rectangle left, top, right and bottom, 0..511 of the screen
+	// each in three cells, the high bits first, the last two cells the sum of the coordinates modulo 64. The
+	// thresholds are row 0's.
 	float BridgeUIBits(int i, float3 th)
 	{
+#if __RENDERER__ < 0xa000
 		float3 b = step(th, tex2Dfetch(ColorPoint, int2((float(i) + 0.5) * LEGIONGU_CTL_PITCH, 1.5 * LEGIONGU_CTL_PITCH)).rgb);
+#else
+		float3 b = step(th, tex2Dfetch(ColorPoint, int2(i * LEGIONGU_CTL_CELL + LEGIONGU_CTL_CELL / 2, LEGIONGU_CTL_CELL + LEGIONGU_CTL_CELL / 2)).rgb);
+#endif
 		return b.r * 4.0 + b.g * 2.0 + b.b;
 	}
 
@@ -3135,17 +3242,19 @@ namespace LegionGU
 	float4 BridgeUIReadPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		int texel = int(pos.x);
+		// The frame is stamped read or not: it tells the effects the bridge has covered the strip (LegionGUInStrip).
+		float4 none = texel >= LEGIONGU_UI_RECTS ? float4(0.0, float(FrameCount % 8388608u), 0.0, 0.0) : 0.0;
 		float3 th;
 		if (!BridgeSeen(th) || BridgeUIBits(0, th) != 5.0)
-			return 0.0;
+			return none;
 		float sum = 0.0;
 		LEGIONGU_UNROLL
 		for (int i = 0; i < LEGIONGU_UI_RECTS * 4; i++)
 			sum += BridgeUICoord(1 + 3 * i, th);
 		if (abs(sum % 64.0 - (BridgeUIBits(LEGIONGU_UI_CELLS - 2, th) * 8.0 + BridgeUIBits(LEGIONGU_UI_CELLS - 1, th))) > 0.5)
-			return 0.0;
+			return none;
 		if (texel >= LEGIONGU_UI_RECTS)
-			return float4(1.0, 0.0, 0.0, 0.0);
+			return float4(1.0, float(FrameCount % 8388608u), 0.0, 0.0);
 		int c = 1 + 12 * texel;
 		return float4(BridgeUICoord(c, th), BridgeUICoord(c + 3, th), BridgeUICoord(c + 6, th), BridgeUICoord(c + 9, th)) / 511.0;
 	}
@@ -3165,7 +3274,6 @@ namespace LegionGU
 		}
 		return ui;
 	}
-#endif
 
 	technique LegionGUBridge <
 		ui_label = "GU-WOW: меню в игре";
@@ -3175,10 +3283,8 @@ namespace LegionGU
 	{
 		pass BridgeRead { VertexShader = FullscreenVS; PixelShader = BridgeReadPS; RenderTarget = LegionGUCtlTex; }
 		pass BridgeSave { VertexShader = FullscreenVS; PixelShader = BridgeSavePS; RenderTarget = BridgePrevTex; }
-#if __RENDERER__ < 0xa000
 		pass BridgeUIRead { VertexShader = FullscreenVS; PixelShader = BridgeUIReadPS; RenderTarget = LegionGUUIRectTex; }
 		pass BridgeUIDraw { VertexShader = FullscreenVS; PixelShader = BridgeUIDrawPS; RenderTarget = LegionGUUITex; }
-#endif
 		pass BridgeHide { VertexShader = BridgeHideVS; PixelShader = BridgeHidePS; }
 	}
 
@@ -3345,6 +3451,8 @@ namespace LegionGU
 	{
 		pass MotionDown { VertexShader = FullscreenVS; PixelShader = MotionDownPS; RenderTarget = MoSceneTex; }
 		pass MotionEstimate { VertexShader = FullscreenVS; PixelShader = MotionEstimatePS; RenderTarget = LegionGUMotionTex; }
+		pass MotionSmooth { VertexShader = FullscreenVS; PixelShader = MotionSmoothPS; RenderTarget = LegionGUMoSmoothTex; }
+		pass MotionSmoothSave { VertexShader = FullscreenVS; PixelShader = MotionSmoothSavePS; RenderTarget = MoSmoothPrevTex; }
 		pass FogState { VertexShader = FullscreenVS; PixelShader = FogStatePS; RenderTarget = FogCurTex; }
 		pass MotionSave { VertexShader = FullscreenVS; PixelShader = MotionSavePS; RenderTarget = MoPrevTex; }
 		pass FogSave { VertexShader = FullscreenVS; PixelShader = FogSavePS; RenderTarget = FogPrevTex; }
