@@ -10,6 +10,10 @@
 // which reads it, runs once more at the end of the frame over the finished picture; the effects of the next frame
 // take the settings from there, one frame late. A frame without that quad (the glow off, the login screen) keeps
 // ReShade's own order: every effect at the end of the frame, around the interface rectangles the addon reports.
+//
+// While the effects run under the interface the module raises the uniform LegionGUUnderUI in both effect files: no
+// window is drawn yet, so the effects lay the fog over the rectangles too, and the see-through chat and frames show
+// the fogged world behind them, never a clear box (the player's shots under water and in Uldaman, 30.09).
 #include <reshade.hpp>
 #include <d3d9.h>
 
@@ -18,6 +22,8 @@ using namespace reshade::api;
 
 static effect_runtime *runtime = nullptr;
 static effect_technique bridge = {};
+static effect_uniform_variable underUI[2] = {};
+static const char *const effectFiles[2] = { "LegionGUbylevan.fx", "LegionGUNightsbylevan.fx" };
 static bool onBack = false;
 static bool copied = false;
 static bool rendered = false;
@@ -37,12 +43,23 @@ static void OnDestroyRuntime(effect_runtime *r)
 	if (runtime == r)
 		runtime = nullptr;
 	bridge = {};
+	underUI[0] = underUI[1] = {};
 }
 
 static void OnReloaded(effect_runtime *r)
 {
-	if (runtime == r)
-		bridge = r->find_technique("LegionGUbylevan.fx", "LegionGUBridge");
+	if (runtime != r)
+		return;
+	bridge = r->find_technique(effectFiles[0], "LegionGUBridge");
+	for (int i = 0; i < 2; ++i)
+		underUI[i] = r->find_uniform_variable(effectFiles[i], "LegionGUUnderUI");
+}
+
+static void SetUnderUI(bool on)
+{
+	for (effect_uniform_variable v : underUI)
+		if (v != 0)
+			runtime->set_uniform_value_bool(v, &on, 1);
 }
 
 static void OnBindTargets(command_list *, uint32_t count, const resource_view *rtvs, resource_view)
@@ -84,7 +101,9 @@ static void BeforeDraw(command_list *cmd_list)
 	}
 	rendered = true;
 	const resource_view rtv = BackBufferView();
+	SetUnderUI(true);
 	runtime->render_effects(cmd_list, rtv, rtv);
+	SetUnderUI(false);
 }
 
 static bool OnDraw(command_list *cmd_list, uint32_t, uint32_t, uint32_t, uint32_t)

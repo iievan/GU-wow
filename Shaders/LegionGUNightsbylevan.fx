@@ -174,7 +174,7 @@
 #define LEGIONGU_CTL_RAYS_OPEN 31 // rays in the open, percent of the full strength; the old fixed cut was 22, 1.7.1
 #define LEGIONGU_CTL_RAYS_REACH 32 // ray length, 50 neutral
 #define LEGIONGU_CTL_SUN_GLOW 33 // the sun's glow in the fog, 50 neutral, 0 off, 100 double
-#define LEGIONGU_CTL_MIST_NEAR 34 // the mist at the feet, ankle-deep, 0 off, 1.7.1
+#define LEGIONGU_CTL_MIST_NEAR 34 // reserved: the mist at the feet, taken out in 2.0 until it is done right
 #define LEGIONGU_CTL_CHAT_L 35   // the chat window in uv, for the heat haze to leave alone (beta-1.0)
 #define LEGIONGU_CTL_CHAT_T 36
 #define LEGIONGU_CTL_CHAT_R 37
@@ -220,21 +220,39 @@ texture2D LegionGUUITex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; 
 sampler2D LegionGUUI { Texture = LegionGUUITex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 uniform uint LegionGUFrame < source = "framecount"; >;
 
+// Direct3D 9: raised by the GU-WOW module while the effects run under the interface (see LegionGUbylevan.fx).
+uniform bool LegionGUUnderUI < source = "guwow_under_ui"; > = false;
+
 // Whether LegionGUBridge has run this frame (see LegionGUbylevan.fx).
 bool LegionGUBridgeDone()
 {
 	return abs(tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).y - float(LegionGUFrame % 8388608u)) <= 0.5;
 }
 
-// 1 on the interface, 0 on the world. Direct3D 11: only once the bridge has run this frame (see
-// LegionGUbylevan.fx).
+// 1 on the interface, 0 on the world. Direct3D 11: only once the bridge has run this frame, Direct3D 9: 0 while the
+// effects run under the interface (see LegionGUbylevan.fx).
 float LegionGUUIAt(float2 uv)
 {
 #if __RENDERER__ >= 0xa000
 	if (!LegionGUBridgeDone())
 		return 0.0;
+#else
+	if (LegionGUUnderUI)
+		return 0.0;
 #endif
 	return tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x;
+}
+
+// The chat's live rectangle in uv (CTL 35..38), empty while the effects run under the interface: no letter is drawn
+// yet, and the kept rectangle stood as a clear box in the fog under water (30.09).
+float4 LegionGUChatRect()
+{
+#if __RENDERER__ < 0xa000
+	if (LegionGUUnderUI)
+		return 0.0;
+#endif
+	return float4(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_L, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_T, 0)).x,
+	              tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_R, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_B, 0)).x);
 }
 
 // The strip's corner. Every effect leaves these pixels as they are, so the strip reaches LegionGUBridge unchanged
@@ -247,14 +265,14 @@ bool LegionGUInStrip(float2 p)
 	// stayed a band of the bare game over the covered strip, and on 3.3.5, with no second row, under it (29.09).
 	return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 #else
-	// Direct3D 11: the interface, and until the bridge has run row 0 and row 1 while the addon paints it (see
-	// LegionGUbylevan.fx).
+	// Direct3D 11: the interface once the bridge has drawn its mask; until then row 0 and row 1 while the addon paints
+	// them (see LegionGUbylevan.fx). When REST misses a frame the effects run after the interface, and an open window
+	// stays exactly as the game composited it: the world's depth under it draws no night, fog or shadow there (01.10).
 	if (LegionGUBridgeDone())
 		return LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
 	return (p.x < float(LEGIONGU_CTL_CELLS * LEGIONGU_CTL_CELL) && p.y < float(LEGIONGU_CTL_CELL))
-		|| (p.x < float(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL) && p.y < float(2 * LEGIONGU_CTL_CELL)
-			&& tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5)
-		|| LegionGUUIAt(p * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)) > 0.5;
+		|| (p.x < float(LEGIONGU_UI_CELLS * LEGIONGU_CTL_CELL) && p.y >= float(LEGIONGU_CTL_CELL) && p.y < float(2 * LEGIONGU_CTL_CELL)
+			&& tex2Dfetch(LegionGUUIRect, int2(LEGIONGU_UI_RECTS, 0)).x > 0.5);
 #endif
 }
 
@@ -963,6 +981,25 @@ namespace LegionGUNights
 	static const float ASPECT = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
 	static const float3 LUMA601 = float3(0.299, 0.587, 0.114);
 
+	// The light added over the picture (the rays, the glow in the air) rises as it is up to ADD_KNEE and then bends
+	// softly toward 1 and never reaches it: the screen blend c + add (1 - c) with add at 1 or more turned the sun
+	// through leaves into flat white patches (2.0). A soft cap after a knee is modern-wow-renderer's bloom idea; the
+	// form here is linear below the knee, so the dim rays and the small fires keep the strength they had.
+	static const float ADD_KNEE = 0.5;
+	float3 SoftAdd(float3 a)
+	{
+		float3 over = max(a - ADD_KNEE, 0.0);
+		return min(a, ADD_KNEE) + (1.0 - ADD_KNEE) * (1.0 - exp(-over / (1.0 - ADD_KNEE)));
+	}
+
+	// A rays source that has just passed the threshold counts little and a clear gap in full: x^2 / (x + 0.5), scaled
+	// to 1 at the top (2.0). A leaf that shivers around the threshold does not switch a shaft on and off.
+	float SourceKnee(float x)
+	{
+		x = saturate(x);
+		return 1.5 * x * x / (x + 0.5);
+	}
+
 	// A pixel is sky when its depth is the far-plane clear value (next to the far plane one D24 step already
 	// means millions of yards, so no real geometry is caught), or when it is at SkyFrom or beyond, in case
 	// the sky writes depth. The fog fades to the sky's treatment over the last SKY_RAMP share before SkyFrom,
@@ -975,8 +1012,11 @@ namespace LegionGUNights
 	static const int GRID_X = 32;
 	static const int GRID_Y = 18;
 
-	// Seconds for the depth-present fade and for the automatic depth type decision.
+	// Seconds for the depth-present fade and for the automatic depth type decision. The depth comes back at
+	// DEPTH_RISE_TIME: after the map, a look at the minimap or a short gap in the depth the effects are there at once;
+	// at DEPTH_FADE_TIME they stood a second off the screen after every map (2.0).
 	static const float DEPTH_FADE_TIME = 1.0;
+	static const float DEPTH_RISE_TIME = 0.15;
 	static const float DEPTH_TYPE_TIME = 1.0;
 	// "Rays only with depth" keeps the rays this many seconds after the depth last differed across the grid,
 	// then fades them out over DEPTH_FADE_TIME. A cleared buffer (a loading screen) then gets no rays.
@@ -1088,8 +1128,9 @@ namespace LegionGUNights
 	static const float FOG_SKY_PALE = 0.5;
 	// The haze layer (see FogHazeColour) goes HAZE_SHADE of the way to the key, the mean colour of the land
 	// nearer than NEAR_LAND yards. It needs more than FOG_KEY_TAPS grid taps of such land, else it keeps the
-	// fog colour.
+	// fog colour. A fog darker than the land under it gives back FOG_KEEP of the brightness it took (see FogBlend).
 	static const float HAZE_SHADE = 0.5;
+	static const float FOG_KEEP = 0.5;
 	static const float NEAR_LAND = 30.0;
 	static const float FOG_KEY_TAPS = 2.0;
 	// Sunlight in the fog: toward the sun the fog colour rises by up to INSCATTER_GAIN and takes on the light
@@ -1277,8 +1318,11 @@ namespace LegionGUNights
 	static const float LIFT_LIT_CUT = 0.8;
 	// The glow in the air: the same fields at a width of GLOW_AIR_R yards (times 1 + GLOW_AIR_R_FOG times the fog dial: wider
 	// in thick fog), times GLOW_AIR_BASE plus GLOW_AIR_FOG times the fog between the camera and the lights, so everything
-	// behind a light, the sky included, gets the same glow and no edge shows on the horizon. Nothing more than
-	// GLOW_AIR_GATE octaves in front of the light gets it. GLOW_AIR_GAIN scales it, eased into GLOW_AIR_MAX, added as a screen
+	// behind a light, the sky included, gets the same glow and no edge shows on the horizon. What stands in front of
+	// the light covers its glow (2.0, after modern-wow-renderer's sphere around a light): the glow lives in the air
+	// within GLOW_OCC_K of the light's distance, at least GLOW_OCC_NEAR yards, and land nearer than that sphere gets
+	// none of it. The old gate by the ratio of depths laid the full halo of a torch ten yards away over a crate a
+	// yard and a half in front of it. GLOW_AIR_GAIN scales it, eased into GLOW_AIR_MAX, added as a screen
 	// blend. The lights run at full strength in the night or where the ambient is at GLOW_AMB_DARK or darker, fade
 	// out by GLOW_AMB_LIGHT, and the day (a bright sky) switches them off. Below LIGHT_EPS in the widest field no
 	// light is near, and the pixel skips the rest.
@@ -1286,8 +1330,8 @@ namespace LegionGUNights
 	static const float GLOW_AIR_TAIL = -0.6;     // the wide levels weigh less: a tighter halo
 	static const float GLOW_AIR_BASE = 0.5;
 	static const float GLOW_AIR_FOG = 1.0;       // halved for the same reason
-	static const float GLOW_AIR_GATE_LO = 0.62;
-	static const float GLOW_AIR_GATE_HI = 0.87;
+	static const float GLOW_OCC_K = 0.25;
+	static const float GLOW_OCC_NEAR = 1.5;
 	static const float GLOW_AIR_GAIN = 1.2;
 	static const float GLOW_AIR_MAX = 0.45;    // 0.32 to 1.6.5
 	// The air glow is eased as GLOW_AIR_MAX (1 - exp(-(a / GLOW_AIR_KNEE)^GLOW_AIR_POW)): below 1 the power lifts weak
@@ -1323,6 +1367,15 @@ namespace LegionGUNights
 	// The indoor share easing at a door (see FogCurTex texel 9): in fast, out slow, like eyes at a doorway.
 	static const float INSIDE_IN = 0.6;
 	static const float INSIDE_OUT = 2.2;
+	// The game's own thick fog (texel 9 .y): land past NEAR_LAND within GAME_FOG_CLOSE of the fog colour counts as
+	// fogged; from GAME_FOG_FROM to GAME_FOG_FULL of such land our fog and the night mist give way (by GAME_FOG_GIVE at
+	// most), over GAME_FOG_ADAPT seconds. Fewer than GAME_FOG_TAPS land taps say nothing.
+	static const float GAME_FOG_CLOSE = 0.25;
+	static const float GAME_FOG_FROM = 0.45;
+	static const float GAME_FOG_FULL = 0.8;
+	static const float GAME_FOG_GIVE = 0.85;
+	static const float GAME_FOG_ADAPT = 3.0;
+	static const float GAME_FOG_TAPS = 8.0;
 
 	// ---------------------------------------------------------------------------------------------------
 	// Textures and samplers
@@ -1356,8 +1409,6 @@ namespace LegionGUNights
 	sampler2D RaysStats { Texture = RaysStatsTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 	// Rays: air along the line of sight per scene texel (0..1), for the composite.
-	texture2D RaysAirTex { Width = LEGIONGU_SCENE_W; Height = LEGIONGU_SCENE_H; Format = R8; };
-	sampler2D RaysAir { Texture = RaysAirTex; };
 
 	// Rays state, persistent between frames. Texel 0: sun point xy the rays use, found share, seeded flag.
 	// Texel 1: smoothed peak brightness. Texel 2: depth state (see DepthDecide).
@@ -1450,6 +1501,27 @@ namespace LegionGUNights
 		return max(LegionGUUIAt(uv), saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x));
 #else
 		return LegionGUUIAt(uv);
+#endif
+	}
+
+	// 1 on a protected interface rectangle, 0 on the world. Using the world's depth under a window's dark pixels drew
+	// silhouettes and fog inside it (01.10), so the whole rectangle counts (see LegionGUInStrip).
+	float UIDrawn(float2 uv, float3 c)
+	{
+		return UIMask(uv);
+	}
+
+	// The interface for the blurs, which only keep it sharp. Direct3D 11: before the bridge has run this frame the
+	// mask of the last frame stands in, so the blur while moving and the far blur leave the windows and the chat
+	// sharp; with an empty mask they smeared with every turn of the camera (2.0). An extra sharp spot costs nothing.
+	float UIMaskBlur(float2 uv)
+	{
+#if __RENDERER__ < 0xa000
+		return UIMask(uv);
+#elif LEGIONGU_UI_MASK
+		return max(tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x, saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x));
+#else
+		return tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x;
 #endif
 	}
 
@@ -1590,6 +1662,10 @@ namespace LegionGUNights
 	// 0.2 or 0.8 before the type flips, so it never flickers.
 	float4 DepthDecide(DepthScan d, float4 prev, bool seeded, float dt)
 	{
+		// While the fullscreen map is open (state bit 32) the world is not drawn: the state holds as it was, and the
+		// effects return with the map closed at full strength.
+		if (seeded && LegionGUState(32u))
+			return prev;
 		int2 size = tex2Dsize(DepthPoint);
 		bool sizeOk = size.x > 1 && size.y > 1;
 		bool varied = DepthVaried(d);
@@ -1632,7 +1708,7 @@ namespace LegionGUNights
 		// as if everything were at the near plane.
 		bool typeKnown = DepthType != 0 || score >= 0.5;
 		float presentNow = (present && typeKnown) ? 1.0 : 0.0;
-		float fade = seeded ? lerp(prev.x, presentNow, Rate(dt, DEPTH_FADE_TIME)) : presentNow;
+		float fade = seeded ? lerp(prev.x, presentNow, Rate(dt, presentNow > prev.x ? DEPTH_RISE_TIME : DEPTH_FADE_TIME)) : presentNow;
 		fade = fade > 0.999 ? 1.0 : (fade < 0.001 ? 0.0 : fade);
 		return float4(fade, presentNow, score, reversed);
 	}
@@ -1709,7 +1785,7 @@ namespace LegionGUNights
 	// haze the whole frame, loading screens included. depthState.x fades the fog in when depth appears.
 	// open is the eased horizon confidence (fog state texel 3): with the horizon in view the haze at the camera
 	// is FOG_HAZE_OPEN of FogHaze t.
-	float2 FogAmount(float2 uv, float t, float4 depthState, float open)
+	float2 FogAmountAll(float2 uv, float t, float4 depthState, float open)
 	{
 		if (depthState.y < 0.5 || depthState.x <= 0.0)
 			return float2(0.0, 0.0);
@@ -1718,7 +1794,13 @@ namespace LegionGUNights
 		float2 o = 0.45 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 		float2 a = 0.25 * (FogAt(uv + float2(-o.x, -o.y), reversed, t, haze0) + FogAt(uv + float2(o.x, -o.y), reversed, t, haze0)
 		                 + FogAt(uv + float2(-o.x, o.y), reversed, t, haze0) + FogAt(uv + float2(o.x, o.y), reversed, t, haze0));
-		return a * (depthState.x * (1.0 - UIMask(uv)));
+		return a * (depthState.x * (1.0 - GAME_FOG_GIVE * tex2Dfetch(FogCur, int2(9, 0)).y));
+	}
+
+	// The same with no fog on the interface.
+	float2 FogAmount(float2 uv, float t, float4 depthState, float open)
+	{
+		return FogAmountAll(uv, t, depthState, open) * (1.0 - UIMask(uv));
 	}
 
 	// Closeness of a pixel to a point, 1 at the point and 0 from INSCATTER_RADIUS screen heights on, falling
@@ -1776,11 +1858,18 @@ namespace LegionGUNights
 	// layers are brighter and warmer toward the sun. Only the haze turns dimmer and cooler away from it: the
 	// distance fog is what far land dissolves into, and a dimmed one left the far hills darker than the sky
 	// right above them, like cardboard (judge, round 2: 37 to 49 levels on field and snow).
+	// The layer takes colour, not light (2.0, after benilla-everwood): a fog darker than the lit land under it
+	// greyed the land into a murky veil, so the blend gets back FOG_KEEP of the brightness it took, filled from
+	// the headroom of the fogged colour so the hue stays the fog's. Only as much as the distance fog leaves:
+	// what the far land fully dissolves into stays the fog colour itself, and the horizon still meets the sky.
 	float3 FogBlend(float3 c, float2 a, float3 fogColour, float4 key, float2 sun)
 	{
 		float3 lit = FogLitMix(fogColour, sun.x, sun.x);
 		float3 haze = FogLitMix(FogHazeColour(fogColour, key), sun.x, sun.y);
-		return c * (1.0 - a.x - a.y) + lit * a.x + haze * a.y;
+		float3 o = c * (1.0 - a.x - a.y) + lit * a.x + haze * a.y;
+		float missing = max(0.0, dot(c - o, LUMA601)) * FOG_KEEP * (1.0 - a.x);
+		float3 room = max(1.0 - o, 0.0);
+		return o + room * saturate(missing / max(dot(room, LUMA601), 1e-4));
 	}
 
 	bool OnBorder(float2 uv)
@@ -1988,15 +2077,7 @@ namespace LegionGUNights
 		float4 depthState = DepthDecide(ScanDepth(), prev1, seeded, dt);
 		if (texel == 1)
 			return depthState;
-		if (texel == 9)
-		{
-			float now = LegionGUState(2u) ? 1.0 : 0.0;
-			float prev9 = seeded ? tex2Dfetch(FogPrev, int2(9, 0)).x : now;
-			float e = lerp(prev9, now, Rate(dt, now > prev9 ? INSIDE_IN : INSIDE_OUT));
-			e = e > 0.999 ? 1.0 : (e < 0.001 ? 0.0 : e);
-			return float4(e, 0.0, 0.0, 1.0);
-		}
-		if (texel >= 4)
+		if (texel >= 4 && texel != 9)
 			return NightStateTexel(texel, depthState, dt);
 
 		float reversed = EffectiveReversed(depthState.w);
@@ -2016,17 +2097,25 @@ namespace LegionGUNights
 		float skyN = 0.0;
 		float3 nearC = float3(0.0, 0.0, 0.0);
 		float nearN = 0.0;
+		float landN = 0.0;
+		float foggedN = 0.0;
+		float prevL = dot(prev0.rgb, LUMA601);
 		[loop]
 		for (int j = 0; j < GRID_Y; ++j)
 		{
+			// Direct3D 9: a real loop over the row too. Unrolled with the check of the game's own fog (2.0) the pass
+			// ran out of Shader Model 3's temp registers, and the whole night file failed to load on 1.12 to 3.3.5.
+#if __RENDERER__ < 0xa000
+			[loop]
+#else
 			[unroll]
+#endif
 			for (int i = 0; i < GRID_X; ++i)
 			{
 				float2 g = GridUV(i, j);
 				float3 c = tex2Dlod(ColorPoint, float4(g, 0.0, 0.0)).rgb;
 				float l = dot(c, LUMA601);
 				sumC += c;
-
 				float u = DepthU(RawDepth(g), reversed);
 				float z = Yards(u);
 				bool sky = IsSky(u);
@@ -2041,7 +2130,29 @@ namespace LegionGUNights
 				float near = (!sky && z < NEAR_LAND) ? 1.0 : 0.0;
 				nearC += c * near;
 				nearN += near;
+				// Land past NEAR_LAND that already wears the fog's colour: the game's own thick fog.
+				float mid = (!sky && z >= NEAR_LAND) ? 1.0 : 0.0;
+				landN += mid;
+				foggedN += mid * step(length(c - prev0.rgb), GAME_FOG_CLOSE * max(max(l, prevL), 0.02));
 			}
+		}
+		// Texel 9: x the indoor share eased at the door; y how much of the land the game's own fog already covers,
+		// eased over GAME_FOG_ADAPT. Where the game fogs the frame thickly by itself (a foggy zone), our fog and the
+		// moonlit mist on top of it made a white veil at night; they give way by y, the night's darkness stays.
+		if (texel == 9)
+		{
+			float4 prev9 = tex2Dfetch(FogPrev, int2(9, 0));
+			float now = LegionGUState(2u) ? 1.0 : 0.0;
+			float e = lerp(seeded ? prev9.x : now, now, Rate(dt, now > prev9.x ? INSIDE_IN : INSIDE_OUT));
+			e = e > 0.999 ? 1.0 : (e < 0.001 ? 0.0 : e);
+			// Only with the horizon in view (the fog colour then comes from the sky, not from the land it is compared
+			// with), a pale fog (a dark clear night matches its dark land and is no foggy zone) and at night: by day the
+			// far land in haze wears the fog colour as well, and the day fog stays as it is.
+			float thick = (depthState.y > 0.5 && landN >= GAME_FOG_TAPS)
+						? smoothstep(GAME_FOG_FROM, GAME_FOG_FULL, foggedN / landN) * tex2Dfetch(FogPrev, int2(4, 0)).x
+						  * smoothstep(0.3, 0.6, tex2Dfetch(FogPrev, int2(3, 0)).x) * smoothstep(0.08, 0.15, prevL) : 0.0;
+			float gf = seeded ? lerp(prev9.y, thick, Rate(dt, GAME_FOG_ADAPT)) : thick;
+			return float4(e, gf, 0.0, 1.0);
 		}
 		float3 average = sumC / float(GRID_X * GRID_Y);
 		if (texel == 2)
@@ -2490,9 +2601,8 @@ namespace LegionGUNights
 		// letters ride well above it, the land and the horizon behind the clear back stay below. In a dark cave the
 		// ambient is so low that the dim floor too passed twice the bar and the chat stood as a light box (30.09): the
 		// letters are also bright by themselves (0.75 and up), the floor behind them is not.
-		float keepUI = 1.0 - UIMask(uv) * smoothstep(UI_KEEP_FROM, UI_KEEP_FULL, v / ambient);
-		float4 chat = float4(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_L, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_T, 0)).x,
-		                     tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_R, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_B, 0)).x);
+		float keepUI = 1.0 - UIDrawn(uv, c) * smoothstep(UI_KEEP_FROM, UI_KEEP_FULL, v / ambient);
+		float4 chat = LegionGUChatRect();
 		if (chat.z > chat.x && uv.x >= chat.x && uv.x <= chat.z && uv.y >= chat.y && uv.y <= chat.w)
 			keepUI = min(keepUI, 1.0 - smoothstep(2.0 * UI_KEEP_FROM, 2.0 * UI_KEEP_FULL, v / ambient) * smoothstep(0.5, 0.75, v));
 		float s = nt.y * keepUI;
@@ -2568,7 +2678,7 @@ namespace LegionGUNights
 			float3 lit = sky ? float3(0.0, 0.0, 0.0) : L.rgb * (exp2(-dz * dz) * keepUI * (1.0 - LIFT_LIT_CUT * h));
 			o += c * lit * (LIFT_MAX / (LIFT_MAX + dot(lit, LUMA601)));
 			float zl = A.a / max(dot(A.rgb, LUMA601), 1e-8);
-			air = A.rgb * (keepUI * (sky ? 1.0 : smoothstep(GLOW_AIR_GATE_LO, GLOW_AIR_GATE_HI, z / zl)));
+			air = A.rgb * (keepUI * (sky ? 1.0 : smoothstep(zl - max(GLOW_OCC_K * zl, GLOW_OCC_NEAR), zl, z)));
 			}
 		}
 
@@ -2583,7 +2693,7 @@ namespace LegionGUNights
 		}
 
 		// the moonlit mist over LegionGUFog's fog (see MIST_COLOUR)
-		float km = MIST_NIGHT_SHARE * saturate(2.0 * n7.z) * keepUI * outside;
+		float km = MIST_NIGHT_SHARE * saturate(2.0 * n7.z) * keepUI * outside * (1.0 - GAME_FOG_GIVE * tex2Dfetch(FogCur, int2(9, 0)).y);
 		if (km > 0.0)
 		{
 			float tf = FogDial();
@@ -2602,7 +2712,7 @@ namespace LegionGUNights
 				mist = lerp(mist, mist * 2.2 * (fireAir.rgb / max(dot(fireAir.rgb, LUMA601), 1e-5)), 0.6 * fireL);
 			o += max(mist - o, 0.0) * (fm * km * depthState.x);
 		}
-		return o + air * (1.0 - saturate(o));
+		return o + SoftAdd(air) * (1.0 - saturate(o));
 	}
 
 	// "Ночь и огни": the frame at a third, the lights that count in colour and the light field L0, and six squares at
@@ -2787,14 +2897,23 @@ namespace LegionGUNights
 		return lerp(land, 1.0, SkyShare(u));
 	}
 
+	// The air in front of the pixel at full resolution (2.0): four depth taps at the pixel corners, like the fog
+	// (see FogAmount). Read from the downsampled scene, the air of the sky reached a pixel or two over the edge of
+	// every trunk and roof, and the shafts drew a lit fringe along the silhouette.
+	float AirHere(float2 uv, float reversed)
+	{
+		float2 o = 0.45 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+		return 0.25 * (AirAt(DepthU(RawDepth(uv + float2(-o.x, -o.y)), reversed)) + AirAt(DepthU(RawDepth(uv + float2(o.x, -o.y)), reversed))
+		              + AirAt(DepthU(RawDepth(uv + float2(-o.x, o.y)), reversed)) + AirAt(DepthU(RawDepth(uv + float2(o.x, o.y)), reversed)));
+	}
+
 	// Pass 1: the downsampled scene, without the UI mask: the sun finder, the peak and the sky ring see the sky
 	// as it is, so a sun under a masked corner is still found. Only the ray source (pass 4) applies the mask.
 	// The colour is the average of the pixel block (LEGIONGU_COLOUR_TAPS bilinear taps per axis), so thin sky
 	// gaps in foliage count on every frame at any even downscale. Alpha is the sky share from depth. Without
 	// depth it is 0: nothing is known to be sky, so Auto finds no sun (a torch or a spell in the upper half of
-	// a dark dungeon would pass for one) and the sky gate stays off. The second target is the mean air of the
-	// block's depth taps (AirAt), AIR_NO_DEPTH without depth.
-	void RaysDownPS(float4 pos : SV_Position, float2 uv : TEXCOORD0, out float4 sceneOut : SV_Target0, out float airOut : SV_Target1)
+	// a dark dungeon would pass for one) and the sky gate stays off.
+	float4 RaysDownPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		float2 px = float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 		float3 c = float3(0.0, 0.0, 0.0);
@@ -2812,11 +2931,9 @@ namespace LegionGUNights
 
 		float4 depthState = tex2Dfetch(RaysPrev, int2(2, 0));
 		float sky = 0.0;
-		float air = AIR_NO_DEPTH;
 		if (depthState.y > 0.5)
 		{
 			float reversed = EffectiveReversed(depthState.w);
-			air = 0.0;
 			[unroll]
 			for (int j2 = 0; j2 < LEGIONGU_SKY_TAPS; ++j2)
 			{
@@ -2826,14 +2943,11 @@ namespace LegionGUNights
 					float2 o = ((float2(i2, j2) + 0.5) / float(LEGIONGU_SKY_TAPS) - 0.5) * float(LEGIONGU_RAYS_DOWNSCALE);
 					float u = DepthU(RawDepth(uv + o * px), reversed);
 					sky += IsSky(u) ? 1.0 : 0.0;
-					air += AirAt(u);
 				}
 			}
 			sky /= float(LEGIONGU_SKY_TAPS * LEGIONGU_SKY_TAPS);
-			air /= float(LEGIONGU_SKY_TAPS * LEGIONGU_SKY_TAPS);
 		}
-		sceneOut = float4(c, sky);
-		airOut = air;
+		return float4(c, sky);
 	}
 
 	// Brightness of a scene texel for the peak: luminance, times the sky share when the sky gate is on.
@@ -3084,7 +3198,8 @@ namespace LegionGUNights
 		if (texel == 6)
 		{
 			float since = seeded ? tex2Dfetch(RaysPrev, int2(6, 0)).x : DEPTH_HOLD_TIME + DEPTH_FADE_TIME;
-			since = DepthVaried(ScanDepth()) ? 0.0 : min(since + dt, 10.0);
+			if (!(seeded && LegionGUState(32u)))
+				since = DepthVaried(ScanDepth()) ? 0.0 : min(since + dt, 10.0);
 			return float4(since, float(FrameCount % STAMP_MOD), 0.0, 1.0);
 		}
 
@@ -3183,7 +3298,7 @@ namespace LegionGUNights
 			{
 				float2 t = uv + ((float2(i, j) + 0.5) / float(LEGIONGU_SRC_TAPS) - 0.5) * block;
 				float4 s = tex2Dlod(RaysScenePoint, float4(t, 0.0, 0.0));
-				float3 lit = s.rgb * saturate((dot(s.rgb, LUMA601) - thr) / span);
+				float3 lit = s.rgb * SourceKnee((dot(s.rgb, LUMA601) - thr) / span);
 				float2 d = (t - sun.e) * float2(ASPECT, 1.0);
 				float f = pow(saturate(1.0 - length(d) / max(RaysRadius, 0.05)), RaysFalloff);
 				float gate = skyGate ? saturate(4.0 * s.a) : 1.0;
@@ -3371,10 +3486,10 @@ namespace LegionGUNights
 		float canopy = saturate((tex2Dfetch(RaysCur, int2(7, 0)).x - CANOPY_LO) / (CANOPY_HI - CANOPY_LO));
 		gain *= lerp(RAYS_OPEN_GAIN, 1.0, canopy);
 		// The light is in the air: as much as there is air in front of the pixel.
-		float air = lerp(AIR_NO_DEPTH, tex2Dlod(RaysAir, float4(uv, 0.0, 0.0)).x, depthLive);
+		float air = depthLive > 0.0 ? lerp(AIR_NO_DEPTH, AirHere(uv, EffectiveReversed(depthState.w)), depthLive) : AIR_NO_DEPTH;
 		gain *= air * AIR_GAIN;
 		float3 add = rays * RaysColour * gain;
-		float3 o = c.rgb + add * (1.0 - saturate(c.rgb));
+		float3 o = c.rgb + SoftAdd(add) * (1.0 - saturate(c.rgb));
 		if (DebugView == DBG_SUN)
 			o = SunMarker(o, uv);
 		return float4(o, c.a);
@@ -3504,9 +3619,8 @@ namespace LegionGUNights
 				// so the shift dies under the UI mask. The chat is not in the painted mask — the player moves and
 				// resizes it — so the addon tells its live rectangle (CTL 35..38, beta-1.0) and the haze dies there
 				// too, with a few pixels of margin for the drag edge.
-				float keep = 1.0 - saturate(UIMask(uv) * 8.0);
-				float4 chat = float4(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_L, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_T, 0)).x,
-				                     tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_R, 0)).x, tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_CHAT_B, 0)).x);
+				float keep = 1.0 - saturate(UIMaskBlur(uv) * 8.0);
+				float4 chat = LegionGUChatRect();
 				if (chat.z > chat.x && uv.x >= chat.x - 0.004 && uv.x <= chat.z + 0.004 && uv.y >= chat.y - 0.004 && uv.y <= chat.w + 0.004)
 					keep = 0.0;
 				float2 off = wob * hz * HAZE_PX * LegionGUValue(LEGIONGU_CTL_HAZE, 50.0) * 0.02 * (float(BUFFER_HEIGHT) / 1080.0) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT) * keep;
@@ -3538,9 +3652,18 @@ namespace LegionGUNights
 			float r = eye.z - eye.x;
 			r = sign(r) * max(abs(r) - EYE_DEAD, 0.0);
 			// At night no dazzle: bright things come and go in the dark (lights, a glowing mount) and each one flashed the
-			// whole frame. Getting used to the dark stays.
+			// whole frame. Getting used to the dark stays. With the addon the game's clock counts too: indoors the night
+			// share is 0 and grows at the door, and stepping out of a lit house into the night dazzled for a second.
 			if (r > 0.0)
-				r *= 1.0 - tex2Dfetch(FogCur, int2(4, 0)).x;
+			{
+				float calm = tex2Dfetch(FogCur, int2(4, 0)).x;
+				if (LegionGUState(1u))
+				{
+					float h = LegionGUHour();
+					calm = max(calm, saturate(1.0 - smoothstep(4.5, 6.0, h) + smoothstep(20.0, 21.5, h)));
+				}
+				r *= 1.0 - calm;
+			}
 			float f = exp(clamp(EYE_STRENGTH * r, -EYE_MAX, EYE_MAX));
 			c *= f;
 			if (f > 1.0)
@@ -3693,12 +3816,14 @@ namespace LegionGUNights
 		float3 gp = frac(float3(float2(p), float(FrameCount % 1024u)) * 0.1031);
 		gp += dot(gp, gp.zyx + 31.32);
 		float gn = frac((gp.x + gp.y) * gp.z) - 0.5;
+		float gm = frac((gp.x + gp.z) * gp.y) - 0.5;
 #else
 		uint gh = uint(p.x) + uint(p.y) * 65521u + FrameCount * 26699u;
 		gh = gh * 747796405u + 2891336453u;
 		gh = ((gh >> ((gh >> 28u) + 4u)) ^ gh) * 277803737u;
 		gh = (gh >> 22u) ^ gh;
 		float gn = float(gh & 65535u) / 65535.0 - 0.5;
+		float gm = float(gh >> 16u) / 65535.0 - 0.5;
 #endif
 		float grain = LegionGUValue(LEGIONGU_CTL_GRAIN, FilmGrain) * 0.01;
 		if (grain > 0.0)
@@ -3706,7 +3831,10 @@ namespace LegionGUNights
 			float gl = dot(c, LUMA601);
 			c = saturate(c + gn * grain * GRAIN_MAX * (0.3 + 2.8 * gl * (1.0 - gl)));
 		}
-		c = saturate(c + gn * (1.0 / 255.0));
+		// The dither is triangular (2.0, after benilla-everwood): the sum of two independent halves, so its noise
+		// does not depend on the shade under it, and a slow gradient of the night sky shows no faint bands where
+		// a flat dither left them.
+		c = saturate(c + (gn + gm) * (1.0 / 255.0));
 		return float4(c, c4.a);
 	}
 
@@ -3756,7 +3884,7 @@ namespace LegionGUNights
 		if (len > MOTION_MAX)
 			m *= MOTION_MAX / len;
 		m *= share;
-		float keep = 1.0 - saturate(UIMask(uv) * 8.0);
+		float keep = 1.0 - saturate(UIMaskBlur(uv) * 8.0);
 		if (keep <= 0.0 || len * share * float(BUFFER_HEIGHT) < 1.0)
 			return c4;
 		// The taps start at a random point of their step, new per pixel and frame: at a long smear eight fixed taps
@@ -3862,19 +3990,6 @@ namespace LegionGUNights
 		return tex2Dfetch(DofFocusCur, int2(0, 0));
 	}
 
-	// Half resolution: rgb = the colour, a = the blur radius 0..1 of DofMaxPx.
-	float4 DofPrepPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
-	{
-		if (!DofOn())
-			return float4(0.0, 0.0, 0.0, 0.0);
-		float f = tex2Dfetch(DofFocusCur, int2(0, 0)).x;
-		float z = DofYards(uv, tex2Dfetch(FogCur, int2(1, 0)));
-		float coc = z >= f ? saturate((z - f) / (f * DOF_SPAN)) : saturate((f - z) / f * DOF_NEAR);
-		if (!PhotoOn())
-			coc = saturate((z - f * PLAY_FROM) / (f * PLAY_SPAN));
-		return float4(tex2Dlod(ColorLinear, float4(uv, 0.0, 0.0)).rgb, coc);
-	}
-
 	// The largest blur radius in half-resolution pixels: the photo mode's own dial, or the normal play one.
 	float DofMaxPx()
 	{
@@ -3884,17 +3999,37 @@ namespace LegionGUNights
 		return DOF_MAX_PX * share;
 	}
 
+	// Half resolution: rgb = the colour, a = the blur radius 0..1 of DofMaxPx. With the dial at 0 there is no blur at
+	// all (01.10): the half-resolution picture swapped in by the distance alone softened the names and the text.
+	float4 DofPrepPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		if (!DofOn() || DofMaxPx() <= 0.0)
+			return float4(0.0, 0.0, 0.0, 0.0);
+		float f = tex2Dfetch(DofFocusCur, int2(0, 0)).x;
+		float z = DofYards(uv, tex2Dfetch(FogCur, int2(1, 0)));
+		float coc = z >= f ? saturate((z - f) / (f * DOF_SPAN)) : saturate((f - z) / f * DOF_NEAR);
+		if (!PhotoOn())
+			coc = saturate((z - f * PLAY_FROM) / (f * PLAY_SPAN));
+		return float4(tex2Dlod(ColorLinear, float4(uv, 0.0, 0.0)).rgb, coc);
+	}
+
 	// A disk of 24 taps. A tap counts only where its own blur reaches this pixel, so the sharp character does not
 	// bleed into the blurred land behind it.
 	float4 DofBlurPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
-		if (!DofOn())
+		if (!DofOn() || DofMaxPx() <= 0.0)
 			return float4(0.0, 0.0, 0.0, 0.0);
 		float4 centre = tex2Dlod(DofPoint, float4(uv, 0.0, 0.0));
 		float2 px = 2.0 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 		float maxPx = DofMaxPx();
 		bool bokeh = PhotoOn() && LegionGUExtra(8u);
 		float r = centre.a * maxPx;
+		// Photo mode over the drawn interface (see DofApplyPS): a tap counts only from the same side of a panel's edge
+		// as this pixel. The world around the panels blurs into itself with no dark halo from them, and the world
+		// behind a see-through panel blurs with its own neighbours inside it. Leaving out every panel tap left inside
+		// a panel only the few taps that reached past its edge: the red smears in the exit dialog (01.10).
+		bool photoUI = PhotoOn() && LegionGUBridgeDone();
+		float ui0 = photoUI ? tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x : 0.0;
 		float3 sum = centre.rgb;
 		float wsum = 1.0;
 		[unroll]
@@ -3902,8 +4037,11 @@ namespace LegionGUNights
 		{
 			float d = sqrt(float(i) / 24.0);
 			float a = float(i) * 2.3999632;
-			float4 t = tex2Dlod(Dof, float4(uv + float2(cos(a), sin(a)) * d * r * px, 0.0, 0.0));
+			float2 tuv = uv + float2(cos(a), sin(a)) * d * r * px;
+			float4 t = tex2Dlod(Dof, float4(tuv, 0.0, 0.0));
 			float w = saturate(t.a * maxPx - d * r + 1.0);
+			if (photoUI)
+				w *= 1.0 - abs(tex2Dlod(LegionGUUI, float4(tuv, 0.0, 0.0)).x - ui0);
 			if (bokeh)
 				w *= 1.0 + BOKEH_GAIN * pow(saturate((dot(t.rgb, LUMA601) - 0.55) / 0.45), 2.0);
 			sum += t.rgb * w;
@@ -3915,9 +4053,19 @@ namespace LegionGUNights
 	float4 DofApplyPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		float4 c = tex2Dfetch(ColorPoint, int2(pos.xy));
-		if (!DofOn() || LegionGUInStrip(pos.xy))
+		// Photo mode over the drawn interface (REST ran the effects after it): a panel's rectangle kept whole stood
+		// as a box of the sharp world in the blurred one (play photo mode, 30.09). Inside it only what differs from
+		// the blurred world around stays sharp: the panels' art and letters. The world in the rectangle blurs.
+		bool photoUI = PhotoOn() && LegionGUBridgeDone();
+		if (!DofOn() || (!photoUI && LegionGUInStrip(pos.xy)))
 			return c;
 		float4 b = tex2Dlod(DofBlur, float4(uv, 0.0, 0.0));
+		float share = smoothstep(0.05, 0.3, b.a);
+		if (photoUI)
+		{
+			float3 dc = abs(c.rgb - b.rgb);
+			share *= 1.0 - LegionGUUIAt(uv) * smoothstep(0.08, 0.2, max(max(dc.r, dc.g), dc.b));
+		}
 		// Normal play: the blur's share from this pixel's own distance, so the edge of a sharp tree or the character
 		// against the blurred land is as crisp as the screen, and the interface on screen stays sharp.
 		if (!PhotoOn())
@@ -3925,7 +4073,7 @@ namespace LegionGUNights
 			float z = DofYards(uv, tex2Dfetch(FogCur, int2(1, 0)));
 			float f = tex2Dfetch(DofFocusCur, int2(0, 0)).x;
 			float coc = saturate((z - f * PLAY_FROM) / (f * PLAY_SPAN));
-			return float4(lerp(c.rgb, b.rgb, smoothstep(0.05, 0.3, coc) * (1.0 - saturate(UIMask(uv) * 8.0))), c.a);
+			return float4(lerp(c.rgb, b.rgb, smoothstep(0.05, 0.3, coc) * (1.0 - saturate(UIMaskBlur(uv) * 8.0))), c.a);
 		}
 		// The cinema frame (the addon's option): black bars to 2.39 : 1 on a narrower screen, with a soft inner
 		// edge of a few pixels instead of a hard cut (1.6.8).
@@ -3934,10 +4082,10 @@ namespace LegionGUNights
 		{
 			float edge = 4.0 * BUFFER_RCP_HEIGHT;
 			float inBar = min(smoothstep(bar - edge, bar, uv.y), smoothstep(bar - edge, bar, 1.0 - uv.y));
-			float3 dofC = lerp(c.rgb, b.rgb, smoothstep(0.05, 0.3, b.a));
+			float3 dofC = lerp(c.rgb, b.rgb, share);
 			return float4(dofC * inBar, c.a);
 		}
-		return float4(lerp(c.rgb, b.rgb, smoothstep(0.05, 0.3, b.a)), c.a);
+		return float4(lerp(c.rgb, b.rgb, share), c.a);
 	}
 
 	technique LegionGUPhoto <

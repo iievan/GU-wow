@@ -1,21 +1,21 @@
-# GUWOW!
+# Graphic Update.. Wow!
 
 **Русский** · [English](#english)
 
 Графическое улучшение World of Warcraft. Основные работы проводятся на версии Legion 7.3.5. 
 Важно: не исключены глитчи, визуальные артефакты и неточности отображений в связи с постоянным тестированием и совершенствованием модификации.
 
-Публичное имя мода — **GUWOW!**. GU-WOW — рабочее название разработки, оно остаётся в именах файлов (`GU-WOW.exe`) и в адресе репозитория.
+Публичное имя мода — **Graphic Update.. Wow!**. GU-WOW — рабочее название разработки, оно остаётся в именах файлов (`GU-WOW.exe`) и в адресе репозитория.
 
-Текущая сборка: **1.7.6-release «Мягкий свет»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **2.0.0-release «Живой воздух»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 1.7.6-release
+## Что входит в сборку 2.0.0-release
 
-Всё настраивается в игре: Интерфейс > Модификации > GUWOW!, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
+Всё настраивается в игре: Интерфейс > Модификации > Graphic Update.. Wow!, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
 | Раздел | Возможность | Что даёт | С версии |
 |---|---|---|---|
@@ -81,8 +81,8 @@
 - Если выключить мод клавишей F11, в левом верхнем углу может появиться полоска квадратиков. Чтобы выключить мод без неё, щёлкните правой кнопкой мыши по кнопке у миникарты.
 - Если поменяли разрешение экрана или масштаб отрисовки в настройках игры, запустите `GU-WOW.exe` и нажмите «Установить» ещё раз.
 - Аддон NightIllusion лучше выключить, иначе ночь затемнится дважды.
-- Если удалить ReShade, но оставить аддон GUWOW!, в левом верхнем углу будет видна полоска квадратиков. Тогда выключите аддон в списке модификаций.
-- Classic 1.12: меню открывается командой `/guwow`, кнопкой у миникарты или кнопкой GUWOW! в меню по Esc. Полноэкранное свечение в настройках графики должно быть включено, иначе туман ляжет и на окна игры. Если в папке игры стоит DXVK (`d3d9.dll`), установщик отключает его на время работы мода: ReShade ставится под тем же именем. Удаление мода включает DXVK обратно.
+- Если удалить ReShade, но оставить аддон Graphic Update.. Wow!, в левом верхнем углу будет видна полоска квадратиков. Тогда выключите аддон в списке модификаций.
+- Classic 1.12: меню открывается командой `/guwow`, кнопкой у миникарты или кнопкой Graphic Update.. Wow! в меню по Esc. Полноэкранное свечение в настройках графики должно быть включено, иначе туман ляжет и на окна игры. Если в папке игры стоит DXVK (`d3d9.dll`), установщик отключает его на время работы мода: ReShade ставится под тем же именем. Удаление мода включает DXVK обратно.
 
 ## Клиенты
 
@@ -95,12 +95,12 @@
 
 ## Лицензии
 
-Автор GUWOW!: levan, https://github.com/iievan. © 2026 levan.
+Автор Graphic Update.. Wow!: levan, https://github.com/iievan. © 2026 levan.
 
 | Часть сборки | Лицензия | Можно без спроса | Нельзя без согласия автора |
 |---|---|---|---|
 | Меню в игре, установщик, готовая настройка, тексты | [лицензия автора](LICENSE-GUWOW.txt) | пользоваться, раздавать без изменений и бесплатно | раздавать изменённые версии, делать клоны, продавать, убирать указание автора |
-| Эффекты: туман, лучи, ночь, картинка | [GPL-3.0](LICENSE) с дополнительными условиями из [NOTICE.txt](NOTICE.txt) | пользоваться, изменять и раздавать с исходным кодом под GPL-3.0 | называть изменённую версию GUWOW!, выдавать её за официальную, убирать указание автора |
+| Эффекты: туман, лучи, ночь, картинка | [GPL-3.0](LICENSE) с дополнительными условиями из [NOTICE.txt](NOTICE.txt) | пользоваться, изменять и раздавать с исходным кодом под GPL-3.0 | называть изменённую версию Graphic Update.. Wow!, выдавать её за официальную, убирать указание автора |
 | Дополнение ReshadeEffectShaderToggler | [MIT](REST-LICENSE.txt), автор 4lex4nder | по условиям MIT | |
 
 Эффекты остаются под GPL-3.0 и не могут перейти под лицензию автора. Туман и лучи основаны на [comfyatmosphere](https://github.com/aloofbit/comfyatmosphere) автора aloofbit. Лицензия GPL-3.0 требует, чтобы производные работы оставались под ней же.
@@ -109,7 +109,7 @@ ReShade (автор crosire) в пакет не входит: установщи
 
 ## Правовая информация
 
-GUWOW! является неофициальным любительским проектом. Он не связан с Blizzard Entertainment, Inc. Blizzard не одобряла, не спонсировала и не поддерживала проект.
+Graphic Update.. Wow! является неофициальным любительским проектом. Он не связан с Blizzard Entertainment, Inc. Blizzard не одобряла, не спонсировала и не поддерживала проект.
 
 World of Warcraft, Warcraft и Blizzard Entertainment являются товарными знаками или зарегистрированными товарными знаками Blizzard Entertainment, Inc. в США и других странах. Эти названия упоминаются только для того, чтобы указать, с какой игрой совместима сборка.
 
@@ -130,17 +130,17 @@ World of Warcraft, Warcraft и Blizzard Entertainment являются това�
 A graphical enhancement for World of Warcraft. The main development work is being carried out for Legion 7.3.5.
 Please note: glitches, visual artifacts, and rendering inaccuracies may occur due to the mod’s ongoing testing and development.
 
-The mod's public name is **GUWOW!**. GU-WOW is the working development name; it stays in the file names (`GU-WOW.exe`) and in the repository address.
+The mod's public name is **Graphic Update.. Wow!**. GU-WOW is the working development name; it stays in the file names (`GU-WOW.exe`) and in the repository address.
 
-Current build: **1.7.6-release "Soft Light"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **2.0.0-release "Living Air"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 1.7.6-release
+## What is in build 2.0.0-release
 
-Everything is set up in the game: Interface > AddOns > GUWOW!, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
+Everything is set up in the game: Interface > AddOns > Graphic Update.. Wow!, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
 | Section | Feature | What it gives | Since |
 |---|---|---|---|
@@ -206,8 +206,8 @@ To remove: `GU-WOW.exe`, the "Удалить" (Remove) button.
 - If you turn the mod off with F11, a strip of small squares may show in the top left corner. To turn the mod off without it, right click the minimap button.
 - If you change the screen resolution or the render scale in the game settings, run `GU-WOW.exe` and press "Установить" (Install) again.
 - Better turn off the NightIllusion add-on, or the night gets darkened twice.
-- If you remove ReShade but keep the GUWOW! add-on, a strip of small squares shows in the top left corner. Turn the add-on off in the add-on list then.
-- Classic 1.12: the menu opens with the `/guwow` command, the minimap button or the GUWOW! button in the Esc menu. Keep the full screen glow on in the video settings, or the fog covers the game's windows too. If the game folder has DXVK (`d3d9.dll`), the installer turns it off while the mod is in: ReShade goes in under the same name. Removing the mod turns DXVK back on.
+- If you remove ReShade but keep the Graphic Update.. Wow! add-on, a strip of small squares shows in the top left corner. Turn the add-on off in the add-on list then.
+- Classic 1.12: the menu opens with the `/guwow` command, the minimap button or the Graphic Update.. Wow! button in the Esc menu. Keep the full screen glow on in the video settings, or the fog covers the game's windows too. If the game folder has DXVK (`d3d9.dll`), the installer turns it off while the mod is in: ReShade goes in under the same name. Removing the mod turns DXVK back on.
 
 ## Clients
 
@@ -220,12 +220,12 @@ To remove: `GU-WOW.exe`, the "Удалить" (Remove) button.
 
 ## Licences
 
-GUWOW! is made by levan, https://github.com/iievan. © 2026 levan.
+Graphic Update.. Wow! is made by levan, https://github.com/iievan. © 2026 levan.
 
 | Part of the build | Licence | Allowed without asking | Needs the author's consent |
 |---|---|---|---|
 | In-game menu, installer, ready settings, texts | [the author's licence](LICENSE-GUWOW.txt) | use it, share it unchanged and free of charge | sharing changed versions, making clones, selling, removing the author's credit |
-| Effects: fog, rays, night, picture | [GPL-3.0](LICENSE) with the additional terms in [NOTICE.txt](NOTICE.txt) | use, change and share them with the source code under GPL-3.0 | calling a changed version GUWOW!, presenting it as official, removing the author's credit |
+| Effects: fog, rays, night, picture | [GPL-3.0](LICENSE) with the additional terms in [NOTICE.txt](NOTICE.txt) | use, change and share them with the source code under GPL-3.0 | calling a changed version Graphic Update.. Wow!, presenting it as official, removing the author's credit |
 | ReshadeEffectShaderToggler add-on | [MIT](REST-LICENSE.txt), by 4lex4nder | under the MIT terms | |
 
 The effects stay under GPL-3.0 and cannot move to the author's licence. The fog and rays are based on [comfyatmosphere](https://github.com/aloofbit/comfyatmosphere) by aloofbit. Its GPL-3.0 licence requires derived works to stay under GPL-3.0.
@@ -234,7 +234,7 @@ ReShade (by crosire) is not part of the package: the installer downloads it from
 
 ## Legal notice
 
-GUWOW! is an unofficial fan project. It is not affiliated with Blizzard Entertainment, Inc. Blizzard has not endorsed, sponsored or supported it.
+Graphic Update.. Wow! is an unofficial fan project. It is not affiliated with Blizzard Entertainment, Inc. Blizzard has not endorsed, sponsored or supported it.
 
 World of Warcraft, Warcraft and Blizzard Entertainment are trademarks or registered trademarks of Blizzard Entertainment, Inc. in the U.S. and other countries. These names are used only to say which game the build works with.
 

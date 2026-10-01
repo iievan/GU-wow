@@ -15,6 +15,11 @@ LegionGUNightsbylevan.fx (ночь, огни, картинка и фотореж
 МЕНЮ В ИГРЕ, УСТАНОВЩИК, ГОТОВАЯ НАСТРОЙКА И ТЕКСТЫ
 Лицензия автора: без согласия автора запрещено раздавать изменённые версии и делать клоны. См. LICENSE-GUWOW.txt.
 
+ИДЕИ ИЗ ДРУГИХ МОДОВ, СБОРКА 2.0
+Код этих проектов в GU-WOW не входит. levan взял из них идеи и написал свою реализацию под ReShade.
+benilla-everwood_graphics автора pkuzic: https://github.com/pkuzic/benilla-everwood_graphics, лицензия MIT или Apache-2.0. Идеи: туман меняет цвет земли и сохраняет её яркость, тени в щелях не ложатся под листву и на светящиеся места, мокрая земля насыщеннее по цвету, треугольный дизеринг ночного неба.
+modern-wow-renderer автора Corfirean: https://github.com/Corfirean/modern-wow-renderer, лицензии нет. Поэтому взяты только идеи, без единой строки кода: мягкий потолок яркости после колена, переход тумана в небо у горизонта, учёт глубины при сборке лучей из малого разрешения, сфера вокруг огня, которую перекрывает предмет перед ним.
+
 СТОРОННИЕ ЧАСТИ
 GU-WOW.exe содержит ReshadeEffectShaderToggler (REST) 1.3.23 автора 4lex4nder: https://github.com/4lex4nder/ReshadeEffectShaderToggler. Он распространяется по лицензии MIT, см. REST-LICENSE.txt.
 GU-WOW.addon32 для клиента 1.12 сделал levan, исходник лежит в Installer/addon. Он собран с заголовками ReShade автора crosire, они распространяются по лицензии BSD-3-Clause или MIT.
@@ -34,6 +39,11 @@ Additional terms under section 7 of GPL-3.0. They apply to everything levan adde
 
 IN-GAME MENU, INSTALLER, READY SETTINGS AND TEXTS
 The author's licence: sharing changed versions and making clones need the author's consent. See LICENSE-GUWOW.txt.
+
+IDEAS FROM OTHER MODS, BUILD 2.0
+No code of these projects is part of GU-WOW. levan took ideas from them and wrote his own implementation for ReShade.
+benilla-everwood_graphics by pkuzic: https://github.com/pkuzic/benilla-everwood_graphics, licensed under MIT or Apache-2.0. Ideas: the fog changes the colour of the land and keeps its brightness, contact shadows skip leaves and lit spots, wet ground is richer in colour, a triangular dither for the night sky.
+modern-wow-renderer by Corfirean: https://github.com/Corfirean/modern-wow-renderer, no licence. So only ideas are taken, not a single line of code: a soft brightness cap after a knee, the fog turning into the sky at the horizon, depth-aware assembly of the rays from a low resolution, a sphere around a light that an object in front of it covers.
 
 THIRD-PARTY PARTS
 GU-WOW.exe contains ReshadeEffectShaderToggler (REST) 1.3.23 by 4lex4nder: https://github.com/4lex4nder/ReshadeEffectShaderToggler. It is licensed under MIT, see REST-LICENSE.txt.

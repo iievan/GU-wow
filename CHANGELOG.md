@@ -1,4 +1,78 @@
-# GUWOW! (в разработке GU-WOW): история версий / Version history
+# Graphic Update.. Wow! (в разработке GU-WOW): история версий / Version history
+
+## 2.0.0-release «Живой воздух» / "Living Air"
+
+### Русский
+
+Второе поколение Graphic Update.. Wow!: свет, туман и ночь считаются по глубине кадра до пикселя. Контуры листвы, крыш и персонажей остаются чистыми.
+
+**Новое**
+- Солнце сквозь листву светит мягкими пятнами. Белых выжженных проплешин почти нет: под кроной пересвечено 5% кадра, в лесу 0,1%.
+- Дальняя земля уходит в небо плавно, шва на горизонте нет. Закат и ночь не тронуты.
+- Лучи и туман держат контур веток, стволов и крыш. Вокруг листвы у солнца нет светлой каймы.
+- Фонарь или костёр за персонажем, ящиком или столбом не светит сквозь них.
+- Туман меняет цвет земли и оставляет ей яркость. Освещённая поляна в дымке не превращается в серую муть.
+- Мокрая дорога в дождь насыщеннее по цвету и не выглядит просто лежащей в тени.
+- Тени в щелях не пачкают крону и не шевелятся с ветром. Окна, огонь и освещённый песок тени не получают.
+- Ночное небо плавное, без едва заметных полос.
+- Игровой фоторежим прячет панели сам, пока ничего не происходит. Панель медленно гаснет и появляется в бою или под мышью. Панель с видимостью 90 и выше видна всегда, правило действует на каждую панель отдельно.
+- Всё про фоторежимы собрано на странице «Фоторежим»: обычный фоторежим, включение игрового фоторежима, его вид и клавиши обоих. На странице «Панели» остались только сами панели: насколько видна каждая в обычной игре и в обоих фоторежимах.
+
+**Исправлено**
+- 1.12 и 3.3.5: под водой и в пещерах вокруг чата и панелей нет рамок. Туман и ночь лежат и под прозрачными окнами игры.
+- Мод называется в игре полным именем Graphic Update.. Wow!: в списке модификаций, в заголовках меню и в подсказке у кнопки миникарты.
+- После карты мира и после щелчка по миникарте эффекты не пропадают: картинка остаётся той же без секундной паузы.
+- Фоторежим прячет весь интерфейс, значки у миникарты тоже.
+- С включённым размытием при движении окна и панели игры не дрожат при поворотах камеры.
+- Кнопки «Самолечение» и «Сообщить об ошибке» стоят под текстом главной страницы меню и его не закрывают.
+- Фоторежим с размытием на нуле показывает картинку полностью резкой: имена, надписи и текст чёткие.
+- Игровой фоторежим: в прозрачных окнах игры, например в окне выхода, мир за окном размыт ровно, без цветных подтёков и мутной рамки.
+- Legion: карта, игровое меню, подсказки и строка чата сохраняют свой игровой вид. Туман, тени и дальняя земля сквозь них не проступают; прозрачной полосы вокруг окон нет.
+
+**Туман у ног появится позднее**
+- В этой версии тумана у ног нет, его ползунок убран из меню. Он получался слабым и лежал не там, где стоит персонаж. Я верну его отдельным обновлением, когда он будет выглядеть как надо. Обычный низовой туман в низинах, над водой и под деревьями работает.
+- Сохранённые коды настроек и пресеты открываются без ошибок, значение тумана у ног в них просто не действует.
+
+**Откуда идеи**
+Часть идей я взял из двух открытых модов и написал их заново под ReShade. Код этих модов в сборку не входит.
+- benilla-everwood_graphics (pkuzic, MIT или Apache-2.0): туман с сохранением яркости, тени в щелях без листвы, насыщенная мокрая земля, плавное ночное небо.
+- modern-wow-renderer (Corfirean): мягкий потолок яркости, переход тумана в небо, учёт глубины у лучей, перекрытие свечения огня. У мода нет лицензии, поэтому взяты только идеи, без единой строки кода.
+
+### English
+
+Second generation of Graphic Update.. Wow!: light, fog and night follow the depth of the frame down to the pixel. The outlines of leaves, roofs and characters stay clean.
+
+**New**
+- The sun through the leaves shines in soft patches. Burnt white spots are nearly gone: under a crown 5% of the frame is overexposed, in a forest 0.1%.
+- The far land fades into the sky smoothly, with no seam at the horizon. Sunset and night are untouched.
+- The rays and the fog keep the outline of branches, trunks and roofs. There is no light fringe around the leaves near the sun.
+- A lamp or a campfire behind a character, a crate or a post does not shine through them.
+- The fog changes the colour of the land and leaves it its brightness. A sunlit glade in the haze does not turn into grey murk.
+- A wet road in the rain is richer in colour and does not look like it lies in shade.
+- Contact shadows do not smudge the crowns and do not crawl with the wind. Windows, fire and sunlit sand get no shadow.
+- The night sky is smooth, with no faint bands.
+- The play photo mode hides the panels on its own while nothing happens. A panel fades out slowly and comes up in a fight or under the mouse. A panel at 90 and up always shows, and the rule works for each panel on its own.
+- Everything about the photo modes sits on the Photo mode page: the plain photo mode, turning the play photo mode on, its look and the keys of both. The Panels page holds only the panels themselves: how much of each shows in plain play and in both photo modes.
+
+**Fixed**
+- 1.12 and 3.3.5: under water and in caves there are no frames around the chat and the panels. The fog and the night lie under the see-through game windows too.
+- In the game the mod goes by its full name Graphic Update.. Wow!: in the add-on list, in the menu titles and in the minimap button tooltip.
+- After the world map and after a click on the minimap the effects stay on: the picture keeps its look with no pause of a second.
+- Photo mode hides the whole interface, the minimap icons too.
+- With motion blur on, the game windows and panels do not shake when the camera turns.
+- The Self-heal and Report a bug buttons sit under the text of the menu's main page and do not cover it.
+- Photo mode with the blur at zero shows a fully sharp picture: names, labels and text are crisp.
+- Play photo mode: in the see-through game windows, such as the exit dialog, the world behind the window is blurred evenly, with no colour smears and no murky frame.
+- Legion: the world map, game menu, tooltips and chat input keep their game appearance. Fog, shadows and distant land do not show through them, and there is no clear band around the windows.
+
+**The mist at the feet comes later**
+- This version has no mist at the feet, and its slider is gone from the menu. It came out weak and did not lie where the character stands. It returns in a separate update once it looks right. The ground mist in hollows, over water and under the trees stays in place.
+- Saved settings codes and presets open with no errors; the mist at the feet value in them simply has no effect.
+
+**Where the ideas come from**
+Some ideas come from two open mods, written anew for ReShade. No code of these mods is part of the build.
+- benilla-everwood_graphics (pkuzic, MIT or Apache-2.0): fog that keeps the brightness, contact shadows without leaves, richer wet ground, a smooth night sky.
+- modern-wow-renderer (Corfirean): a soft brightness cap, the fog turning into the sky, depth-aware rays, a light's glow covered by what stands in front of it. The mod has no licence, so only ideas are taken, not a single line of code.
 
 ## 1.7.6-release «Мягкий свет» / "Soft Light"
 

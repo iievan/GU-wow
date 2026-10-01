@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "public-release-beta-1.1"
+local VERSION = "2.0.0-release"
 local CELL = 4
 local CELLS = 89
 
@@ -34,7 +34,7 @@ local DEFAULTS = {
 	bright = 60, contrast = 40, satur = 50, warmth = 50,
 	-- 1.7.1: the rays' own dials. In the open the old fixed cut was 22; 45 makes a field twice as sunlit.
 	raysOpen = 70, raysReach = 60, sunGlow = 60,
-	-- 1.7.1: the mist at the feet, ankle-deep in swamps. 0 keeps it off.
+	-- 1.7.1: the mist at the feet. Taken out in 2.0 until it is done right; the key stays so old codes read.
 	mistNear = 0,
 	-- 1.7.3: which objects glow at night and how far (50 is the old look), and the motion blur (0 off). These are
 	-- the player's own taste for the screen, like the dials above: a code and a ready preset leave them alone.
@@ -97,7 +97,7 @@ local BASE_PRESETS = {
 	-- The standard look of beta-1.0 and 1.7.x: thick mist, deep night, strong light round the lamps.
 	{ "Deep Atmosphere", { fogThickness = 10, mist = 70, mistDensity = 45, raysStrength = 100, nightDarkness = 80,
 		nightDepth = 70, lightGlow = 100, caveDarkness = 75, sharpness = 25, grade = 80, ao = 90, hazeStrength = 30,
-		hdrStrength = 15, grain = 10, mistHigh = 40, rayDefinition = 55, mistNear = 25 } },
+		hdrStrength = 15, grain = 10, mistHigh = 40, rayDefinition = 55, mistNear = 0 } },
 	-- Bright colours and crisp edges for questing by day; little mist, a light night.
 	{ "Vivid Adventure", { fogThickness = 10, mist = 20, mistDensity = 35, nightDarkness = 20, nightDepth = 25,
 		sharpness = 45, grade = 90, vignette = 30, hdrStrength = 40, grain = 0, style = 4 } },
@@ -106,7 +106,7 @@ local BASE_PRESETS = {
 		grade = 90, vignette = 50, hdrStrength = 45, grain = 20, mistHigh = 60, style = 2 } },
 	-- Low mist over the ground, soft light, a quiet dawn look.
 	{ "Misty Dawn", { fogThickness = 45, fogDistance = 80, mist = 90, mistDensity = 65, raysStrength = 90, grade = 85,
-		sharpness = 10, vignette = 35, hazeStrength = 20, hdrStrength = 30, grain = 15, mistHigh = 90, mistNear = 30, style = 1 } },
+		sharpness = 10, vignette = 35, hazeStrength = 20, hdrStrength = 30, grain = 15, mistHigh = 90, mistNear = 0, style = 1 } },
 	-- The picture close to the game's own: the effects on, but light.
 	{ "Pure Game", { fogThickness = 5, mist = 10, mistDensity = 30, raysStrength = 50, nightDarkness = 10, nightDepth = 10,
 		lightGlow = 30, caveDarkness = 0, sharpness = 10, grade = 40, vignette = 15, ao = 40, hazeStrength = 0,
@@ -381,9 +381,8 @@ end
 -- What only the game knows: 1 live, 2 indoors, 4 flying, 8 photo mode, 16 wet ground on, 32 world map open;
 -- the time of day 0..63 for 0..24 h; the player's facing 0..63 for a full turn (0 north, counterclockwise).
 local lastState, lastTime, lastFacing
--- The map stays "open" for the effects half a second after it closes: the first frames of the world after it
--- still carry the depth and the light of the frame before the map, and the land showed a ghost of it (29.09).
-local mapUntil = 0
+-- The shader holds its state while the map is open, so the effects come back with the first frame of the world after
+-- it. A pause after the map read on screen as a flicker of the bare game on every look at the map (2.0).
 local function GameState()
 	local s = 1
 	if IsIndoors and IsIndoors() then
@@ -400,8 +399,7 @@ local function GameState()
 	end
 	-- Only the fullscreen map: part of it is drawn before the effects start, and the night darkened it. The
 	-- windowed map covers a piece of the screen, and the world around it keeps the effects.
-	if (WorldMapFrame and WorldMapFrame:IsShown() and not (WorldMapFrame_InWindowedMode and WorldMapFrame_InWindowedMode()))
-		or GetTime() < mapUntil then
+	if WorldMapFrame and WorldMapFrame:IsShown() and not (WorldMapFrame_InWindowedMode and WorldMapFrame_InWindowedMode()) then
 		s = s + 32
 	end
 	local h, m = GetGameTime()
@@ -583,6 +581,14 @@ end
 -- the player types in the chat, points at the panel or fights (the fight panels).
 local function PanelAlpha(g)
 	local key = g[1]
+	-- The play photo mode (2.0): a panel under 90 rests hidden while nothing happens and comes up whole in a fight,
+	-- under the mouse or, the chat, while the player types. Each panel on its own; one at 90 and up keeps its dial.
+	if game and not photo and (DB["game_" .. key] or 100) < 90 then
+		if InCombatLockdown() or MouseOver(g[3]) or (key == "chat" and (chatTyping or (ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()))) then
+			return 1
+		end
+		return 0
+	end
 	local a = ((photo and DB["photo_" .. key]) or (game and DB["game_" .. key]) or DB["ui_" .. key] or 100) / 100
 	if a >= 1 then
 		return 1
@@ -590,7 +596,8 @@ local function PanelAlpha(g)
 	if key == "chat" and (chatTyping or (ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow())) then
 		return 1
 	end
-	if DB.panelWake and ((FIGHT[key] and InCombatLockdown()) or MouseOver(g[3])) then
+	-- Photo mode is a clean picture: the mouse over a panel (the minimap button that started it) wakes nothing.
+	if DB.panelWake and not photo and ((FIGHT[key] and InCombatLockdown()) or MouseOver(g[3])) then
 		return 1
 	end
 	return a
@@ -610,14 +617,15 @@ end
 -- Each group's alpha on screen and the one it goes to: under the mouse or in a fight a panel comes up softly and
 -- goes back slower still, the eye follows it. A dial, photo mode or the chat set it at once.
 local panelGoal, panelNow = {}, {}
-local FADE_IN, FADE_OUT = 3, 1.25
+-- The play photo mode lets a resting panel go slowly, over four seconds.
+local FADE_IN, FADE_OUT, FADE_IDLE = 3, 1.25, 0.25
 local function PanelGoals()
 	for _, g in ipairs(HIDE_GROUPS) do
 		panelGoal[g[1]] = PanelAlpha(g)
 	end
 	-- The minimap blips draw past the transparency (see MinimapOff), so a map faded to 0 hides itself, out of
-	-- combat only.
-	if Minimap and not InCombatLockdown() and not photo then
+	-- combat only, in photo mode too: there its icons stayed on the clean picture (2.0).
+	if Minimap and not InCombatLockdown() then
 		local mmOff = panelGoal.minimap == 0 and (panelNow.minimap or 0) == 0
 		if mmOff and Minimap:IsShown() then
 			Minimap:Hide()
@@ -639,7 +647,7 @@ local function PanelFade(dt, all)
 		elseif a < goal then
 			a = math.min(goal, a + dt * FADE_IN)
 		elseif a > goal then
-			a = math.max(goal, a - dt * FADE_OUT)
+			a = math.max(goal, a - dt * ((game and not photo) and FADE_IDLE or FADE_OUT))
 		end
 		if all or a ~= panelNow[key] then
 			panelNow[key] = a
@@ -794,11 +802,13 @@ local function UICell(i, v)
 	UIBits(i + 2, v % 8)
 end
 
--- A panel the player made see-through (the dials) or photo mode dimmed: below half its alpha the effects go over
--- its place.
+-- A panel the player made see-through (the dials) or photo mode dimmed: once it is nearly gone the effects go over
+-- its place. While its text still shows it keeps its rectangle: at half its alpha the night already sank the fading
+-- quest tracker, the top lines went dark in the middle of a word (30.09).
+local PANEL_GONE = 0.05
 local function PanelHidden(f)
 	while f and f ~= UIParent do
-		if (hiddenFrames[f] and hiddenFrames[f] < 0.5) or dimmed[f] then
+		if (hiddenFrames[f] and hiddenFrames[f] < PANEL_GONE) or dimmed[f] then
 			return true
 		end
 		f = f.GetParent and f:GetParent()
@@ -835,7 +845,9 @@ end
 -- A group over 60% of the screen is no window (the full screen world map, another addon's frame over the world):
 -- it is skipped, else the effects would leave the whole picture alone. DB.uiSeen keeps what was sent last, each group
 -- by its first frame in screen percent, for a report from a live game.
-local UI_PAD = 3
+-- The frame coordinates already include its visible border. Extra padding created a clear band of unprocessed world
+-- around a window at night and in fog (01.10).
+local UI_PAD = 0
 local UI_MAX_SHARE = 0.6
 local function Clamp511(v)
 	return math.max(0, math.min(511, v))
@@ -901,7 +913,7 @@ local function Photo(on)
 		return
 	end
 	if on and InCombatLockdown() then
-		print("|cffffd200GUWOW!:|r " .. T("фоторежим недоступен в бою.", "photo mode is not available in combat."))
+		print("|cffffd200Graphic Update.. Wow!:|r " .. T("фоторежим недоступен в бою.", "photo mode is not available in combat."))
 		return
 	end
 	photo = on
@@ -952,9 +964,9 @@ function GUWOW_ToggleGame()
 		return
 	end
 	game = not game
-	ApplyHide()
+	PanelGoals()
 	Paint()
-	print("|cffffd200GUWOW!:|r " .. (game and T("игровой фоторежим включён. Выход: та же клавиша, /gu game или Alt + щелчок по кнопке у миникарты.",
+	print("|cffffd200Graphic Update.. Wow!:|r " .. (game and T("игровой фоторежим включён. Выход: та же клавиша, /gu game или Alt + щелчок по кнопке у миникарты.",
 		"play photo mode on. Leave with the same key, /gu game or Alt + click on the minimap button.")
 		or T("игровой фоторежим выключен.", "play photo mode off.")))
 end
@@ -967,7 +979,7 @@ function GUWOW_ToggleMod()
 	DB.master = not DB.master
 	Refresh()
 	Paint()
-	print("|cffffd200GUWOW!:|r " .. (DB.master and T("включён", "on") or T("выключен", "off")))
+	print("|cffffd200Graphic Update.. Wow!:|r " .. (DB.master and T("включён", "on") or T("выключен", "off")))
 end
 
 -- A clean shot: the interface and the strip hide for a moment (the shader keeps the last settings), the game takes
@@ -1027,15 +1039,18 @@ UIParent:HookScript("OnShow", function()
 	if photoPanels then
 		PhotoDim(true)
 		ApplyHide()
+		if PanelAlpha(HIDE_GROUPS[5]) == 0 then
+			MinimapOff()
+		end
 	else
 		UIParent:SetAlpha(0)
+		MinimapOff()
 	end
-	MinimapOff()
 	Paint()
 end)
 
-BINDING_HEADER_GUWOW = "GUWOW!"
-BINDING_NAME_GUWOW_TOGGLE = T("Включить или выключить GUWOW!", "Turn GUWOW! on or off")
+BINDING_HEADER_GUWOW = "Graphic Update.. Wow!"
+BINDING_NAME_GUWOW_TOGGLE = T("Включить или выключить Graphic Update.. Wow!", "Turn Graphic Update.. Wow! on or off")
 BINDING_NAME_GUWOW_PHOTO = T("Фоторежим (прячет интерфейс, размывает фон)", "Photo mode (hides the interface, blurs the background)")
 BINDING_NAME_GUWOW_SHOT = T("Чистый снимок экрана", "Clean screenshot")
 BINDING_NAME_GUWOW_GAME = T("Игровой фоторежим (прячет панели, игра идёт)", "Play photo mode (hides the panels, the game goes on)")
@@ -1127,14 +1142,14 @@ Refresh = function()
 end
 
 local function Say(text)
-	print("|cffffd200GUWOW!:|r " .. text)
+	print("|cffffd200Graphic Update.. Wow!:|r " .. text)
 end
 
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("GUWOW! обновлён: публичная бета 1.1.\n\nНаписать в поддержку теперь можно из отдельной страницы «Сообщение в поддержку» в меню или по Ctrl + щелчок по кнопке у миникарты. Клавишу фоторежима можно назначить прямо на странице «Фоторежим», там же мягкое размытие дали для обычной игры. На странице «Панели» у каждой панели свой ползунок прозрачности: под мышью и в бою панель плавно проявляется целиком. На «Ночи» новые ручки: что считать огнём и радиус свечения. На «Картинке» размытие при движении. У каждого ползунка подсказка простыми словами, готовых пресетов стало больше.\n\nМеню: /gu или кнопка у миникарты.",
-		"GUWOW! is updated: public beta 1.1.\n\nWriting to support now has its own page, Message to support, in the menu, or Ctrl + click on the minimap button. The photo mode key is set right on the Photo mode page, and so is a soft far blur for normal play. On the Panels page each panel has its own transparency slider: under the mouse and in a fight the panel fades in whole. Night has new dials: what counts as a light and the glow radius. Picture has motion blur. Every slider has a tip in plain words, and there are more ready presets.\n\nMenu: /gu or the minimap button."),
+	text = T("Graphic Update.. Wow! обновлён: публичная бета 1.1.\n\nНаписать в поддержку теперь можно из отдельной страницы «Сообщение в поддержку» в меню или по Ctrl + щелчок по кнопке у миникарты. Клавишу фоторежима можно назначить прямо на странице «Фоторежим», там же мягкое размытие дали для обычной игры. На странице «Панели» у каждой панели свой ползунок прозрачности: под мышью и в бою панель плавно проявляется целиком. На «Ночи» новые ручки: что считать огнём и радиус свечения. На «Картинке» размытие при движении. У каждого ползунка подсказка простыми словами, готовых пресетов стало больше.\n\nМеню: /gu или кнопка у миникарты.",
+		"Graphic Update.. Wow! is updated: public beta 1.1.\n\nWriting to support now has its own page, Message to support, in the menu, or Ctrl + click on the minimap button. The photo mode key is set right on the Photo mode page, and so is a soft far blur for normal play. On the Panels page each panel has its own transparency slider: under the mouse and in a fight the panel fades in whole. Night has new dials: what counts as a light and the glow radius. Picture has motion blur. Every slider has a tip in plain words, and there are more ready presets.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -1144,8 +1159,8 @@ StaticPopupDialogs["GUWOW_NEWS"] = {
 
 -- The full screen glow off on WotLK 3.3.5 (see PLAYER_ENTERING_WORLD): one click turns it on.
 StaticPopupDialogs["GUWOW_GLOW"] = {
-	text = T("GUWOW!: в настройках графики выключено полноэкранное свечение. Без него туман и ночь ложатся и на окна игры.\n\nВключить свечение сейчас?",
-		"GUWOW!: the full screen glow is off in the video settings. Without it the fog and the night cover the game's windows too.\n\nTurn the glow on now?"),
+	text = T("Graphic Update.. Wow!: в настройках графики выключено полноэкранное свечение. Без него туман и ночь ложатся и на окна игры.\n\nВключить свечение сейчас?",
+		"Graphic Update.. Wow!: the full screen glow is off in the video settings. Without it the fog and the night cover the game's windows too.\n\nTurn the glow on now?"),
 	button1 = T("Включить", "Turn on"),
 	button2 = CANCEL or "Cancel",
 	OnAccept = function()
@@ -1161,8 +1176,8 @@ StaticPopupDialogs["GUWOW_GLOW"] = {
 -- After «Send» and the reload (1.7.3): players saw no answer at all. The game cannot hear the helper, so the window
 -- says where the report is now and what the Windows notice means.
 StaticPopupDialogs["GUWOW_SENT"] = {
-	text = T("GUWOW!: отчёт сохранён и передан программе GU-WOW.\n\nЧерез несколько секунд Windows покажет уведомление «Спасибо. Сообщение об ошибке доставлено разработчику».\n\nЕсли уведомления нет, программа GU-WOW не запущена. Запустите её, и отчёт уйдёт сам.",
-		"GUWOW!: the report is saved and handed to the GU-WOW program.\n\nIn a few seconds Windows shows the notice «Thank you. The error report has been delivered to the developer».\n\nIf no notice shows, the GU-WOW program is not running. Start it, and the report goes on its own."),
+	text = T("Graphic Update.. Wow!: отчёт сохранён и передан программе GU-WOW.\n\nЧерез несколько секунд Windows покажет уведомление «Спасибо. Сообщение об ошибке доставлено разработчику».\n\nЕсли уведомления нет, программа GU-WOW не запущена. Запустите её, и отчёт уйдёт сам.",
+		"Graphic Update.. Wow!: the report is saved and handed to the GU-WOW program.\n\nIn a few seconds Windows shows the notice «Thank you. The error report has been delivered to the developer».\n\nIf no notice shows, the GU-WOW program is not running. Start it, and the report goes on its own."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -1400,18 +1415,18 @@ end)
 -- The welcome page (1.6.9): what GU-WOW is, the hints and the bug report. The settings live on the three
 -- child pages: «Основные», «Дополнительно», «Фоторежим».
 local home = CreateFrame("Frame", "LegionGUHome", UIParent)
-home.name = "GUWOW!"
+home.name = "Graphic Update.. Wow!"
 home:Hide()
 local homeTitle = home:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 homeTitle:SetPoint("TOPLEFT", 16, -16)
-homeTitle:SetText("GUWOW! " .. VERSION)
+homeTitle:SetText("Graphic Update.. Wow! " .. VERSION)
 local homeText = home:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 homeText:SetPoint("TOPLEFT", 16, -52)
 homeText:SetWidth(600)
 homeText:SetJustifyH("LEFT")
 homeText:SetSpacing(4)
-homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Сообщение в поддержку» — написать автору об ошибке, со снимком экрана.\n«Основные» — включатель мода и готовые пресеты.\n«Атмосфера» — туман, погода, мокрая земля, тени и марево.\n«Лучи» — лучи солнца и свечение в тумане, со своими пресетами.\n«Ночь» — темнота, свет огней и подземелья.\n«Картинка» — резкость, цвет, яркость, размытие при движении и плёночные эффекты.\n«Дополнительно» — стили, коды, свои пресеты, поведение и видимость панелей.\n«Фоторежим» — снимки, своя клавиша и всё, что нужно только для них.\n\nПодсказки:\nНаведите мышь на ползунок, и появится подсказка простыми словами.\nF11 включает и выключает весь мод. Клавишу фоторежима можно назначить на странице «Фоторежим».\nИгровой фоторежим прячет выбранные панели, играть в нём можно как обычно, и в бою тоже. Его панели и вид задаются на странице «Панели».\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим, Alt + левая — игровой фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu game · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
-	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMessage to support — tell the author about a bug, with a screenshot.\nMain — the mod switch and the ready presets.\nAtmosphere — fog, weather, wet ground, shadows and heat haze.\nRays — the sun rays and the glow in the fog, with their own presets.\nNight — darkness, firelight and dungeons.\nPicture — sharpness, colour, brightness, motion blur and the film effects.\nExtras — styles, codes, your presets, behaviour and the panels you see.\nPhoto mode — screenshots, its own key and what only they need.\n\nHints:\nHover a slider for a tip in plain words.\nF11 toggles the whole mod. The photo mode key is set on the Photo mode page.\nThe play photo mode hides the panels you pick, and you play in it as usual, in a fight too. Its panels and look are set on the Panels page.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode, Alt + left the play photo mode.\nChat commands: /gu menu · /gu photo · /gu game · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
+homeText:SetText(T("Туман, лучи солнца, ночь по игровым часам, свет огней и картинка. Всё меняется сразу.\n\nСтраницы слева:\n«Сообщение в поддержку» — написать автору об ошибке, со снимком экрана.\n«Основные» — включатель мода и готовые пресеты.\n«Атмосфера» — туман, погода, мокрая земля, тени и марево.\n«Лучи» — лучи солнца и свечение в тумане, со своими пресетами.\n«Ночь» — темнота, свет огней и подземелья.\n«Картинка» — резкость, цвет, яркость, размытие при движении и плёночные эффекты.\n«Дополнительно» — стили, коды, свои пресеты, поведение и видимость панелей.\n«Фоторежим» — снимки, своя клавиша и всё, что нужно только для них.\n\nПодсказки:\nНаведите мышь на ползунок, и появится подсказка простыми словами.\nF11 включает и выключает весь мод. Клавиши фоторежима и игрового фоторежима назначаются на странице «Фоторежим».\nИгровой фоторежим медленно прячет панели, пока ничего не происходит. В бою и под мышью панель появляется. Панель с видимостью 90 и выше видна всегда. Видимость задаётся на странице «Панели».\nКнопка у миникарты: левая — меню, правая — вкл/выкл, средняя — фоторежим, Alt + левая — игровой фоторежим.\nКоманды чата: /gu меню · /gu photo · /gu game · /gu shot · /gu check · /gu fix · /gu report · /gu help.",
+	"Fog, sun rays, night by the game clock, firelight and the picture. Everything applies at once.\n\nThe pages on the left:\nMessage to support — tell the author about a bug, with a screenshot.\nMain — the mod switch and the ready presets.\nAtmosphere — fog, weather, wet ground, shadows and heat haze.\nRays — the sun rays and the glow in the fog, with their own presets.\nNight — darkness, firelight and dungeons.\nPicture — sharpness, colour, brightness, motion blur and the film effects.\nExtras — styles, codes, your presets, behaviour and the panels you see.\nPhoto mode — screenshots, its own key and what only they need.\n\nHints:\nHover a slider for a tip in plain words.\nF11 toggles the whole mod. The photo mode and play photo mode keys are set on the Photo mode page.\nThe play photo mode slowly hides the panels while nothing happens. In a fight and under the mouse a panel comes up. A panel at 90 and up always shows. The dials are on the Panels page.\nThe minimap button: left opens the menu, right toggles, middle starts photo mode, Alt + left the play photo mode.\nChat commands: /gu menu · /gu photo · /gu game · /gu shot · /gu check · /gu fix · /gu report · /gu help."))
 
 local panel = CreateFrame("Frame", "LegionGUPanel", UIParent)
 panel.name = T("Основные", "Main")
@@ -1420,7 +1435,7 @@ panel:Hide()
 
 local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("GUWOW!: " .. panel.name)
+title:SetText("Graphic Update.. Wow!: " .. panel.name)
 local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 sub:SetText(T("Всё, что видно в игре. Меняется сразу. Пресет листается стрелками, «Применить» на полоске вверху экрана оставляет его.",
@@ -1435,7 +1450,7 @@ local function NewPage(frameName, ru, en, subRu, subEn)
 	f:Hide()
 	local t = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	t:SetPoint("TOPLEFT", 16, -16)
-	t:SetText("GUWOW!: " .. f.name)
+	t:SetText("Graphic Update.. Wow!: " .. f.name)
 	if subRu then
 		local s = f:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 		s:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -6)
@@ -1476,7 +1491,7 @@ local function ShrinkOptions()
 end
 
 local L, R = 16, 470
-Check(panel, "master", T("Включить GUWOW!", "Enable GUWOW!"), L, -60)
+Check(panel, "master", T("Включить Graphic Update.. Wow!", "Enable Graphic Update.. Wow!"), L, -60)
 
 -- The presets: the arrows walk through the ready ones and the player's own and show each at once as a preview.
 -- «Apply» on the bar at the top of the screen makes it the player's own, the sliders tune it before that. The name
@@ -1619,9 +1634,6 @@ Slider(panelAtmo, "mistDensity", T("Плотность низового тума
 	T("Насколько эта дымка непрозрачная. Выше — как вата", "How solid that haze is. Higher looks like cotton wool"))
 Slider(panelAtmo, "mistHigh", T("Туман с высоты: с гор и в полёте", "Mist from a height: hills and flight"), L + 6, -278, nil, nil, nil,
 	T("Сколько дымки видно внизу, когда вы на горе или летите. 0 — сверху всё чисто", "How much haze you see below from a hill or in flight. 0 keeps the view clear"))
--- The mist at the feet (1.7.1): ankle-deep, with no clear circle around the player. Swamps ask for it.
-Slider(panelAtmo, "mistNear", T("Туман у ног: по щиколотку", "Mist at the feet: ankle-deep"), L + 6, -320, nil, nil, 71,
-	T("Стелется прямо под персонажем, без чистого круга. 0 выключает — как раньше", "Lies right under the character, no clear circle. 0 turns it off — as before"))
 Header(panelAtmo, T("Погода и земля", "Weather and ground"), R, -60)
 Check(panelAtmo, "weather", T("Погодное настроение", "Weather mood"), R, -74)
 Check(panelAtmo, "wet", T("Мокрая земля в дождь", "Wet ground in rain"), R, -98)
@@ -1908,7 +1920,7 @@ local function OpenReport()
 	if back.SetColorTexture then back:SetColorTexture(0, 0, 0, 0.85) else back:SetTexture(0, 0, 0, 0.85) end
 	local head = fr:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	head:SetPoint("TOP", 0, -12)
-	head:SetText(T("Сообщение об ошибке GUWOW!", "GUWOW! bug report"))
+	head:SetText(T("Сообщение об ошибке Graphic Update.. Wow!", "Graphic Update.. Wow! bug report"))
 	local l1 = fr:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	l1:SetPoint("TOPLEFT", 16, -44)
 	l1:SetText(T("Название ошибки:", "Title:"))
@@ -1953,8 +1965,8 @@ local function OpenReport()
 	warn:SetPoint("BOTTOMLEFT", 16, 86)
 	warn:SetWidth(408)
 	warn:SetJustifyH("LEFT")
-	warn:SetText(T("Для отправки GUWOW! снимет вашу конфигурацию и ошибки интерфейса и перезагрузит игровой интерфейс. Это займёт пару секунд, и вы вернётесь в игру.",
-		"To send the report, GUWOW! takes your setup and interface errors and reloads the game interface. It takes a couple of seconds, and you are back in the game."))
+	warn:SetText(T("Для отправки Graphic Update.. Wow! снимет вашу конфигурацию и ошибки интерфейса и перезагрузит игровой интерфейс. Это займёт пару секунд, и вы вернётесь в игру.",
+		"To send the report, Graphic Update.. Wow! takes your setup and interface errors and reloads the game interface. It takes a couple of seconds, and you are back in the game."))
 	local note = fr:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	note:SetPoint("BOTTOMLEFT", warn, "TOPLEFT", 0, 6)
 	note:SetWidth(408)
@@ -2021,9 +2033,16 @@ local function OpenReport()
 end
 
 
--- The welcome page buttons, created here so SelfHeal and OpenReport already exist.
-Button(home, T("Самолечение", "Self-heal"), 16, -350, 170, function() SelfHeal() end)
-Button(home, T("Сообщить об ошибке", "Report a bug"), 196, -350, 170, function() OpenReport() end)
+-- The welcome page buttons, created here so SelfHeal and OpenReport already exist. They sit under the text, however
+-- long it grows in the player's language (2.0).
+do
+	local heal = Button(home, T("Самолечение", "Self-heal"), 16, 0, 170, function() SelfHeal() end)
+	heal:ClearAllPoints()
+	heal:SetPoint("TOPLEFT", homeText, "BOTTOMLEFT", 0, -20)
+	local report = Button(home, T("Сообщить об ошибке", "Report a bug"), 0, 0, 170, function() OpenReport() end)
+	report:ClearAllPoints()
+	report:SetPoint("LEFT", heal, "RIGHT", 10, 0)
+end
 
 -- The support page (1.7.3): players did not find the report behind a button on the welcome page, so it has its own
 -- line in the list of pages, the first one, with one big button.
@@ -2034,8 +2053,8 @@ supportText:SetPoint("TOPLEFT", 16, -70)
 supportText:SetWidth(600)
 supportText:SetJustifyH("LEFT")
 supportText:SetSpacing(4)
-supportText:SetText(T("Как написать:\n1. Встаньте так, чтобы ошибка была видна на экране.\n2. Нажмите «Написать в поддержку».\n3. Коротко назовите ошибку и опишите, что вы делали.\n4. Нажмите «Приложить снимок», если ошибку видно глазами.\n5. Нажмите «Отправить». Интерфейс перезагрузится на пару секунд.\n\nВерсия игры, настройки GUWOW! и журналы прикладываются сами. Отчёт отправляет программа GU-WOW, она должна быть запущена.\n\nЕсли эффекты пропали совсем, сначала нажмите «Самолечение».",
-	"How to write:\n1. Stand so that the bug is on the screen.\n2. Press «Write to support».\n3. Name the bug in a few words and describe what you were doing.\n4. Press «Attach a shot» if the bug can be seen.\n5. Press «Send». The interface reloads for a couple of seconds.\n\nThe game version, the GUWOW! settings and the logs go with it on their own. The GU-WOW program sends the report, so keep it running.\n\nIf the effects are gone completely, press «Self-heal» first."))
+supportText:SetText(T("Как написать:\n1. Встаньте так, чтобы ошибка была видна на экране.\n2. Нажмите «Написать в поддержку».\n3. Коротко назовите ошибку и опишите, что вы делали.\n4. Нажмите «Приложить снимок», если ошибку видно глазами.\n5. Нажмите «Отправить». Интерфейс перезагрузится на пару секунд.\n\nВерсия игры, настройки Graphic Update.. Wow! и журналы прикладываются сами. Отчёт отправляет программа GU-WOW, она должна быть запущена.\n\nЕсли эффекты пропали совсем, сначала нажмите «Самолечение».",
+	"How to write:\n1. Stand so that the bug is on the screen.\n2. Press «Write to support».\n3. Name the bug in a few words and describe what you were doing.\n4. Press «Attach a shot» if the bug can be seen.\n5. Press «Send». The interface reloads for a couple of seconds.\n\nThe game version, the Graphic Update.. Wow! settings and the logs go with it on their own. The GU-WOW program sends the report, so keep it running.\n\nIf the effects are gone completely, press «Self-heal» first."))
 local supportButton = Button(panelSupport, T("Написать в поддержку", "Write to support"), 16, -300, 260, function() OpenReport() end)
 supportButton:SetHeight(32)
 Button(panelSupport, T("Самолечение", "Self-heal"), 290, -305, 170, function() SelfHeal() end)
@@ -2047,7 +2066,7 @@ page.parent = home.name
 page:Hide()
 local title2 = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title2:SetPoint("TOPLEFT", 16, -16)
-title2:SetText("GUWOW!: " .. page.name)
+title2:SetText("Graphic Update.. Wow!: " .. page.name)
 
 local sub2 = page:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub2:SetPoint("TOPLEFT", title2, "BOTTOMLEFT", 0, -6)
@@ -2095,7 +2114,7 @@ Button(page, T("Попробовать код", "Try the code"), 162, -162, 140,
 	if t then
 		Preview(t, T("код настройки", "settings code"))
 	else
-		Say(T("это не код GUWOW!.", "this is not a GUWOW! code."))
+		Say(T("это не код Graphic Update.. Wow!.", "this is not a Graphic Update.. Wow! code."))
 	end
 end)
 
@@ -2224,7 +2243,7 @@ pagePhoto.parent = home.name
 pagePhoto:Hide()
 local title3 = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title3:SetPoint("TOPLEFT", 16, -16)
-title3:SetText("GUWOW!: " .. pagePhoto.name)
+title3:SetText("Graphic Update.. Wow!: " .. pagePhoto.name)
 local sub3 = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub3:SetPoint("TOPLEFT", title3, "BOTTOMLEFT", 0, -6)
 sub3:SetText(T("Интерфейс прячется, персонаж в фокусе, фон размыт. Выход: Esc, Enter или сама клавиша фоторежима.",
@@ -2239,69 +2258,80 @@ Slider(pagePhoto, "playBlur", T("Размытие дали в обычной и�
 	T("Дальний план за персонажем слегка размыт, как в объективе, и глазу спокойнее. Персонаж, всё рядом с ним и интерфейс остаются чёткими. 0 — выключено", "The far land behind your character is a little blurred, as through a lens, easier on the eyes. Your character, everything near and the interface stay sharp. 0 is off"))
 Button(pagePhoto, T("Фоторежим", "Photo mode"), 330, -74, 150, GUWOW_TogglePhoto)
 Button(pagePhoto, T("Чистый снимок", "Clean screenshot"), 330, -102, 150, GUWOW_Screenshot)
+-- The play photo mode: the same page, its own block below the plain photo mode.
+Header(pagePhoto, T("Игровой фоторежим", "Play photo mode"), 16, -262)
+Button(pagePhoto, T("Игровой фоторежим: вкл/выкл", "Play photo mode: on/off"), 16, -282, 220, GUWOW_ToggleGame)
+Check(pagePhoto, "gamePhoto", T("Игровой фоторежим с размытием фона и кинорамкой", "Play photo mode with the background blur and the cinema bars"), 16, -310)
 local photoPanelsNote = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-photoPanelsNote:SetPoint("TOPLEFT", 16, -250)
+photoPanelsNote:SetPoint("TOPLEFT", 16, -410)
 photoPanelsNote:SetWidth(590)
 photoPanelsNote:SetJustifyH("LEFT")
-photoPanelsNote:SetText(T("Какие панели оставить в фоторежиме и насколько прозрачными, задаётся на странице «Панели», кнопка «Фоторежим».",
-	"Which panels stay in photo mode and how see-through, is set on the «Panels» page, button «Photo mode»."))
+photoPanelsNote:SetText(T("Какие панели видны в обоих фоторежимах и насколько прозрачными, задаётся на странице «Панели».",
+	"Which panels show in both photo modes and how see-through, is set on the «Panels» page."))
 
--- The photo key right here (1.7.3): the player presses the button, then the key, and the game's own binding is set,
--- the same one as in Menu → Key Bindings. Esc cancels. A key that had another action loses it, the speech says which.
-local keyLabel = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-keyLabel:SetPoint("TOPLEFT", 16, -196)
-keyLabel:SetWidth(300)
-keyLabel:SetJustifyH("LEFT")
-local function ShowPhotoKey()
-	local k = GetBindingKey and GetBindingKey("GUWOW_PHOTO")
-	keyLabel:SetText(T("Клавиша фоторежима: ", "Photo mode key: ") .. (k and (GetBindingText and GetBindingText(k, "KEY_") or k) or T("не назначена", "none")))
-end
-widgets.photoKey = { Refresh = ShowPhotoKey }
-local catcher = CreateFrame("Button", "LegionGUKeyCatcher", pagePhoto, "UIPanelButtonTemplate")
-catcher:SetWidth(220)
-catcher:SetHeight(22)
-catcher:SetPoint("TOPLEFT", 16, -212)
-catcher:SetText(T("Назначить клавишу фоторежима", "Set the photo mode key"))
-local MODIFIERS = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true, UNKNOWN = true }
-local function StopCatch()
-	catcher:EnableKeyboard(false)
-	catcher:SetScript("OnKeyDown", nil)
-	catcher:SetText(T("Назначить клавишу фоторежима", "Set the photo mode key"))
-end
-catcher:SetScript("OnClick", function(self)
-	if InCombatLockdown() then
-		Say(T("клавиши нельзя менять в бою.", "keys cannot be changed in combat."))
-		return
+-- The keys right here (1.7.3, the play photo mode key 2.0): the player presses the button, then the key, and the game's
+-- own binding is set, the same one as in Menu → Key Bindings. Esc cancels. A key that had another action loses it, the
+-- speech says which.
+local function KeyCatcher(action, frameName, y, labelText, setText, doneText)
+	local MODIFIERS = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true, UNKNOWN = true }
+	local label = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	label:SetPoint("TOPLEFT", 16, y)
+	label:SetWidth(300)
+	label:SetJustifyH("LEFT")
+	local function ShowKey()
+		local k = GetBindingKey and GetBindingKey(action)
+		label:SetText(labelText .. (k and (GetBindingText and GetBindingText(k, "KEY_") or k) or T("не назначена", "none")))
 	end
-	self:SetText(T("Нажмите клавишу… (Esc — отмена)", "Press a key… (Esc cancels)"))
-	self:EnableKeyboard(true)
-	self:SetScript("OnKeyDown", function(_, key)
-		if MODIFIERS[key] then
+	widgets[action] = { Refresh = ShowKey }
+	local catcher = CreateFrame("Button", frameName, pagePhoto, "UIPanelButtonTemplate")
+	catcher:SetWidth(260)
+	catcher:SetHeight(22)
+	catcher:SetPoint("TOPLEFT", 16, y - 16)
+	catcher:SetText(setText)
+	local function StopCatch()
+		catcher:EnableKeyboard(false)
+		catcher:SetScript("OnKeyDown", nil)
+		catcher:SetText(setText)
+	end
+	catcher:SetScript("OnClick", function(self)
+		if InCombatLockdown() then
+			Say(T("клавиши нельзя менять в бою.", "keys cannot be changed in combat."))
 			return
 		end
-		StopCatch()
-		if key == "ESCAPE" then
-			return
-		end
-		local full = (IsAltKeyDown() and "ALT-" or "") .. (IsControlKeyDown() and "CTRL-" or "") .. (IsShiftKeyDown() and "SHIFT-" or "") .. key
-		local old = GetBindingAction and GetBindingAction(full)
-		local was = GetBindingKey and GetBindingKey("GUWOW_PHOTO")
-		if SetBinding(full, "GUWOW_PHOTO") then
-			-- One key for photo mode: the old one is freed only after the new one is set.
-			if was and was ~= full then
-				SetBinding(was)
+		self:SetText(T("Нажмите клавишу… (Esc — отмена)", "Press a key… (Esc cancels)"))
+		self:EnableKeyboard(true)
+		self:SetScript("OnKeyDown", function(_, key)
+			if MODIFIERS[key] then
+				return
 			end
-			SaveBindings(GetCurrentBindingSet and GetCurrentBindingSet() or 1)
-			local lost = (old and old ~= "" and old ~= "GUWOW_PHOTO") and (T(" Прежнее действие этой клавиши снято: ", " The key's old action is cleared: ")
-				.. (_G["BINDING_NAME_" .. old] or old) .. ".") or ""
-			Say(T("фоторежим теперь на клавише ", "photo mode is now on ") .. full .. "." .. lost)
-		else
-			Say(T("эту клавишу игра назначить не дала.", "the game did not allow this key."))
-		end
-		ShowPhotoKey()
+			StopCatch()
+			if key == "ESCAPE" then
+				return
+			end
+			local full = (IsAltKeyDown() and "ALT-" or "") .. (IsControlKeyDown() and "CTRL-" or "") .. (IsShiftKeyDown() and "SHIFT-" or "") .. key
+			local old = GetBindingAction and GetBindingAction(full)
+			local was = GetBindingKey and GetBindingKey(action)
+			if SetBinding(full, action) then
+				-- One key per action: the old one is freed only after the new one is set.
+				if was and was ~= full then
+					SetBinding(was)
+				end
+				SaveBindings(GetCurrentBindingSet and GetCurrentBindingSet() or 1)
+				local lost = (old and old ~= "" and old ~= action) and (T(" Прежнее действие этой клавиши снято: ", " The key's old action is cleared: ")
+					.. (_G["BINDING_NAME_" .. old] or old) .. ".") or ""
+				Say(doneText .. T(" теперь на клавише ", " is now on ") .. full .. "." .. lost)
+			else
+				Say(T("эту клавишу игра назначить не дала.", "the game did not allow this key."))
+			end
+			Refresh()
+		end)
 	end)
-end)
-catcher:SetScript("OnHide", StopCatch)
+	catcher:SetScript("OnHide", StopCatch)
+end
+KeyCatcher("GUWOW_PHOTO", "LegionGUKeyCatcher", -196, T("Клавиша фоторежима: ", "Photo mode key: "),
+	T("Назначить клавишу фоторежима", "Set the photo mode key"), T("фоторежим", "photo mode"))
+KeyCatcher("GUWOW_GAME", "LegionGUGameKeyCatcher", -344,T("Клавиша игрового фоторежима: ", "Play photo mode key: "),
+	T("Назначить клавишу игрового фоторежима", "Set the play photo mode key"), T("игровой фоторежим", "play photo mode"))
 pagePhoto:SetScript("OnShow", function()
 	GrowOptions()
 	Refresh()
@@ -2367,8 +2397,8 @@ for mode in pairs(panelSliders) do
 		local s = Slider(panelPanels, mode .. g[1], g[2], i <= 5 and 20 or 340, -120 - ((i - 1) % 5) * 48, 0, 100, nil,
 			mode == "ui_" and T("Сколько видно панели в обычной игре. 100 — целиком, 0 — не видно совсем",
 				"How much of the panel shows in plain play. 100 whole, 0 not at all")
-			or mode == "game_" and T("Сколько видно панели в игровом фоторежиме. Играть можно как обычно, прозрачная панель работает",
-				"How much of the panel shows in the play photo mode. You play as usual, a see-through panel still works")
+			or mode == "game_" and T("Игровой фоторежим. 90 и выше — панель видна всегда. Ниже 90 — панель медленно прячется, пока ничего не происходит, и появляется в бою и под мышью",
+				"The play photo mode. 90 and up, the panel always shows. Under 90 it slowly hides while nothing happens and comes up in a fight and under the mouse")
 			or T("Сколько видно панели в фоторежиме. Все панели на 0 — интерфейс прячется целиком",
 				"How much of the panel shows in photo mode. All panels at 0 hide the whole interface"),
 			function()
@@ -2386,8 +2416,6 @@ Button(panelPanels, T("Показать все панели", "Show all panels")
 	ApplyHide()
 	Refresh()
 end)
-Button(panelPanels, T("Игровой фоторежим: вкл/выкл", "Play photo mode: on/off"), 230, -400, 220, GUWOW_ToggleGame)
-Check(panelPanels, "gamePhoto", T("Игровой фоторежим с размытием фона и кинорамкой", "Play photo mode with the background blur and the cinema bars"), 16, -430)
 
 
 page:SetScript("OnShow", function()
@@ -2533,12 +2561,7 @@ mm:SetScript("OnClick", function(self, button)
 end)
 mm:SetScript("OnEnter", function(self)
 	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-	GameTooltip:AddLine("GUWOW! " .. VERSION)
-	GameTooltip:AddLine(T("Левая кнопка: меню", "Left click: menu"), 1, 1, 1)
-	GameTooltip:AddLine(T("Правая кнопка: включить или выключить", "Right click: on or off"), 1, 1, 1)
-	GameTooltip:AddLine(T("Shift + левая или средняя: фоторежим", "Shift + left or middle click: photo mode"), 1, 1, 1)
-	GameTooltip:AddLine(T("Alt + левая: игровой фоторежим", "Alt + left click: play photo mode"), 1, 1, 1)
-	GameTooltip:AddLine(T("Ctrl + левая: написать в поддержку", "Ctrl + left click: write to support"), 0.4, 1, 0.4)
+	GameTooltip:AddLine("Graphic Update.. Wow!")
 	GameTooltip:Show()
 end)
 mm:SetScript("OnLeave", function()
@@ -2598,10 +2621,9 @@ end)
 if WorldMapFrame then
 	WorldMapFrame:HookScript("OnShow", function() Paint() end)
 	WorldMapFrame:HookScript("OnHide", function()
-		mapUntil = GetTime() + 0.5
 		UpdateZone()
 		Paint()
-		After(0.55, Paint)
+		After(0.2, Paint)
 	end)
 end
 

@@ -23,9 +23,9 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("GU-WOW: fog, sun rays, night and picture for World of Warcraft. Installer and support helper.")]
 [assembly: AssemblyCompany("levan")]
 [assembly: AssemblyCopyright("© 2026 levan")]
-[assembly: AssemblyVersion("1.7.6")]
-[assembly: AssemblyFileVersion("1.7.6")]
-[assembly: AssemblyInformationalVersion("1.7.6-release")]
+[assembly: AssemblyVersion("2.0.0")]
+[assembly: AssemblyFileVersion("2.0.0")]
+[assembly: AssemblyInformationalVersion("2.0.0-release")]
 
 class ShotForm : Form
 {
@@ -35,7 +35,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "1.7.6-release";
+	const string Version = "2.0.0-release";
 	static readonly bool RU = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru";
 	static string T(string ru, string en) { return RU ? ru : en; }
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
@@ -82,15 +82,15 @@ static class WowGU
 			return;
 		}
 		Application.EnableVisualStyles();
-		form = new ShotForm { Text = "GUWOW! " + Version, ClientSize = new Size(660, 620), Font = new Font("Segoe UI", 10f), FormBorderStyle = FormBorderStyle.FixedSingle, MaximizeBox = false, StartPosition = FormStartPosition.CenterScreen };
-		var title = new Label { Text = "GUWOW!", Location = new Point(16, 12), Size = new Size(630, 28), Font = new Font("Segoe UI", 13f, FontStyle.Bold) };
+		form = new ShotForm { Text = "Graphic Update.. Wow! " + Version, ClientSize = new Size(660, 620), Font = new Font("Segoe UI", 10f), FormBorderStyle = FormBorderStyle.FixedSingle, MaximizeBox = false, StartPosition = FormStartPosition.CenterScreen };
+		var title = new Label { Text = "Graphic Update.. Wow!", Location = new Point(16, 12), Size = new Size(630, 28), Font = new Font("Segoe UI", 13f, FontStyle.Bold) };
 		var head = new Label
 		{
 			Text = T(
 				"Графическое улучшение World of Warcraft, созданное специально для сообщества Brothers of Turtle.\n\n" +
 				"Добавляет в игру лучи солнца, туман и дымку, ночь по игровым часам и тёплый свет огней. " +
 				"Сразу после установки работает с настройками по умолчанию. Изменить их можно в меню игры: " +
-				"Интерфейс > Модификации > GUWOW!.\n\n" +
+				"Интерфейс > Модификации > Graphic Update.. Wow!.\n\n" +
 				"Создано на основе ReShade. © 2026 levan. Эффекты распространяются по лицензии GPL-3.0. " +
 				"Меню в игре, установщик и готовая настройка распространяются по лицензии автора: изменённые версии и клоны только с его согласия.\n\n" +
 				"Неофициальный любительский проект. Не связан с Blizzard Entertainment и не претендует на её " +
@@ -98,7 +98,7 @@ static class WowGU
 				"A graphics enhancement for World of Warcraft, made especially for the Brothers of Turtle community.\n\n" +
 				"Adds sun rays, fog and haze, night that follows the in-game clock, and warm firelight. " +
 				"Works with default settings right after install. You can change them in the game menu: " +
-				"Interface > AddOns > GUWOW!.\n\n" +
+				"Interface > AddOns > Graphic Update.. Wow!.\n\n" +
 				"Built on ReShade. © 2026 levan. The effects are distributed under the GPL-3.0 license. " +
 				"The in-game menu, the installer and the ready-made preset are distributed under the author's license: modified versions and clones only with his consent.\n\n" +
 				"An unofficial fan project. Not affiliated with Blizzard Entertainment and claims none of its " +
@@ -131,7 +131,7 @@ static class WowGU
 		report.Click += delegate { RunJob(Report); };
 		remove.Click += delegate
 		{
-			if (MessageBox.Show(form, T("Удалить GUWOW! из этой папки игры?", "Remove GUWOW! from this game folder?"), "GUWOW!", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+			if (MessageBox.Show(form, T("Удалить Graphic Update.. Wow! из этой папки игры?", "Remove Graphic Update.. Wow! from this game folder?"), "Graphic Update.. Wow!", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
 				RunJob(Uninstall);
 		};
 		pathBox.Text = FindGame() ?? "";
@@ -201,13 +201,13 @@ static class WowGU
 			Directory.CreateDirectory(appData);
 			var sentFile = Path.Combine(appData, "sent.txt");
 			// No icon in the tray: it shows only for the moment of a Windows balloon, which needs one, and hides again.
-			var tray = new NotifyIcon { Icon = System.Drawing.SystemIcons.Information, Visible = false, Text = "GUWOW!" };
+			var tray = new NotifyIcon { Icon = System.Drawing.SystemIcons.Information, Visible = false, Text = "Graphic Update.. Wow!" };
 			var hide = new System.Windows.Forms.Timer { Interval = 12000 };
 			hide.Tick += delegate { hide.Stop(); tray.Visible = false; };
 			Action<string, ToolTipIcon> notify = (text, icon) =>
 			{
 				tray.Visible = true;
-				tray.ShowBalloonTip(8000, "GUWOW!", text, icon);
+				tray.ShowBalloonTip(8000, "Graphic Update.. Wow!", text, icon);
 				hide.Stop();
 				hide.Start();
 			};
@@ -726,7 +726,7 @@ static class WowGU
 			int iface = current.Major * 10000 + current.Minor * 100 + (current.Major >= 10 ? current.Patch : 0);
 			var toc = Encoding.UTF8.GetString(Resource("toc")).Replace("70300", iface.ToString());
 			File.WriteAllText(G(@"Interface\AddOns\LegionGU\LegionGU.toc"), toc, new UTF8Encoding(false));
-			Say(T("Меню в игре: Интерфейс > Модификации > GUWOW!, или команда /gu.", "The in-game menu: Interface > AddOns > GUWOW!, or the /gu command."));
+			Say(T("Меню в игре: Интерфейс > Модификации > Graphic Update.. Wow!, или команда /gu.", "The in-game menu: Interface > AddOns > Graphic Update.. Wow!, or the /gu command."));
 		}
 		else if (classic) Say(T("Меню в игре: команда /guwow или кнопка у миникарты.", "The in-game menu: the /guwow command or the minimap button."));
 		else Say(T("Меню в игре для этого клиента не ставится: настройки в окне ReShade (Scroll Lock).", "The in-game menu is not installed for this client: settings live in the ReShade window (Scroll Lock)."));
@@ -789,8 +789,11 @@ static class WowGU
 		// leaves a thin empty strip, about 37 px. The OSD (FPS, clock) keeps ReShade's default size through FPSScale:
 		// its text is FontSize x FPSScale x FontScale. The compiled effects kept in the game folder, not in Temp that
 		// disk cleaners wipe, keep the compile to a second, so the banner stays about 5 s. A font size or a cache
-		// folder the player chose stays as it is; the 10 px of 1.5.2 is ours.
+		// folder the player chose stays as it is; the 10 px of 1.5.2 is ours, and so is the 8 px: a scale other than
+		// 0.125 beside it (ReShade keeps a zoom of its window there) made the banner huge again (2.0).
 		var fontSize = IniGet(rs, "STYLE", "FontSize");
+		if (fontSize != null && fontSize.StartsWith("8.") && !(IniGet(rs, "STYLE", "FontScale") ?? "").StartsWith("0.125"))
+			IniSet(rs, "STYLE", "FontScale", "0.125000", true);
 		bool ours152 = fontSize != null && fontSize.StartsWith("10") && (IniGet(rs, "STYLE", "FontScale") ?? "").StartsWith("1.0");
 		if (string.IsNullOrEmpty(fontSize) || fontSize.StartsWith("13") || ours152)
 		{
@@ -873,7 +876,7 @@ static class WowGU
 				"It is a zero-load helper: it delivers your error reports to the developer straight to GitHub " +
 				"when you press Send on the mod's panel yourself. On its own it sends nothing anywhere and only reads game files.\n\n" +
 				"If you would rather not, press No: the mod works fully, and reports will open as a page in the browser."),
-				T("GUWOW!: помощник поддержки", "GUWOW!: support helper"), MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+				T("Graphic Update.. Wow!: помощник поддержки", "Graphic Update.. Wow!: support helper"), MessageBoxButtons.YesNo, MessageBoxIcon.Question,
 				MessageBoxDefaultButton.Button1) == DialogResult.Yes;
 			marker["watch"] = wants ? "1" : "0";
 		}
