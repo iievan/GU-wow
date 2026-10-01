@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "2.0.0-release"
+local VERSION = "2.0.1-release"
 local CELL = 4
 local CELLS = 89
 
@@ -153,7 +153,7 @@ for _, p in ipairs(BASE_PRESETS) do
 end
 
 local DB
--- A look tried on the page «Profiles and photo»: on screen until «Apply» or «Cancel», never saved by itself, so
+-- A look tried on the page «Extras»: on screen until «Apply» or «Cancel», never saved by itself, so
 -- experiments do not touch the player's own settings. Gone after /reload.
 local preview, previewBase, previewStyle
 local photo = false
@@ -744,52 +744,8 @@ for i = 1, 13 do
 	bags[i] = "ContainerFrame" .. i
 end
 UI_GROUPS[#UI_GROUPS + 1] = bags
--- The quest tracker stands over the whole right side, blocks or not: its rectangle is what it shows now.
-local function TrackerParts()
-	local list = { ObjectiveTrackerFrame and ObjectiveTrackerFrame.HeaderMenu }
-	local blocks = ObjectiveTrackerFrame and ObjectiveTrackerFrame.BlocksFrame
-	if blocks then
-		for _, f in ipairs({ blocks:GetChildren() }) do
-			list[#list + 1] = f
-		end
-	elseif ObjectiveTrackerFrame then
-		list[#list + 1] = ObjectiveTrackerFrame
-	end
-	return list
-end
-for _, g in ipairs(HIDE_GROUPS) do
-	if g[1] == "quests" then
-		UI_GROUPS[#UI_GROUPS + 1] = { "WatchFrame", "QuestWatchFrame", parts = TrackerParts }
-	elseif g[1] == "chat" then
-		local names = { "ChatFrame1EditBox" }
-		for _, n in ipairs(g[3]) do
-			names[#names + 1] = n
-		end
-		UI_GROUPS[#UI_GROUPS + 1] = names
-	elseif g[1] == "bars" then
-		UI_GROUPS[#UI_GROUPS + 1] = { "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight" }
-		UI_GROUPS[#UI_GROUPS + 1] = { "MultiBarRight", "MultiBarLeft" }
-	elseif g[1] == "party" or g[1] == "target" then
-		for _, n in ipairs(g[3]) do
-			UI_GROUPS[#UI_GROUPS + 1] = { n }
-		end
-	elseif g[1] == "buffs" then
-		-- The buttons stand outside the small BuffFrame, in rows to the left and down.
-		local names = { "BuffFrame" }
-		for i = 1, 32 do
-			names[#names + 1] = "BuffButton" .. i
-		end
-		for i = 1, 16 do
-			names[#names + 1] = "DebuffButton" .. i
-		end
-		for i = 1, 3 do
-			names[#names + 1] = "TempEnchant" .. i
-		end
-		UI_GROUPS[#UI_GROUPS + 1] = names
-	else
-		UI_GROUPS[#UI_GROUPS + 1] = g[3]
-	end
-end
+-- Permanent gameplay panels are not sent. Their frame bounds are much wider than their art, and a protected bound
+-- kept a clear rectangle of world behind the portrait, the bars and the cast frame (2.0.1).
 
 local function UIBits(i, v)
 	Tint(uiCells[i], math.floor(v / 4) % 2, math.floor(v / 2) % 2, v % 2)
@@ -1128,7 +1084,7 @@ local function ParseCode(code)
 end
 
 -- ---------------------------------------------------------------------------------------------------------------
--- The panels: Interface > AddOns > GU-WOW, and its page «Profiles and photo»
+-- The panels: Interface > AddOns > GU-WOW, and its page «Extras»
 -- ---------------------------------------------------------------------------------------------------------------
 
 -- The widgets show what is on screen, a preview too. Setting a slider there is not a change by the player.
@@ -1148,8 +1104,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("Graphic Update.. Wow! обновлён: публичная бета 1.1.\n\nНаписать в поддержку теперь можно из отдельной страницы «Сообщение в поддержку» в меню или по Ctrl + щелчок по кнопке у миникарты. Клавишу фоторежима можно назначить прямо на странице «Фоторежим», там же мягкое размытие дали для обычной игры. На странице «Панели» у каждой панели свой ползунок прозрачности: под мышью и в бою панель плавно проявляется целиком. На «Ночи» новые ручки: что считать огнём и радиус свечения. На «Картинке» размытие при движении. У каждого ползунка подсказка простыми словами, готовых пресетов стало больше.\n\nМеню: /gu или кнопка у миникарты.",
-		"Graphic Update.. Wow! is updated: public beta 1.1.\n\nWriting to support now has its own page, Message to support, in the menu, or Ctrl + click on the minimap button. The photo mode key is set right on the Photo mode page, and so is a soft far blur for normal play. On the Panels page each panel has its own transparency slider: under the mouse and in a fight the panel fades in whole. Night has new dials: what counts as a light and the glow radius. Picture has motion blur. Every slider has a tip in plain words, and there are more ready presets.\n\nMenu: /gu or the minimap button."),
+	text = T("Graphic Update.. Wow! обновлён: 2.0.1 «Живой воздух».\n\nСвет, туман, ночные огни и тени учитывают глубину кадра: листва, крыши, персонажи и предметы сохраняют чистые контуры. Игровой фоторежим плавно прячет каждую панель отдельно и возвращает её под мышью или в бою. Настройки обоих фоторежимов собраны на странице «Фоторежим», а видимость интерфейса — на странице «Панели». Карта, меню, подсказки и чат сохраняют игровой вид без тумана и дальней земли поверх них.\n\nМеню: /gu или кнопка у миникарты.",
+		"Graphic Update.. Wow! is updated: 2.0.1 “Living Air”.\n\nLight, fog, night lights and shadows follow frame depth: leaves, roofs, characters and objects keep clean outlines. Play photo mode fades every panel separately and brings it back under the mouse or in combat. Both photo modes are on the Photo mode page, while interface visibility is on the Panels page. The map, menus, tooltips and chat keep their game appearance with no fog or distant land over them.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -1563,8 +1519,8 @@ local function SaveShown()
 		return
 	end
 	if #DB.presets >= MAX_PRESETS then
-		Say(T("пресетов уже 10. Удалите ненужный кнопкой «-» или на странице «Профили и фото».",
-			"there are 10 presets already. Delete one with «-» or on the «Profiles and photo» page."))
+		Say(T("пресетов уже 10. Удалите ненужный кнопкой «-» или на странице «Дополнительно».",
+			"there are 10 presets already. Delete one with «-» or on the «Extras» page."))
 		return
 	end
 	if preview then

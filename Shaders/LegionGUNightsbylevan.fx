@@ -1491,17 +1491,12 @@ namespace LegionGUNights
 		return clamp(FrameTime * 0.001, 0.0, 0.1);
 	}
 
-	// 1 where the painted mask says "UI", 0 on the world.
+	// 1 on a protected open window, 0 on the world. The add-on sends menus, maps, bags and dialogs. Permanent
+	// gameplay panels are drawn after the effects by REST and stay out of this mask: masking their transparent bounds
+	// left conspicuous clear rectangles behind portraits, bars and the cast frame (2.0.1).
 	float UIMask(float2 uv)
 	{
-#if __RENDERER__ < 0xa000
-		// Direct3D 9: the interface the addon reports; the painted mask is of the Legion layout.
 		return LegionGUUIAt(uv);
-#elif LEGIONGU_UI_MASK
-		return max(LegionGUUIAt(uv), saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x));
-#else
-		return LegionGUUIAt(uv);
-#endif
 	}
 
 	// 1 on a protected interface rectangle, 0 on the world. Using the world's depth under a window's dark pixels drew
@@ -1511,15 +1506,11 @@ namespace LegionGUNights
 		return UIMask(uv);
 	}
 
-	// The interface for the blurs, which only keep it sharp. Direct3D 11: before the bridge has run this frame the
-	// mask of the last frame stands in, so the blur while moving and the far blur leave the windows and the chat
-	// sharp; with an empty mask they smeared with every turn of the camera (2.0). An extra sharp spot costs nothing.
+	// The last complete live window mask also keeps a newly opened window sharp through the first bridge update.
 	float UIMaskBlur(float2 uv)
 	{
 #if __RENDERER__ < 0xa000
 		return UIMask(uv);
-#elif LEGIONGU_UI_MASK
-		return max(tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x, saturate(tex2Dlod(UIMaskSampler, float4(uv, 0.0, 0.0)).x));
 #else
 		return tex2Dlod(LegionGUUI, float4(uv, 0.0, 0.0)).x;
 #endif

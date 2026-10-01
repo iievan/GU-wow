@@ -1,5 +1,31 @@
 # Graphic Update.. Wow! (в разработке GU-WOW): история версий / Version history
 
+## 2.0.1-release «Живой воздух» / "Living Air"
+
+### Русский
+
+**Исправлено**
+- В игровом фоторежиме панели плавно растворяются в спокойный момент и плавно возвращаются под мышью и в бою.
+- За портретом, полосами, полосой заклинания и чатом туман и ночь ложатся ровно, без светлых прямоугольников чистого мира.
+- Legion показывает версию 2.0.1 и новое окно «Что нового» про «Живой воздух».
+- Подсказки ведут к действующим страницам «Дополнительно», «Фоторежим» и «Панели».
+- Установщик заново собран из окончательных шейдеров и аддонов версии 2.0.
+
+**Известные проблемы**
+- Эффекты ещё могут иногда ложиться поверх отдельных окон и панелей интерфейса. Исправление выйдет в следующих обновлениях.
+
+### English
+
+**Fixed**
+- In play photo mode panels fade out smoothly in a calm moment and fade back in under the mouse or in combat.
+- Behind the portrait, the bars, the cast bar and the chat the fog and the night lie evenly, with no clear rectangles of untouched world.
+- Legion shows version 2.0.1 and the new “What is new” window for “Living Air”.
+- The hints point to the current Extras, Photo mode and Panels pages.
+- The installer is rebuilt from the final 2.0 shaders and add-ons.
+
+**Known issues**
+- Effects may still occasionally draw over some interface windows and panels. A fix will follow in upcoming updates.
+
 ## 2.0.0-release «Живой воздух» / "Living Air"
 
 ### Русский

@@ -4,7 +4,7 @@
 -- this is a file of its own: the menu is a window opened by /guwow and the minimap button. Lua 5.0 has no # and no %,
 -- a loop variable is one for the whole loop, and the script handlers get this, event and arg1, not parameters.
 
-local VERSION = "2.0.0-release"
+local VERSION = "2.0.1-release"
 local CELL = 4
 local CELLS = 89
 
@@ -366,11 +366,8 @@ end
 -- ---------------------------------------------------------------------------------------------------------------
 -- The interface the effects leave alone. 1.12 draws the windows into the same frame as the world, and REST is
 -- Legion's only, so without this the fog and the rays lay over them. The second strip row tells the shader the
--- rectangles of what is on screen: open windows first, each of its own, then the bars in groups.
--- A frame's bounds are often much wider than its art: the unit frames hold a portrait and a panel of bars with
--- empty world round them, the stance and pet bars span the whole bar width for one or two buttons. The world in
--- there stayed without fog, a box plainly seen around the window. So the bars go by their buttons and the unit
--- frames by their portrait and their bars, each grown by `grow` units to the art's rim.
+-- rectangles of the open windows and the bags, each of its own. GU-WOW.addon32 runs the effects before the
+-- interface draws, so the permanent panels need no rectangle.
 -- ---------------------------------------------------------------------------------------------------------------
 
 local function Numbered(prefix, count, suffix)
@@ -389,26 +386,10 @@ for _, n in ipairs({ "GUWOWMenu", "GameMenuFrame", "OptionsFrame", "SoundOptions
 	"LootFrame", "HelpFrame", "DressUpFrame", "ItemTextFrame", "GameTooltip" }) do
 	table.insert(UI_GROUPS, { n })
 end
-local unitGrow = 6
+-- Permanent gameplay panels are not sent. Their frame bounds are wider than their art, and a protected bound kept a
+-- clear rectangle of world behind the portrait, the bars and the cast frame (2.0.1).
 for _, g in ipairs({
 	Numbered("ContainerFrame", 12),
-	{ "ChatFrame1", "ChatFrame2", "ChatFrame3", "ChatFrame4", "ChatFrame5", "ChatFrame6", "ChatFrame7", "ChatFrameEditBox" },
-	{ "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight" },
-	{ "MainMenuBarLeftEndCap" },
-	{ "MainMenuBarRightEndCap" },
-	Numbered("ShapeshiftButton", 10),
-	Numbered("PetActionButton", 10),
-	{ "MultiBarRight", "MultiBarLeft" },
-	{ "PlayerPortrait", "PlayerLevelText", grow = unitGrow },
-	{ "PlayerName", "PlayerFrameHealthBar", "PlayerFrameManaBar", grow = unitGrow },
-	{ "TargetPortrait", "TargetLevelText", grow = unitGrow },
-	{ "TargetName", "TargetFrameHealthBar", "TargetFrameManaBar", grow = unitGrow },
-	{ "TargetofTargetFrame" },
-	{ "PetFrame" },
-	Numbered("PartyMemberFrame", 4),
-	{ "MinimapCluster" },
-	{ "BuffFrame", "TemporaryEnchantFrame" },
-	{ "CastingBarFrame" },
 }) do
 	table.insert(UI_GROUPS, g)
 end

@@ -7,13 +7,13 @@
 
 Публичное имя мода — **Graphic Update.. Wow!**. GU-WOW — рабочее название разработки, оно остаётся в именах файлов (`GU-WOW.exe`) и в адресе репозитория.
 
-Текущая сборка: **2.0.0-release «Живой воздух»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **2.0.1-release «Живой воздух»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 2.0.0-release
+## Что входит в сборку 2.0.1-release
 
 Всё настраивается в игре: Интерфейс > Модификации > Graphic Update.. Wow!, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -50,14 +50,14 @@
 | Удобство | Меню в игре | Все переключатели и ползунки, изменения видны сразу | 1.3 |
 | Удобство | Настройки автора | Кнопка возвращает настройки автора после вопроса. Пресеты остаются | 1.5.4 |
 | Удобство | Что нового | После обновления игра один раз показывает, что появилось | 1.5.4 |
-| Удобство | Мои пресеты | До 10 своих настроек с названиями на странице «Профили и фото». Их можно сохранить, загрузить и удалить. Перед загрузкой, удалением и перезаписью меню спрашивает подтверждение | 1.5.1 |
+| Удобство | Мои пресеты | До 10 своих настроек с названиями на странице «Дополнительно». Их можно сохранить, загрузить и удалить. Перед загрузкой, удалением и перезаписью меню спрашивает подтверждение | 1.5.1 |
 | Удобство | Предпросмотр | Готовые пресеты, стили и чужие коды сначала только показываются на экране. Ваши настройки меняются, только если нажать «Применить» | 1.5.1 |
 | Удобство | Готовые пресеты | На главной странице меню: Levan Soft (настройки автора), Deep Atmosphere, Vivid Adventure, Moonlight, Misty Dawn, Pure Game, Northern Frost, Warm Night Lamps, Soft Watercolor, Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir, More FPS, первые восемь с 1.7.3. Стрелки показывают пресет сразу, «Применить» оставляет его, ползунки подстраивают его до применения. «+» сохраняет свои настройки как «Пользовательские #1» и дальше по номерам, до 10, «-» удаляет показанный | 1.6.0 |
 | Удобство | Прозрачность панелей | Страница «Панели»: у каждой панели свой ползунок прозрачности для обычной игры и для фоторежима. Под мышью и в бою панель плавно проявляется целиком | 1.7.3 |
 | Удобство | Сообщение в поддержку | Своя страница в меню, Ctrl + щелчок по кнопке у миникарты. Снимок экрана прикладывается, после отправки игра говорит, что сообщение ушло | 1.7.3 |
 | Удобство | Коды настройки | Кнопка «Мой код» даёт строку с вашими настройками. Друг вставляет её и нажимает «Попробовать код» | 1.5 |
 | Удобство | Кнопка у миникарты | Щелчок левой кнопкой мыши открывает меню, правой включает и выключает мод. Shift с левой кнопкой или средняя кнопка запускают фоторежим. Кнопку можно перетащить по кругу миникарты | 1.5 |
-| Удобство | Автокачество | По умолчанию выключено, включается на странице «Профили и фото». Если кадров меньше, чем задано ползунком «Держать кадров не ниже» (по умолчанию 45), тени в щелях, низовой туман, резкость, мокрая земля и привыкание глаз временно отключаются | 1.5 |
+| Удобство | Автокачество | По умолчанию выключено, включается на странице «Дополнительно». Если кадров меньше, чем задано ползунком «Держать кадров не ниже» (по умолчанию 45), тени в щелях, низовой туман, резкость, мокрая земля и привыкание глаз временно отключаются | 1.5 |
 | Удобство | Меню на английском | Для игроков с нерусским клиентом | 1.5 |
 | Удобство | Чистый экран | Эффекты не трогают интерфейс, стартовый экран, экраны загрузки и открытую карту мира | 1.3 |
 | Установщик | Установка в одну кнопку | Ставит и удаляет сборку. ReShade скачивается с официального сайта и проверяется | 1.3 |
@@ -132,13 +132,13 @@ Please note: glitches, visual artifacts, and rendering inaccuracies may occur du
 
 The mod's public name is **Graphic Update.. Wow!**. GU-WOW is the working development name; it stays in the file names (`GU-WOW.exe`) and in the repository address.
 
-Current build: **2.0.0-release "Living Air"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **2.0.1-release "Living Air"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 2.0.0-release
+## What is in build 2.0.1-release
 
 Everything is set up in the game: Interface > AddOns > Graphic Update.. Wow!, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -175,14 +175,14 @@ Everything is set up in the game: Interface > AddOns > Graphic Update.. Wow!, th
 | Convenience | In-game menu | All switches and sliders, changes show at once | 1.3 |
 | Convenience | Author's settings | A button restores the author's settings after a question. Presets stay | 1.5.4 |
 | Convenience | What is new | After an update the game shows once what has appeared | 1.5.4 |
-| Convenience | My presets | Up to 10 named sets of your own settings on the "Profiles and photo" page. You can save, load and delete them. Before loading, deleting or overwriting, the menu asks you to confirm | 1.5.1 |
+| Convenience | My presets | Up to 10 named sets of your own settings on the "Extras" page. You can save, load and delete them. Before loading, deleting or overwriting, the menu asks you to confirm | 1.5.1 |
 | Convenience | Preview | Ready presets, styles and friends' codes are first only shown on screen. Your settings change only when you press "Apply" | 1.5.1 |
 | Convenience | Ready presets | On the main menu page: Levan Soft (the author's settings), Deep Atmosphere, Vivid Adventure, Moonlight, Misty Dawn, Pure Game, Northern Frost, Warm Night Lamps, Soft Watercolor, Starry Night, Peaceful Morning, Cinema, Clear Day, Golden Sunset, Fairy Forest, Grim Storm, Noir, More FPS, the first eight since 1.7.3. The arrows show a preset at once, «Apply» keeps it, the sliders tune it before that. «+» saves your settings as «Custom #1» and up by number, 10 at most, «-» deletes the shown one | 1.6.0 |
 | Convenience | Panel transparency | The Panels page: each panel has its own transparency slider for normal play and for photo mode. Under the mouse and in a fight the panel fades in whole | 1.7.3 |
 | Convenience | Message to support | A page of its own in the menu, Ctrl + click on the minimap button. The screenshot goes along, and after sending the game says the message is gone | 1.7.3 |
 | Convenience | Settings codes | The "My code" button gives a line with your settings. A friend pastes it and presses "Try the code" | 1.5 |
 | Convenience | Minimap button | Left click opens the menu, right click turns the mod on or off. Shift and left click, or middle click, start photo mode. The button can be dragged around the minimap | 1.5 |
-| Convenience | Auto quality | Off by default, turn it on on the "Profiles and photo" page. When the frame rate drops below the "Keep FPS at least" slider (45 by default), contact shadows, ground mist, sharpening, wet ground and eye adaptation pause | 1.5 |
+| Convenience | Auto quality | Off by default, turn it on on the "Extras" page. When the frame rate drops below the "Keep FPS at least" slider (45 by default), contact shadows, ground mist, sharpening, wet ground and eye adaptation pause | 1.5 |
 | Convenience | English menu | For players with a non-Russian client | 1.5 |
 | Convenience | Clean screen | The effects leave the interface, the login screen, loading screens and the open world map alone | 1.3 |
 | Installer | One-click install | Installs and removes the build. ReShade is downloaded from the official site and checked | 1.3 |
