@@ -3880,7 +3880,8 @@ namespace LegionGUNights
 			return c4;
 		// The taps start at a random point of their step, new per pixel and frame: at a long smear eight fixed taps
 		// drew eight copies of every bright edge, the steps showed on a turn (29.09); jittered they blend into grain
-		// the eye does not follow.
+		// the eye does not follow. The taps go in mirrored pairs around the pixel (2.0.2): one shared phase shifted
+		// the whole kernel by up to a sixteenth of the smear each frame, and the picture with the panels on it shook.
 #if __RENDERER__ < 0xa000
 		float3 jp = frac(float3(pos.xy, float(FrameCount % 1024u)) * 0.1031);
 		jp += dot(jp, jp.zyx + 31.32);
@@ -3897,7 +3898,8 @@ namespace LegionGUNights
 		[unroll]
 		for (int i = 0; i < MOTION_TAPS; ++i)
 		{
-			float2 t = uv - m * ((float(i) + jitter) / float(MOTION_TAPS) - 0.5);
+			float r = (float(i % (MOTION_TAPS / 2)) + jitter) / float(MOTION_TAPS);
+			float2 t = uv + m * (i < MOTION_TAPS / 2 ? -r : r);
 			float w = MotionShare(DofYards(t, depthState), character);
 			sum += tex2Dlod(ColorLinear, float4(t, 0.0, 0.0)).rgb * w;
 			wsum += w;

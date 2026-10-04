@@ -4,7 +4,7 @@
 -- this is a file of its own: the menu is a window opened by /guwow and the minimap button. Lua 5.0 has no # and no %,
 -- a loop variable is one for the whole loop, and the script handlers get this, event and arg1, not parameters.
 
-local VERSION = "2.0.1-release"
+local VERSION = "2.0.2-release"
 local CELL = 4
 local CELLS = 89
 
@@ -1625,32 +1625,6 @@ mm:SetScript("OnEnter", function()
 end)
 mm:SetScript("OnLeave", function()
 	GameTooltip:Hide()
-end)
-
--- The game menu (Esc) gets a «Third-party mods» button under «Macros»: 1.12 has no options window for addons. A
--- client that moved the buttons around gets it under «Return to game». A label wider than the button widens it.
-local gmButton = CreateFrame("Button", "GameMenuButtonGUWOW", GameMenuFrame, "GameMenuButtonTemplate")
-gmButton:SetText(T("Сторонние модификации", "Third-party mods"))
-local gmTextWidth = gmButton.GetTextWidth and gmButton:GetTextWidth()
-if gmTextWidth and gmTextWidth + 16 > gmButton:GetWidth() then
-	gmButton:SetWidth(gmTextWidth + 16)
-end
-local _, below
-if GameMenuButtonLogout then
-	_, below = GameMenuButtonLogout:GetPoint(1)
-end
-if GameMenuButtonMacros and below == GameMenuButtonMacros then
-	gmButton:SetPoint("TOP", GameMenuButtonMacros, "BOTTOM", 0, -1)
-	GameMenuButtonLogout:ClearAllPoints()
-	GameMenuButtonLogout:SetPoint("TOP", gmButton, "BOTTOM", 0, -1)
-else
-	gmButton:SetPoint("TOP", GameMenuButtonContinue, "BOTTOM", 0, -1)
-end
-GameMenuFrame:SetHeight(GameMenuFrame:GetHeight() + 22)
-gmButton:SetScript("OnClick", function()
-	PlaySound("igMainMenuOption")
-	HideUIPanel(GameMenuFrame)
-	menu:Show()
 end)
 
 -- ---------------------------------------------------------------------------------------------------------------

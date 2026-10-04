@@ -7,13 +7,13 @@
 
 Публичное имя мода — **Graphic Update.. Wow!**. GU-WOW — рабочее название разработки, оно остаётся в именах файлов (`GU-WOW.exe`) и в адресе репозитория.
 
-Текущая сборка: **2.0.1-release «Живой воздух»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **2.0.2-release «Живой воздух»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 2.0.1-release
+## Что входит в сборку 2.0.2-release
 
 Всё настраивается в игре: Интерфейс > Модификации > Graphic Update.. Wow!, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -82,7 +82,7 @@
 - Если поменяли разрешение экрана или масштаб отрисовки в настройках игры, запустите `GU-WOW.exe` и нажмите «Установить» ещё раз.
 - Аддон NightIllusion лучше выключить, иначе ночь затемнится дважды.
 - Если удалить ReShade, но оставить аддон Graphic Update.. Wow!, в левом верхнем углу будет видна полоска квадратиков. Тогда выключите аддон в списке модификаций.
-- Classic 1.12: меню открывается командой `/guwow`, кнопкой у миникарты или кнопкой Graphic Update.. Wow! в меню по Esc. Полноэкранное свечение в настройках графики должно быть включено, иначе туман ляжет и на окна игры. Если в папке игры стоит DXVK (`d3d9.dll`), установщик отключает его на время работы мода: ReShade ставится под тем же именем. Удаление мода включает DXVK обратно.
+- Classic 1.12: меню открывается командой `/guwow` или кнопкой у миникарты. Полноэкранное свечение в настройках графики должно быть включено, иначе туман ляжет и на окна игры. Если в папке игры стоит DXVK (`d3d9.dll`), установщик отключает его на время работы мода: ReShade ставится под тем же именем. Удаление мода включает DXVK обратно.
 
 ## Клиенты
 
@@ -132,13 +132,13 @@ Please note: glitches, visual artifacts, and rendering inaccuracies may occur du
 
 The mod's public name is **Graphic Update.. Wow!**. GU-WOW is the working development name; it stays in the file names (`GU-WOW.exe`) and in the repository address.
 
-Current build: **2.0.1-release "Living Air"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **2.0.2-release "Living Air"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 2.0.1-release
+## What is in build 2.0.2-release
 
 Everything is set up in the game: Interface > AddOns > Graphic Update.. Wow!, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -207,7 +207,7 @@ To remove: `GU-WOW.exe`, the "Удалить" (Remove) button.
 - If you change the screen resolution or the render scale in the game settings, run `GU-WOW.exe` and press "Установить" (Install) again.
 - Better turn off the NightIllusion add-on, or the night gets darkened twice.
 - If you remove ReShade but keep the Graphic Update.. Wow! add-on, a strip of small squares shows in the top left corner. Turn the add-on off in the add-on list then.
-- Classic 1.12: the menu opens with the `/guwow` command, the minimap button or the Graphic Update.. Wow! button in the Esc menu. Keep the full screen glow on in the video settings, or the fog covers the game's windows too. If the game folder has DXVK (`d3d9.dll`), the installer turns it off while the mod is in: ReShade goes in under the same name. Removing the mod turns DXVK back on.
+- Classic 1.12: the menu opens with the `/guwow` command or the minimap button. Keep the full screen glow on in the video settings, or the fog covers the game's windows too. If the game folder has DXVK (`d3d9.dll`), the installer turns it off while the mod is in: ReShade goes in under the same name. Removing the mod turns DXVK back on.
 
 ## Clients
 

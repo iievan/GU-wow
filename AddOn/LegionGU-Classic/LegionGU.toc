@@ -3,6 +3,6 @@
 ## Notes: Graphic Update.. Wow! settings for the fog, the sun rays, the night and the picture, inside the game. Open: /guwow or the minimap button.
 ## Notes-ruRU: Настройки тумана, лучей солнца, ночи и картинки Graphic Update.. Wow! прямо в игре. Открыть: /guwow или кнопка у миникарты.
 ## Author: levan
-## Version: 2.0.1-release
+## Version: 2.0.2-release
 ## SavedVariables: LegionGUDB
 LegionGU.lua

@@ -1,5 +1,19 @@
 # Graphic Update.. Wow! (в разработке GU-WOW): история версий / Version history
 
+## 2.0.2-release «Живой воздух» / "Living Air"
+
+### Русский
+
+**Исправлено**
+- Интерфейс стоит неподвижно при повороте камеры с включённым размытием в движении. Размытие собиралось вокруг точки, которая каждый кадр немного смещалась, и картинка с панелями мелко дрожала.
+- В Classic 1.12 главное меню (Esc) содержит только кнопки игры. Отдельная кнопка «Сторонние модификации» перекрывала соседние пункты. Меню открывается кнопкой у миникарты или командой `/guwow`.
+
+### English
+
+**Fixed**
+- The interface stays still while the camera turns with motion blur on. The blur gathered around a point that moved slightly every frame, and the picture with its panels shook.
+- In Classic 1.12 the game menu (Esc) holds only the game's own buttons. The extra «Third-party mods» button covered its neighbours. The menu opens with the minimap button or the `/guwow` command.
+
 ## 2.0.1-release «Живой воздух» / "Living Air"
 
 ### Русский

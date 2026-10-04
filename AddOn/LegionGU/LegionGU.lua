@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "2.0.1-release"
+local VERSION = "2.0.2-release"
 local CELL = 4
 local CELLS = 89
 
@@ -1104,8 +1104,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("Graphic Update.. Wow! обновлён: 2.0.1 «Живой воздух».\n\nСвет, туман, ночные огни и тени учитывают глубину кадра: листва, крыши, персонажи и предметы сохраняют чистые контуры. Игровой фоторежим плавно прячет каждую панель отдельно и возвращает её под мышью или в бою. Настройки обоих фоторежимов собраны на странице «Фоторежим», а видимость интерфейса — на странице «Панели». Карта, меню, подсказки и чат сохраняют игровой вид без тумана и дальней земли поверх них.\n\nМеню: /gu или кнопка у миникарты.",
-		"Graphic Update.. Wow! is updated: 2.0.1 “Living Air”.\n\nLight, fog, night lights and shadows follow frame depth: leaves, roofs, characters and objects keep clean outlines. Play photo mode fades every panel separately and brings it back under the mouse or in combat. Both photo modes are on the Photo mode page, while interface visibility is on the Panels page. The map, menus, tooltips and chat keep their game appearance with no fog or distant land over them.\n\nMenu: /gu or the minimap button."),
+	text = T("Graphic Update.. Wow! обновлён: 2.0.2 «Живой воздух».\n\nИнтерфейс стоит неподвижно, когда камера поворачивается с размытием в движении.\n\nСвет, туман, ночные огни и тени учитывают глубину кадра: листва, крыши, персонажи и предметы сохраняют чистые контуры. Игровой фоторежим плавно прячет каждую панель отдельно и возвращает её под мышью или в бою. Настройки обоих фоторежимов собраны на странице «Фоторежим», а видимость интерфейса — на странице «Панели». Карта, меню, подсказки и чат сохраняют игровой вид без тумана и дальней земли поверх них.\n\nМеню: /gu или кнопка у миникарты.",
+		"Graphic Update.. Wow! is updated: 2.0.2 “Living Air”.\n\nThe interface stays still while the camera turns with motion blur on.\n\nLight, fog, night lights and shadows follow frame depth: leaves, roofs, characters and objects keep clean outlines. Play photo mode fades every panel separately and brings it back under the mouse or in combat. Both photo modes are on the Photo mode page, while interface visibility is on the Panels page. The map, menus, tooltips and chat keep their game appearance with no fog or distant land over them.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
