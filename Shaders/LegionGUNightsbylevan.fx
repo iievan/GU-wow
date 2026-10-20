@@ -345,6 +345,14 @@ int LegionGUStyleValue()
 	return LegionGUPanel() ? int(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_STYLE, 0)).x * 63.0 + 0.5) : -1;
 }
 
+// A switch carried in the style cell (8 the cinema frame, 16 the fire smoke, 32 the rain mist); without the panel
+// the answer is noPanel.
+bool LegionGUStyleBit(int bit, bool noPanel)
+{
+	int v = LegionGUStyleValue();
+	return v < 0 ? noPanel : (v / bit) % 2 == 1;
+}
+
 // A switch of LEGIONGU_CTL_EXTRA; all off without the panel.
 bool LegionGUExtra(uint bit)
 {
@@ -1354,6 +1362,13 @@ namespace LegionGUNights
 	static const float CAVE_TIME = 1.0;
 	static const float CAVE_AMB_DARK = 0.04;
 	static const float CAVE_AMB_LIGHT = 0.10;
+	static const float CAVE_AMB_LIGHT_MAX = 0.28; // at «Темнота подземелий» 100 a lit dungeon darkens too
+	// Fire smoke (2.0.3): above a warm light a grey column rises SMOKE_YD yards, sampled SMOKE_TAPS times up the
+	// screen in the light field L1, with a slow drifting sway. Behind nearer things it does not show.
+	static const int SMOKE_TAPS = 6;
+	static const float SMOKE_YD = 3.5;
+	static const float SMOKE_GAIN = 60.0;
+	static const float3 SMOKE_COLOUR = float3(0.10, 0.095, 0.09);
 	// Moonlit mist at night: the fog of LegionGUFog is lifted toward MIST_COLOUR (never darkened) by its own opacity,
 	// the sky by MIST_SKY of the far fog, and the land by no more than the sky, so far hills and the sky above them meet
 	// without a step. Toward the moon (the
@@ -2017,7 +2032,11 @@ namespace LegionGUNights
 			cave = cave > 0.999 ? 1.0 : (cave < 0.001 ? 0.0 : cave);
 			if (texel == 7)
 				return float4(min(noSky, 100.0), cave, sOut, deepOut);
-			float sCave = LegionGUValue(LEGIONGU_CTL_CAVE, CaveDarkness) * 0.01 * cave * (1.0 - smoothstep(CAVE_AMB_DARK, CAVE_AMB_LIGHT, max(a, AMBIENT_MIN))) * live;
+			// The higher the dial, the brighter the cave it still darkens (2.0.3): with the fixed CAVE_AMB_LIGHT a lit
+			// dungeon passed for daylight, and the dial did nothing there at any value.
+			float caveDial = LegionGUValue(LEGIONGU_CTL_CAVE, CaveDarkness) * 0.01;
+			float caveLight = lerp(CAVE_AMB_LIGHT, CAVE_AMB_LIGHT_MAX, caveDial);
+			float sCave = caveDial * cave * (1.0 - smoothstep(CAVE_AMB_DARK, caveLight, max(a, AMBIENT_MIN))) * live;
 			float s = max(sNight, sCave);
 			float g = LegionGUValue(LEGIONGU_CTL_GLOW, LightGlow) * 0.01 * LightsDarkness(n * (1.0 - insideE), d, max(a, AMBIENT_MIN)) * live / (1.0 + LightTotalPow(lights / LIGHT_TOTAL_REF));
 			g *= 1.0 + DEEP_GLOW * deep;
@@ -2702,6 +2721,35 @@ namespace LegionGUNights
 			if (fireL > 0.0)
 				mist = lerp(mist, mist * 2.2 * (fireAir.rgb / max(dot(fireAir.rgb, LUMA601), 1e-5)), 0.6 * fireL);
 			o += max(mist - o, 0.0) * (fm * km * depthState.x);
+		}
+
+		// Fire smoke (2.0.3): a warm glow below this pixel sends a grey column up to SMOKE_YD yards over it, swaying slowly.
+		// The column is cut where a nearer thing stands in front of the fire.
+		[branch]
+		if (nt.z > 0.0 && keepUI > 0.0 && LegionGUStyleBit(16, true))
+		{
+			float ts = GUTimer * 0.001;
+			float smoke = 0.0;
+			float3 smokeLit = float3(0.0, 0.0, 0.0);
+			[loop]
+			for (int i = 1; i <= SMOKE_TAPS; i++)
+			{
+				float dy = 0.04 * i * i / SMOKE_TAPS;
+				float2 su = uv + float2(dy * 0.15 * sin(ts * 0.6 + dy * 40.0 + uv.x * 25.0), dy);
+				float4 F = tex2Dlod(AirS, float4(su, 0.0, 0.0));
+				float fl = dot(F.rgb, LUMA601);
+				if (fl > LIGHT_EPS)
+				{
+					float fz = F.a / fl;
+					float reach = SMOKE_YD / (FOV_TAN2 * max(fz, 1.0));
+					float fw = saturate((F.r - F.b) / max(F.r, 1e-5) * 2.0);
+					float w = fw * saturate(fl * SMOKE_GAIN) * saturate(1.0 - dy / reach) * (sky || z > fz - 2.0 ? 1.0 : 0.0);
+					smoke = max(smoke, w);
+					smokeLit = max(smokeLit, F.rgb * w);
+				}
+			}
+			smoke *= 0.35 * keepUI * (0.75 + 0.25 * sin(ts * 1.3 + uv.y * 60.0));
+			o = lerp(o, SMOKE_COLOUR + 0.5 * smokeLit, smoke);
 		}
 		return o + SoftAdd(air) * (1.0 - saturate(o));
 	}
@@ -3996,7 +4044,9 @@ namespace LegionGUNights
 	// all (01.10): the half-resolution picture swapped in by the distance alone softened the names and the text.
 	float4 DofPrepPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
-		if (!DofOn() || DofMaxPx() <= 0.0)
+		if (!DofOn())
+			discard;
+		if (DofMaxPx() <= 0.0)
 			return float4(0.0, 0.0, 0.0, 0.0);
 		float f = tex2Dfetch(DofFocusCur, int2(0, 0)).x;
 		float z = DofYards(uv, tex2Dfetch(FogCur, int2(1, 0)));
@@ -4010,7 +4060,9 @@ namespace LegionGUNights
 	// bleed into the blurred land behind it.
 	float4 DofBlurPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
-		if (!DofOn() || DofMaxPx() <= 0.0)
+		if (!DofOn())
+			discard;
+		if (DofMaxPx() <= 0.0)
 			return float4(0.0, 0.0, 0.0, 0.0);
 		float4 centre = tex2Dlod(DofPoint, float4(uv, 0.0, 0.0));
 		float2 px = 2.0 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
@@ -4045,6 +4097,8 @@ namespace LegionGUNights
 
 	float4 DofApplyPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
+		if (!DofOn())
+			discard;
 		float4 c = tex2Dfetch(ColorPoint, int2(pos.xy));
 		// Photo mode over the drawn interface (REST ran the effects after it): a panel's rectangle kept whole stood
 		// as a box of the sharp world in the blurred one (play photo mode, 30.09). Inside it only what differs from
@@ -4071,7 +4125,7 @@ namespace LegionGUNights
 		// The cinema frame (the addon's option): black bars to 2.39 : 1 on a narrower screen, with a soft inner
 		// edge of a few pixels instead of a hard cut (1.6.8).
 		float bar = 0.5 * saturate(1.0 - float(BUFFER_WIDTH) / float(BUFFER_HEIGHT) / 2.39);
-		if (LegionGUStyleValue() >= 8 && bar > 0.0)
+		if (LegionGUStyleBit(8, false) && bar > 0.0)
 		{
 			float edge = 4.0 * BUFFER_RCP_HEIGHT;
 			float inBar = min(smoothstep(bar - edge, bar, uv.y), smoothstep(bar - edge, bar, 1.0 - uv.y));

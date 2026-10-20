@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "2.0.2-release"
+local VERSION = "2.0.3-release"
 local CELL = 4
 local CELLS = 89
 
@@ -15,30 +15,30 @@ local function T(ru, en)
 	return RU and ru or en
 end
 
--- The standard settings, the preset «Levan Soft»: the owner's own look, neutral and soft, taken from the live
--- Legion game on 2026-09-28 evening. The same on every client.
+-- The standard settings, the preset «Levan Soft»: the owner's own look, taken from the live Legion game on
+-- 2026-10-20 (2.0.3). The same on every client.
 local DEFAULTS = {
 	master = true, fog = true, weather = true, wet = true, rays = true, night = true, eye = true,
 	zones = true, autoQuality = false, targetFps = 45, orbit = false, hideNames = true, cinema = true, style = 0,
-	chatBack = true,
-	fogThickness = 27, fogDistance = 100, mist = 30, mistDensity = 40, raysStrength = 80,
-	nightDarkness = 25, nightDepth = 41, lightGlow = 50, caveDarkness = 6,
-	sharpness = 15, grade = 75, vignette = 55, ao = 75,
+	chatBack = true, smoke = true, rainMist = true, cave = true,
+	fogThickness = 50, fogDistance = 100, mist = 45, mistDensity = 30, raysStrength = 70,
+	nightDarkness = 10, nightDepth = 10, lightGlow = 10, caveDarkness = 0,
+	sharpness = 35, grade = 70, vignette = 60, ao = 75,
 	-- Heat haze and cinema HDR: 0 off, 50 the look of 1.5.4.
-	hazeStrength = 24, hdrStrength = 50, grain = 29, bokeh = false, photoBlur = 30,
+	hazeStrength = 10, hdrStrength = 70, grain = 20, bokeh = false, photoBlur = 0,
 	-- 1.6.0: how much of the low mist stays seen from a height, and how defined the ray shafts are.
-	mistHigh = 80, rayDefinition = 20,
+	mistHigh = 0, rayDefinition = 60,
 	-- 1.6.7: the drift of the mist; the shader caps it at 40 (beta-1.0).
-	mistFlow = 10,
+	mistFlow = 0,
 	-- 1.7.0: brightness and colour, 50 is the game's own picture.
-	bright = 60, contrast = 40, satur = 50, warmth = 50,
+	bright = 50, contrast = 50, satur = 50, warmth = 50,
 	-- 1.7.1: the rays' own dials. In the open the old fixed cut was 22; 45 makes a field twice as sunlit.
-	raysOpen = 70, raysReach = 60, sunGlow = 60,
+	raysOpen = 70, raysReach = 80, sunGlow = 60,
 	-- 1.7.1: the mist at the feet. Taken out in 2.0 until it is done right; the key stays so old codes read.
 	mistNear = 0,
 	-- 1.7.3: which objects glow at night and how far (50 is the old look), and the motion blur (0 off). These are
 	-- the player's own taste for the screen, like the dials above: a code and a ready preset leave them alone.
-	lightThreshold = 50, lightRadius = 50, motionBlur = 0,
+	lightThreshold = 70, lightRadius = 70, motionBlur = 15,
 	-- 1.7.3: the far land softly blurred in normal play, the photo mode lens at its own strength (0 off).
 	playBlur = 0,
 	-- 1.7.3: a panel shows whole under the mouse and the fight panels in a fight (see PanelAlpha).
@@ -365,6 +365,9 @@ end
 
 local function Effective(key)
 	local v = V(key)
+	if key == "caveDarkness" and not DB.cave then
+		v = 0
+	end
 	if DB.zones and zoneKind and KIND_MODS[zoneKind][key] then
 		v = v * KIND_MODS[zoneKind][key]
 	end
@@ -454,7 +457,9 @@ local function Paint()
 	local switches = (haze > 0 and 1 or 0) + (hot and 2 or 0) + (hdr > 0 and 4 or 0) + (DB.bokeh and 8 or 0)
 		+ (checkView and 16 or 0)
 	local chatL, chatT, chatR, chatB = ChatRect()
-	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + ((DB.cinema or (game and DB.gamePhoto)) and 8 or 0),
+	-- The style cell also carries the switches of 2.0.3: 16 the fire smoke, 32 the thicker ground mist in the rain.
+	local extra = { state, time, Code(V("nightDepth")), Code(Effective("ao")), (V("style") or 0) + ((DB.cinema or (game and DB.gamePhoto)) and 8 or 0)
+		+ (DB.smoke and 16 or 0) + (DB.rainMist and 32 or 0),
 		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches, Code(haze), Code(hdr), facing,
 		Code(V("mistHigh") or 0), Code(V("rayDefinition") or 0), Code(V("mistFlow") or 0),
 		Code(V("bright") or 50), Code(V("contrast") or 50), Code(V("satur") or 50), Code(V("warmth") or 50),
@@ -1104,8 +1109,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("Graphic Update.. Wow! обновлён: 2.0.2 «Живой воздух».\n\nИнтерфейс стоит неподвижно, когда камера поворачивается с размытием в движении.\n\nСвет, туман, ночные огни и тени учитывают глубину кадра: листва, крыши, персонажи и предметы сохраняют чистые контуры. Игровой фоторежим плавно прячет каждую панель отдельно и возвращает её под мышью или в бою. Настройки обоих фоторежимов собраны на странице «Фоторежим», а видимость интерфейса — на странице «Панели». Карта, меню, подсказки и чат сохраняют игровой вид без тумана и дальней земли поверх них.\n\nМеню: /gu или кнопка у миникарты.",
-		"Graphic Update.. Wow! is updated: 2.0.2 “Living Air”.\n\nThe interface stays still while the camera turns with motion blur on.\n\nLight, fog, night lights and shadows follow frame depth: leaves, roofs, characters and objects keep clean outlines. Play photo mode fades every panel separately and brings it back under the mouse or in combat. Both photo modes are on the Photo mode page, while interface visibility is on the Panels page. The map, menus, tooltips and chat keep their game appearance with no fog or distant land over them.\n\nMenu: /gu or the minimap button."),
+	text = T("Graphic Update.. Wow! обновлён: 2.0.3 «Живой воздух».\n\nНад костром поднимается дым, в дождь у земли гуще дымка. Тёмные линии через весь экран над панелями больше не появляются. Лучи солнца не пропадают от пары облаков в голубом небе. Темнота подземелий работает и в освещённых залах, её можно выключить отдельно.\n\nСтандартные настройки обновлены под вид автора. Ваши нынешние настройки остаются, вернуть стандартные можно кнопкой «Стандартные настройки».\n\nМеню: /gu или кнопка у миникарты.",
+		"Graphic Update.. Wow! is updated: 2.0.3 “Living Air”.\n\nSmoke rises over campfires, and the ground mist gets thicker in the rain. Dark lines across the screen over the panels are gone. A few clouds in a blue sky no longer take the sun rays away. Dungeon darkness works in lit halls too and has its own switch.\n\nThe standard settings now follow the author's look. Your current settings stay; the «Standard settings» button brings back the standard ones.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -1593,9 +1598,10 @@ Slider(panelAtmo, "mistHigh", T("Туман с высоты: с гор и в п�
 Header(panelAtmo, T("Погода и земля", "Weather and ground"), R, -60)
 Check(panelAtmo, "weather", T("Погодное настроение", "Weather mood"), R, -74)
 Check(panelAtmo, "wet", T("Мокрая земля в дождь", "Wet ground in rain"), R, -98)
-Slider(panelAtmo, "ao", T("Тени в щелях", "Contact shadows"), R + 6, -140, nil, nil, nil,
+Check(panelAtmo, "rainMist", T("Гуще дымка у земли в дождь", "Thicker ground mist in rain"), R, -122)
+Slider(panelAtmo, "ao", T("Тени в щелях", "Contact shadows"), R + 6, -164, nil, nil, nil,
 	T("Мягкие тени под камнями, травой и у стен: предметы стоят на земле, а не парят. Немного нагружает видеокарту", "Soft shadows under stones, grass and by walls: things sit on the ground. Costs a little GPU"))
-Slider(panelAtmo, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), R + 6, -182, nil, nil, 71,
+Slider(panelAtmo, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), R + 6, -206, nil, nil, 71,
 	T("Воздух дрожит от жары в пустынях и у лавы. В других местах его нет", "The air shimmers with heat in deserts and by lava. Nowhere else"))
 
 Check(panelRays, "rays", T("Лучи солнца", "Sun rays"), L, -60)
@@ -1617,15 +1623,17 @@ Slider(panelNight, "nightDarkness", T("Темнота ночи", "Night darkness
 	T("Насколько темнеет мир ночью по игровым часам. 0 — ночь как в игре", "How dark the world gets at night by the game clock. 0 keeps the game's own night"))
 Slider(panelNight, "nightDepth", T("Глубина ночи", "Night depth"), L + 6, -158, nil, nil, nil,
 	T("Дополнительная тьма поверх «Темноты ночи»: 0 обычная ночь, 100 глухая", "Extra darkness over the night darkness: 0 a plain night, 100 pitch dark"))
-Slider(panelNight, "lightGlow", T("Свет огней", "Light glow"), R + 6, -116, nil, nil, nil,
+Check(panelNight, "smoke", T("Дым от костров", "Smoke from campfires"), R, -76)
+Check(panelNight, "cave", T("Темнота подземелий", "Dungeon darkness"), R, -100)
+Slider(panelNight, "lightGlow", T("Свет огней", "Light glow"), R + 6, -140, nil, nil, nil,
 	T("Насколько ярко ночью светят фонари, костры и окна. 0 — огни не светят сверх игры", "How bright lamps, fires and windows glow at night. 0 adds no glow"))
-Slider(panelNight, "caveDarkness", T("Темнота подземелий", "Dungeon darkness"), R + 6, -158, nil, nil, nil,
+Slider(panelNight, "caveDarkness", T("Темнота подземелий", "Dungeon darkness"), R + 6, -182, nil, nil, nil,
 	T("Насколько темно в пещерах и подземельях. 0 — как в игре", "How dark caves and dungeons are. 0 keeps the game's look"))
 -- The lights' own dials (1.7.3): which objects glow and how far the glow spreads. 50 is the old look.
-Header(panelNight, T("Огни ночью", "Lights at night"), L, -210)
-Slider(panelNight, "lightThreshold", T("Что считать огнём (50 — как было)", "What counts as a light (50 — as before)"), L + 6, -250, nil, nil, nil,
+Header(panelNight, T("Огни ночью", "Lights at night"), L, -234)
+Slider(panelNight, "lightThreshold", T("Что считать огнём (50 — как было)", "What counts as a light (50 — as before)"), L + 6, -274, nil, nil, nil,
 	T("Больше — светятся только настоящие фонари и костры. Меньше — светятся и тусклые предметы. Если ночью светится то, что не должно, прибавьте", "Higher: only real lamps and fires glow. Lower: dim things glow too. If wrong things glow at night, raise it"))
-Slider(panelNight, "lightRadius", T("Радиус свечения (50 — как было)", "Glow radius (50 — as before)"), R + 6, -250, nil, nil, 86,
+Slider(panelNight, "lightRadius", T("Радиус свечения (50 — как было)", "Glow radius (50 — as before)"), R + 6, -274, nil, nil, 86,
 	T("Как далеко вокруг огня разливается свет. Меньше — аккуратный ореол, больше — широкое зарево", "How far the light spreads round a flame. Lower is a tight halo, higher a wide glow"))
 
 Header(panelPic, T("Картинка", "Picture"), L, -60)

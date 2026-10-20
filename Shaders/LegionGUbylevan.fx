@@ -369,6 +369,14 @@ int LegionGUStyleValue()
 	return LegionGUPanel() ? int(tex2Dfetch(LegionGUCtl, int2(LEGIONGU_CTL_STYLE, 0)).x * 63.0 + 0.5) : -1;
 }
 
+// A switch carried in the style cell (8 the cinema frame, 16 the fire smoke, 32 the rain mist); without the panel
+// the answer is noPanel.
+bool LegionGUStyleBit(int bit, bool noPanel)
+{
+	int v = LegionGUStyleValue();
+	return v < 0 ? noPanel : (v / bit) % 2 == 1;
+}
+
 // The depth check view (/gu check in the game chat, extra bit 16): the effects draw the depth instead of the
 // picture, so a player sees in one look whether the depth works.
 bool LegionGUCheckView()
@@ -1200,6 +1208,17 @@ namespace LegionGU
 		return tau > 0.0 ? 1.0 - exp(-dt / tau) : 1.0;
 	}
 
+	// What the grey sky leaves of the rays and the sun's glow (fog state texel 5, y). Under a solid grey overcast
+	// the finder follows a bright cloud and its shafts beat through the rain, so a full grey takes four fifths
+	// away. A few clouds in a blue sky only take some blue out of the average: until 2.0.3 the cut was linear and
+	// that alone took a third of the rays, so they read as gone. It starts at GREY_CUT_FROM now.
+	static const float GREY_CUT_FROM = 0.45;
+	static const float GREY_CUT_FULL = 0.9;
+	float GreySkyKeep()
+	{
+		return 1.0 - 0.8 * smoothstep(GREY_CUT_FROM, GREY_CUT_FULL, tex2Dfetch(FogCur, int2(5, 0)).y);
+	}
+
 	// Last frame's duration in seconds. The original clamps at 0.5, but when the game stutters during a camera
 	// turn it draws a few frames a second, each carries a huge dt, and every eased state — the glow in the fog,
 	// the haze, the enclosure — leaps a visible step per frame (1.6.9). Clamped at 0.1 a transition through a
@@ -1572,7 +1591,7 @@ namespace LegionGU
 	{
 		// The grey sky takes the glow away like it takes the rays (see RaysCompositePS): in the rain the finder
 		// follows a bright cloud, and its glow flooded half the frame with yellow through the downpour.
-		float grey = 1.0 - 0.8 * saturate(tex2Dfetch(FogCur, int2(5, 0)).y);
+		float grey = GreySkyKeep();
 		// The player's dial (1.7.1): 50 the built-in look, 0 no glow at all, 100 twice the glow.
 		float dial = LegionGUValue(LEGIONGU_CTL_SUN_GLOW, 50.0) * 0.02;
 		return (SunInFogAt(uv, tex2Dfetch(FogCur, int2(4, 0)))) * grey * dial * (1.0 - LegionGUNight());
@@ -1774,6 +1793,11 @@ namespace LegionGU
 	static const float WEATHER_LUM_LO = 0.08;     // darker skies are the night, not the weather
 	static const float WEATHER_LUM_HI = 0.20;
 	static const float WEATHER_TIME = 4.0;
+	// The ground mist in the rain (2.0.3): at a full overcast it stands RAIN_MIST_HEIGHT higher, RAIN_MIST_DENSE
+	// thicker, and may grow RAIN_MIST_MAX times as opaque.
+	static const float RAIN_MIST_HEIGHT = 0.6;
+	static const float RAIN_MIST_DENSE = 1.2;
+	static const float RAIN_MIST_MAX = 1.4;
 
 	// ---------------------------------------------------------------------------------------------------
 	// The camera's motion: one shift per frame, found by matching the downsampled luminance of the frame
@@ -2331,6 +2355,11 @@ namespace LegionGU
 		float thick = LegionGUValue(LEGIONGU_CTL_MIST_DENSITY, MistDensity) * 0.01;
 		float4 m = float4(MIST_HEIGHT * lerp(0.5, 1.4, amount), amount < 0.5 ? lerp(25.0, MIST_START, amount * 2.0) : lerp(MIST_START, 6.0, amount * 2.0 - 1.0),
 		                  MIST_DENSITY * 2.0 * amount * exp2(MIST_DENSITY_SPAN * (thick - 0.5)), lerp(MIST_MAX.x, MIST_MAX.y, thick));
+		// In the rain (2.0.3) the ground mist rises higher and lies thicker, as wet air does.
+		float rainMist = LegionGUStyleBit(32, true) ? saturate(tex2Dfetch(FogCur, int2(5, 0)).x) : 0.0;
+		m.x *= 1.0 + RAIN_MIST_HEIGHT * rainMist;
+		m.z *= 1.0 + RAIN_MIST_DENSE * rainMist;
+		m.w = lerp(m.w, min(1.0, m.w * RAIN_MIST_MAX), rainMist);
 		// «Туман с высоты»: how much of the mist stays when the eye is high over the ground plane, on a cliff
 		// or in the air. At 0 the land below is clear (the old look), at 100 the valley keeps its blanket
 		// however high the camera stands. In flight the game's word scales it the same way.
@@ -3097,7 +3126,7 @@ namespace LegionGU
 		gain *= lerp(LegionGUValue(LEGIONGU_CTL_RAYS_OPEN, 100.0 * RAYS_OPEN_GAIN) * 0.01, 1.0, canopy);
 		// Under a grey overcast the sun stands behind the clouds: what the finder follows there is a bright
 		// cloud, and its shafts beat through the rain. The grey sky takes up to four fifths of the rays away.
-		gain *= 1.0 - 0.8 * saturate(tex2Dfetch(FogCur, int2(5, 0)).y);
+		gain *= GreySkyKeep();
 		// The light is in the air: as much as there is air in front of the pixel.
 		float air = depthLive > 0.0 ? lerp(AIR_NO_DEPTH, AirHere(uv, EffectiveReversed(depthState.w)), depthLive) : AIR_NO_DEPTH;
 		gain *= air * AIR_GAIN;
@@ -3361,6 +3390,10 @@ namespace LegionGU
 		float4 depthState = tex2Dfetch(FogCur, int2(1, 0));
 		if (depthState.y < 0.5 || depthState.x <= 0.0 || !LegionGUOn(1u) || (SurfAO() <= 0.0 && SurfWet() <= 0.0))
 			return float2(0.0, 0.0);
+		// The centre of one full-resolution depth texel. A half-resolution pixel centre falls on the corner of four
+		// texels, and the point sampler picks one of them by rounding: every 90th row or so it picked the other
+		// row, the normal tilted and the ground got a dark line across the whole screen (2.0.3).
+		uv = (floor(pos.xy) * 2.0 + 0.5) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
 		float reversed = EffectiveReversed(depthState.w);
 		if (IsSky(DepthU(RawDepth(uv), reversed)))
 			return float2(0.0, 0.0);

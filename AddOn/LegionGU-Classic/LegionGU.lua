@@ -4,7 +4,7 @@
 -- this is a file of its own: the menu is a window opened by /guwow and the minimap button. Lua 5.0 has no # and no %,
 -- a loop variable is one for the whole loop, and the script handlers get this, event and arg1, not parameters.
 
-local VERSION = "2.0.2-release"
+local VERSION = "2.0.3-release"
 local CELL = 4
 local CELLS = 89
 

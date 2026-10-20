@@ -1,5 +1,35 @@
 # Graphic Update.. Wow! (в разработке GU-WOW): история версий / Version history
 
+## 2.0.3-release «Живой воздух» / "Living Air"
+
+### Русский
+
+**Новое**
+- Над кострами и тёплыми огнями поднимается серый дымок и медленно колышется. Выключатель «Дым от костров» на странице «Ночь».
+- В дождь низовой туман поднимается выше и лежит гуще. Выключатель «Гуще дымка у земли в дождь» на странице «Атмосфера».
+- У темноты подземелий появился свой выключатель на странице «Ночь».
+- Стандартные настройки обновлены под нынешний вид автора: туман гуще, ночь мягче, огни спокойнее, резкость выше, лёгкое размытие при повороте камеры. Ваши настройки при обновлении не меняются, стандартные возвращает кнопка «Стандартные настройки».
+
+**Исправлено**
+- Над панелями больше не появляются тёмные линии через весь экран. Тени в щелях брали глубину на стыке соседних строк, и на ровной земле проступала полоса.
+- Несколько облаков в голубом небе больше не гасят лучи солнца. Раньше любая серость неба забирала часть лучей, теперь их глушит только сплошная пасмурность.
+- Ползунок «Темнота подземелий» работает и в освещённых залах. Раньше такой зал считался днём, и ползунок там ничего не менял.
+- Размытие дальнего плана и фоторежима, когда оба выключены, больше не тратит кадры.
+
+### English
+
+**New**
+- A grey wisp of smoke rises over campfires and warm flames and sways slowly. The «Smoke from campfires» switch is on the Night page.
+- In the rain the ground mist rises higher and lies thicker. The «Thicker ground mist in rain» switch is on the Atmosphere page.
+- Dungeon darkness has its own switch on the Night page.
+- The standard settings now follow the author's current look: thicker fog, a softer night, calmer lights, more sharpness and a light motion blur on camera turns. An update keeps your own settings; the «Standard settings» button brings back the standard ones.
+
+**Fixed**
+- No more dark lines across the screen over the panels. Contact shadows read depth on the seam of two rows, and a stripe showed on flat ground.
+- A few clouds in a blue sky no longer take the sun rays away. Any grey in the sky used to cut the rays; now only a full overcast does.
+- The «Dungeon darkness» slider works in lit halls too. Such a hall used to pass for daylight, and the slider did nothing there.
+- The far blur and the photo mode blur cost no frames while both are off.
+
 ## 2.0.2-release «Живой воздух» / "Living Air"
 
 ### Русский

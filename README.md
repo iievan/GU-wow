@@ -7,13 +7,13 @@
 
 Публичное имя мода — **Graphic Update.. Wow!**. GU-WOW — рабочее название разработки, оно остаётся в именах файлов (`GU-WOW.exe`) и в адресе репозитория.
 
-Текущая сборка: **2.0.2-release «Живой воздух»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **2.0.3-release «Живой воздух»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
 Поддержка осуществляется только на ОС Windows 10-11.
 
-## Что входит в сборку 2.0.2-release
+## Что входит в сборку 2.0.3-release
 
 Всё настраивается в игре: Интерфейс > Модификации > Graphic Update.. Wow!, кнопка у миникарты или команда `/gu` в чате. В колонке «С версии» указана сборка, в которой появилась возможность. «До 1.3» значит, что она была уже в первых сборках.
 
@@ -27,18 +27,20 @@
 | Атмосфера | Погодное настроение | В пасмурную погоду и в дождь дымка гуще, цвет холоднее, контраст мягче. Работает, только когда включён туман | 1.3 |
 | Атмосфера | Тени в щелях | Мягкие тени под камнями, травой и у стен, предметы садятся на землю | 1.4 |
 | Атмосфера | Мокрая земля | В дождь и в пасмурную погоду земля темнеет, блестит и отражает небо | 1.4 |
+| Атмосфера | Дымка в дождь | В дождь низовой туман поднимается выше и лежит гуще. Выключатель на странице «Атмосфера» | 2.0.3 |
 | Атмосфера | Марево | В пустынях и огненных землях дальняя земля дрожит от жара. Персонажи и небо не искажаются. Ползунок силы на главной странице меню, 0 выключает | 1.5.4 |
 | Атмосфера | Атмосфера по зонам | В болотах и лесах гуще низовой туман, в пустынях воздух прозрачнее, в снегах больше дымки. В выжженных землях и в городах низового тумана меньше. Ползунки игрока остаются главными | 1.5 |
 | Ночь | Ночь по игровым часам | Темнеет с 21:00 до 5:00 с плавным переходом. Ползунки «Темнота ночи» и «Глубина ночи» | 1.3 |
 | Ночь | Свет огней | Огонь, окна и лава светят тёплым светом. Ползунки «Свет огней», «Что считать огнём» и «Радиус свечения» | до 1.3, ручки 1.7.3 |
-| Ночь | Темнота подземелий | Отдельный ползунок темноты для подземелий, пещер и тёмных домов. Срабатывает, когда неба не видно несколько секунд и вокруг темно | до 1.3 |
+| Ночь | Темнота подземелий | Отдельный ползунок темноты для подземелий, пещер и тёмных домов. Срабатывает, когда неба не видно несколько секунд и вокруг темно. С 2.0.3 работает и в освещённых залах, есть отдельный выключатель | до 1.3 |
+| Ночь | Дым от костров | Над костром и тёплым огнём поднимается серый дымок и медленно колышется. Выключатель на странице «Ночь» | 2.0.3 |
 | Ночь | Ночь за окном | Из таверны и домов видна ночь на улице | 1.4 |
 | Ночь | Лунный свет | Ночью луна даёт мягкие холодные лучи | 1.5 |
 | Картинка | Резкость, цвет по времени суток, виньетка, привыкание глаз | Чёткость без мыла, золотистые вечер и утро, прохладные тени ночью, мягкое затемнение краёв, глаза привыкают к темноте и свету | 1.3 |
 | Картинка | Цветовые стили | «Тёплый», «Холодный», «Плёнка», «Сочный», а с 1.5.4 ещё «Закат», «Сказка» и «Нуар». Меняют характер цвета, как фильтр фотоаппарата | 1.5 |
 | Картинка | Кино-HDR | Тени глубже, яркое не выгорает в белое, цвет чуть плотнее, как на киноплёнке. Ползунок силы на главной странице меню | 1.5.4 |
 | Картинка | Плёночное зерно | Лёгкое зерно плёнки, ползунок на главной странице меню | 1.5.4 |
-| Картинка | Размытие при движении | Картинка смазывается только на быстром повороте камеры, персонаж и маунт остаются чёткими. Ползунок на странице «Картинка», по умолчанию выключено | 1.7.3 |
+| Картинка | Размытие при движении | Картинка смазывается только на быстром повороте камеры, персонаж и маунт остаются чёткими. Ползунок на странице «Картинка» | 1.7.3 |
 | Картинка | Яркость и цвет | Яркость, контрастность, сочность цвета и тепло картинки — сам WoW так не умеет. Пресеты: «Стандарт WoW», пять готовых и слот «Мой». 50 у ползунка = картинка игры | 1.7.0 |
 | Фото | Фоторежим | Интерфейс прячется, персонаж в фокусе, фон размыт. Не работает в бою | 1.4 |
 | Фото | Сила размытия и боке | Ползунок силы размытия фона. По умолчанию размытие втрое мягче, чем в 1.5.3. Боке превращает огни на размытом фоне в мягкие кружки | 1.5.4 |
@@ -132,13 +134,13 @@ Please note: glitches, visual artifacts, and rendering inaccuracies may occur du
 
 The mod's public name is **Graphic Update.. Wow!**. GU-WOW is the working development name; it stays in the file names (`GU-WOW.exe`) and in the repository address.
 
-Current build: **2.0.2-release "Living Air"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **2.0.3-release "Living Air"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
 Supported operating systems: Windows 10 and Windows 11 only.
 
-## What is in build 2.0.2-release
+## What is in build 2.0.3-release
 
 Everything is set up in the game: Interface > AddOns > Graphic Update.. Wow!, the minimap button or the `/gu` chat command. The "Since" column shows the build where a feature first appeared. "Before 1.3" means it was already in the first builds.
 
@@ -152,18 +154,20 @@ Everything is set up in the game: Interface > AddOns > Graphic Update.. Wow!, th
 | Atmosphere | Weather mood | In overcast weather and rain the haze gets thicker, the colours cooler and the contrast softer. Works only with the fog on | 1.3 |
 | Atmosphere | Contact shadows | Soft shadows under stones, grass and near walls, objects sit on the ground | 1.4 |
 | Atmosphere | Wet ground | In rain and overcast weather the ground darkens, shines and reflects the sky | 1.4 |
+| Atmosphere | Mist in the rain | In the rain the ground mist rises higher and lies thicker. A switch on the Atmosphere page | 2.0.3 |
 | Atmosphere | Heat haze | In deserts and fire lands the far ground wavers in the heat. Characters and the sky stay still. A strength slider on the main menu page, 0 turns it off | 1.5.4 |
 | Atmosphere | Atmosphere by zone | Thicker ground mist in swamps and forests, clearer air in deserts, more haze in the snow. Less ground mist in scorched lands and cities. Your sliders stay in charge | 1.5 |
 | Night | Night by the game clock | It gets dark from 21:00 to 5:00 with a smooth fade. Sliders "Night darkness" and "Night depth" | 1.3 |
 | Night | Light glow | Fire, windows and lava glow with warm light. Sliders "Light glow", "What counts as a light" and "Glow radius" | before 1.3, dials 1.7.3 |
-| Night | Dungeon darkness | A separate darkness slider for dungeons, caves and dark houses. It starts when no sky has been seen for a few seconds and the place is dark | before 1.3 |
+| Night | Dungeon darkness | A separate darkness slider for dungeons, caves and dark houses. It starts when no sky has been seen for a few seconds and the place is dark. Since 2.0.3 it works in lit halls too and has its own switch | before 1.3 |
+| Night | Campfire smoke | A grey wisp rises over campfires and warm flames and sways slowly. A switch on the Night page | 2.0.3 |
 | Night | Night outside | From a tavern or a house you see the night outside | 1.4 |
 | Night | Moonlight | At night the moon casts soft cold rays | 1.5 |
 | Picture | Sharpness, time of day colour, vignette, eye adaptation | Crisp picture without blur, golden evenings and mornings, cool shadows at night, soft dark edges, eyes that adapt to dark and light | 1.3 |
 | Picture | Colour styles | Warm, Cold, Film, Vivid, and since 1.5.4 Sunset, Fairy tale and Noir. They change the mood of the colours, like a camera filter | 1.5 |
 | Picture | Cinema HDR | Deeper shadows, bright areas no longer burn to white, a little denser colour, like film. A strength slider on the main menu page | 1.5.4 |
 | Picture | Film grain | A light film grain, a slider on the main menu page | 1.5.4 |
-| Picture | Motion blur | The picture smears only on a fast camera turn; the character and the mount stay crisp. A slider on the Picture page, off by default | 1.7.3 |
+| Picture | Motion blur | The picture smears only on a fast camera turn; the character and the mount stay crisp. A slider on the Picture page | 1.7.3 |
 | Picture | Brightness and colour | Brightness, contrast, colour richness and picture warmth — WoW itself cannot do this. Presets: WoW standard, five ready looks and a My slot. 50 on a slider = the game's own picture | 1.7.0 |
 | Photo | Photo mode | The interface hides, your character stays in focus, the background is blurred. Not available in combat | 1.4 |
 | Photo | Blur strength and bokeh | A slider for the background blur. By default the blur is three times softer than in 1.5.3. Bokeh turns lights in the blur into soft discs | 1.5.4 |
