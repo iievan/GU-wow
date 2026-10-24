@@ -1,7 +1,10 @@
 # Builds GU-WOW.exe with the csc.exe that ships with Windows (.NET Framework 4.x). The payload goes in as resources.
+# "build.sh lite" builds GU-WOW-Lite.exe: the same payload, the installer switches LEGIONGU_LITE on.
 R="$(cd "$(dirname "$0")/.." && pwd -W)"
 export MSYS2_ARG_CONV_EXCL="*" MSYS_NO_PATHCONV=1
-/c/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe /nologo /target:winexe /optimize+ /platform:anycpu /out:GU-WOW.exe \
+OUT=GU-WOW.exe DEF=
+[ "$1" = lite ] && OUT=GU-WOW-Lite.exe DEF=/define:LITE
+/c/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe /nologo /target:winexe /optimize+ /platform:anycpu /out:$OUT $DEF \
  /r:System.Windows.Forms.dll /r:System.Drawing.dll \
  "/resource:$R/Shaders/LegionGUbylevan.fx,p~reshade-shaders~Shaders~LegionGUbylevan.fx" \
  "/resource:$R/Shaders/LegionGUNightsbylevan.fx,p~reshade-shaders~Shaders~LegionGUNightsbylevan.fx" \

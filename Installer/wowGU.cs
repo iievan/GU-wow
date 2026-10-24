@@ -36,6 +36,14 @@ class ShotForm : Form
 static class WowGU
 {
 	const string Version = "2.0.3-release";
+	// GU-WOW-Lite.exe is the same installer built with /define:LITE: it switches LEGIONGU_LITE on in the preset,
+	// the full one switches it off, so either can be installed over the other.
+#if LITE
+	const bool Lite = true;
+#else
+	const bool Lite = false;
+#endif
+	static string Edition { get { return Lite ? " Lite" : ""; } }
 	static readonly bool RU = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru";
 	static string T(string ru, string en) { return RU ? ru : en; }
 	// F5 opens the ReShade window: key, Ctrl, Shift, Alt. One plain key: Ctrl + Scroll Lock (1.5.4 to 1.6.1)
@@ -82,7 +90,7 @@ static class WowGU
 			return;
 		}
 		Application.EnableVisualStyles();
-		form = new ShotForm { Text = "Graphic Update.. Wow! " + Version, ClientSize = new Size(660, 620), Font = new Font("Segoe UI", 10f), FormBorderStyle = FormBorderStyle.FixedSingle, MaximizeBox = false, StartPosition = FormStartPosition.CenterScreen };
+		form = new ShotForm { Text = "Graphic Update.. Wow! " + Version + Edition, ClientSize = new Size(660, 620), Font = new Font("Segoe UI", 10f), FormBorderStyle = FormBorderStyle.FixedSingle, MaximizeBox = false, StartPosition = FormStartPosition.CenterScreen };
 		var title = new Label { Text = "Graphic Update.. Wow!", Location = new Point(16, 12), Size = new Size(630, 28), Font = new Font("Segoe UI", 13f, FontStyle.Bold) };
 		var head = new Label
 		{
@@ -441,7 +449,7 @@ static class WowGU
 			sb.AppendLine("- " + kv.Groups[1].Value + ": " + kv.Groups[2].Value.Trim());
 		sb.AppendLine();
 		sb.AppendLine("## Машина и установка");
-		sb.AppendLine("- Установщик: " + Version);
+		sb.AppendLine("- Установщик: " + Version + Edition);
 		sb.AppendLine("- Клиент: " + current.Name + " " + current.Major + "." + current.Minor + "." + current.Patch + (current.X64 ? " x64" : " x86"));
 		sb.AppendLine("- Windows: " + Environment.OSVersion.VersionString);
 		sb.AppendLine("- Экран: " + Screen.PrimaryScreen.Bounds.Width + "x" + Screen.PrimaryScreen.Bounds.Height);
@@ -515,7 +523,7 @@ static class WowGU
 				sb.AppendLine();
 			}
 			sb.AppendLine("## Машина и установка");
-			sb.AppendLine("- Установщик: " + Version);
+			sb.AppendLine("- Установщик: " + Version + Edition);
 			sb.AppendLine("- Клиент: " + current.Name + " " + current.Major + "." + current.Minor + "." + current.Patch + (current.X64 ? " x64" : " x86"));
 			sb.AppendLine("- Windows: " + Environment.OSVersion.VersionString);
 			sb.AppendLine("- Экран: " + Screen.PrimaryScreen.Bounds.Width + "x" + Screen.PrimaryScreen.Bounds.Height);
@@ -646,7 +654,7 @@ static class WowGU
 		// are stopped, the fresh watcher starts again at the end of the install.
 		try
 		{
-			foreach (var p in Process.GetProcessesByName("GU-WOW"))
+			foreach (var p in Process.GetProcessesByName("GU-WOW").Concat(Process.GetProcessesByName("GU-WOW-Lite")))
 				if (p.Id != Process.GetCurrentProcess().Id) { p.Kill(); p.WaitForExit(3000); }
 		}
 		catch { }
@@ -731,6 +739,7 @@ static class WowGU
 		else if (classic) Say(T("Меню в игре: команда /guwow или кнопка у миникарты.", "The in-game menu: the /guwow command or the minimap button."));
 		else Say(T("Меню в игре для этого клиента не ставится: настройки в окне ReShade (Scroll Lock).", "The in-game menu is not installed for this client: settings live in the ReShade window (Scroll Lock)."));
 		MergePreset();
+		SetLite();
 		Say(T("Эффекты и пресет на месте.", "The effects and the preset are in place."));
 
 		// 3. REST: the effects go under the interface. Its ini carries the Legion 7.3.5 interface shader.
@@ -748,6 +757,12 @@ static class WowGU
 				if (!Regex.IsMatch(t, @"^Techniques=", RegexOptions.Multiline)) t = Regex.Replace(t, @"^\[Group0\]\r?\n", "[Group0]\r\n" + bridge + "\r\n", RegexOptions.Multiline);
 				File.WriteAllText(ini, t);
 			}
+			// Lite: REST's descriptor tracking and constant buffer hook are off. The mod reads neither, and both ran on
+			// the CPU at every draw of the game. The full build puts them back, so either can be installed over the other.
+			var rest = File.ReadAllText(ini);
+			rest = Regex.Replace(rest, @"^TrackDescriptors=\w+", "TrackDescriptors=" + (Lite ? "False" : "True"), RegexOptions.Multiline);
+			rest = Regex.Replace(rest, @"^ConstantBufferHookType=\w+", "ConstantBufferHookType=" + (Lite ? "none" : "default"), RegexOptions.Multiline);
+			File.WriteAllText(ini, rest);
 			marker["rest"] = "1";
 			Say(T("Интерфейс остаётся чистым: туман и солнце его не трогают.", "The interface stays clean: fog and sun do not touch it."));
 		}
@@ -852,6 +867,14 @@ static class WowGU
 		{
 			if (!File.Exists(cfg + ".wowgu-backup")) File.Copy(cfg, cfg + ".wowgu-backup");
 			if (current.Major >= 6) ConfigSet(cfg, "MSAAQuality", "0"); else ConfigSet(cfg, "gxMultisample", "1");
+			// Lite: the game's own sun shafts off, the rays of the mod draw the same light once. The game's shadows stay.
+			if (Lite && Legion)
+			{
+				ConfigSet(cfg, "sunShafts", "0");
+				ConfigSet(cfg, "RAIDsunShafts", "0");
+				ConfigSet(cfg, "graphicsSunshafts", "1");
+				ConfigSet(cfg, "raidGraphicsSunshafts", "1");
+			}
 			Say(T("Сглаживание MSAA выключено, копия настроек: WTF\\Config.wtf.wowgu-backup.", "MSAA anti-aliasing is turned off; a copy of the settings: WTF\\Config.wtf.wowgu-backup."));
 			// With triple buffering the 1.12 client draws the world again after GU-WOW.addon32 has run the effects, and
 			// the fog and the rays never reach the screen.
@@ -1068,6 +1091,21 @@ static class WowGU
 	static void WriteMarker(Dictionary<string, string> d)
 	{
 		File.WriteAllLines(G(Marker), new[] { "# Установлено GU-WOW. Нужен для удаления." }.Concat(d.Select(p => p.Key + "=" + p.Value)));
+	}
+
+	// LEGIONGU_LITE=0 or 1 in the preprocessor line of both effects, the other definitions as they are.
+	static void SetLite()
+	{
+		var path = G(Preset);
+		const string key = "PreprocessorDefinitions";
+		var text = File.ReadAllText(path).Replace("\r\n", "\n");
+		foreach (var sec in new[] { "LegionGUbylevan.fx", "LegionGUNightsbylevan.fx" })
+		{
+			var defs = (IniGetText(text, sec, key) ?? "").Split(',').Where(d => d.Length > 0 && !d.StartsWith("LEGIONGU_LITE=")).ToList();
+			defs.Add("LEGIONGU_LITE=" + (Lite ? "1" : "0"));
+			text = IniSetText(text, sec, key, string.Join(",", defs));
+		}
+		File.WriteAllText(path, text.Replace("\n", "\r\n"));
 	}
 
 	// The preset: a fresh copy, or the new techniques and settings added to the player's own values.

@@ -56,6 +56,18 @@
 
 // Settings that need a recompile. ReShade lists them under "Preprocessor definitions" of this effect.
 
+// 1 = the Lite build (GU-WOW-Lite.exe sets it): the same look for less heat. The rays read a quarter of the frame,
+// the fog and the ground mist read depth at two points of a pixel instead of four and one instead of two, the
+// shadows in crevices take 12 samples instead of 24, the unused motion blur pass is not run. The night, the lights
+// and the shape of the rays are untouched.
+#ifndef LEGIONGU_LITE
+	#define LEGIONGU_LITE 0
+#endif
+#if LEGIONGU_LITE
+	#undef LEGIONGU_RAYS_DOWNSCALE
+	#define LEGIONGU_RAYS_DOWNSCALE 4
+#endif
+
 // The rays work at 1/N resolution per axis: 2 = half (as the original), 4 = quarter (cheaper). Whole numbers
 // 2..8. Even values average every pixel of their block; odd values above 2 read only part of it. 1 is not
 // offered: the light buffer has a fixed size, so full resolution gives no sharper shafts, and without the
@@ -1575,8 +1587,13 @@ namespace LegionGU
 		float haze0 = saturate(FogHaze * t) * lerp(1.0, FOG_HAZE_OPEN, view.x) * (1.0 - view.y);
 		float band = SkyBand(uv, view) * saturate(2.0 * t);
 		float2 o = 0.45 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+#if LEGIONGU_LITE
+		// Lite: two opposite corners instead of four, the edge on the sky stays soft at half the depth reads.
+		float2 a = 0.5 * (FogAt(uv - o, reversed, t, haze0, band) + FogAt(uv + o, reversed, t, haze0, band));
+#else
 		float2 a = 0.25 * (FogAt(uv + float2(-o.x, -o.y), reversed, t, haze0, band) + FogAt(uv + float2(o.x, -o.y), reversed, t, haze0, band)
 		                 + FogAt(uv + float2(-o.x, o.y), reversed, t, haze0, band) + FogAt(uv + float2(o.x, o.y), reversed, t, haze0, band));
+#endif
 		a.x *= lerp(1.0, ENCL_FOG, view.y);
 		return a * depthState.x;
 	}
@@ -2374,7 +2391,11 @@ namespace LegionGU
 		{
 			float reversed = EffectiveReversed(depthState.w);
 			float2 o = 0.45 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+#if LEGIONGU_LITE
+			mist = MistAt(uv, reversed, ground, m, 1.0);
+#else
 			mist = 0.5 * (MistAt(uv - o, reversed, ground, m, 1.0) + MistAt(uv + o, reversed, ground, m, 1.0));
+#endif
 			mist *= depthState.x * (1.0 - smoothstep(0.6, 0.95, view.y)) * keepUI;
 		}
 		if (a.x + a.y <= 0.0 && mist <= 0.0 && weather <= 0.0)
@@ -3343,6 +3364,7 @@ namespace LegionGU
 	static const float AO_MAX_PX = 56.0;       // largest radius in half-resolution pixels (40 until 1.6.5)
 	static const float AO_BIAS = 0.15;         // cosine below which a sample does not shade: flat ground stays clean
 	static const float AO_GAIN = 3.5;          // a corner shades about a third of the disk; this brings it to full
+	static const int AO_RINGS = 2 - LEGIONGU_LITE; // samples per direction: 1 in Lite
 	static const float AO_DARK = 0.6;          // darkening of a full corner at «Тени в щелях» 100
 	static const float AO_FAR = 120.0;         // yards: farther, the shadows fade out
 	static const float AO_LEAF_CUT = 0.6;      // share of the shadow taken off where the depth is leafy spikes
@@ -3408,6 +3430,7 @@ namespace LegionGU
 		float up = saturate(dot(n, SurfUp()));
 
 		// Twenty-four samples on a disk AO_RADIUS yards across at this depth, turned per pixel (sixteen until 1.6.5).
+		// Lite takes one sample per direction, near and far in turn, so the disk is still covered in all twelve.
 		float rpx = min(AO_RADIUS / (p.z * AO_TAN_HALF_FOV) * 0.5 * (BUFFER_HEIGHT / 2), AO_MAX_PX);
 		if (rpx < 1.0)
 			return float2(0.0, up);
@@ -3419,15 +3442,16 @@ namespace LegionGU
 			float a = turn + k * 0.5235988;
 			float2 dir = float2(cos(a), sin(a)) * rpx * px;
 			LEGIONGU_UNROLL
-			for (int s = 0; s < 2; ++s)
+			for (int s = 0; s < AO_RINGS; ++s)
 			{
-				float3 v = ViewPos(uv + dir * (s == 0 ? 0.45 : 1.0), reversed) - p;
+				float ring = AO_RINGS == 1 ? (frac(k * 0.5) < 0.25 ? 0.45 : 1.0) : (s == 0 ? 0.45 : 1.0);
+				float3 v = ViewPos(uv + dir * ring, reversed) - p;
 				float dist = length(v);
 				float fall = saturate(1.0 - dist * dist / (AO_RADIUS * AO_RADIUS));
 				occ += saturate(dot(n, v) / max(dist, 1e-4) - AO_BIAS) * fall;
 			}
 		}
-		occ = saturate(occ / 24.0 * AO_GAIN) * (1.0 - smoothstep(AO_FAR * 0.6, AO_FAR, p.z));
+		occ = saturate(occ / (12.0 * AO_RINGS) * AO_GAIN) * (1.0 - smoothstep(AO_FAR * 0.6, AO_FAR, p.z));
 		// Two guards (2.0, after benilla-everwood). Leaves cut out of a crown scatter the depth into spikes, and
 		// the samples there are noise: the crown came out dirty and crawled with the wind. A spike is the smaller
 		// of the two one-sided depth steps, capped by their difference, which is near 0 on any plane and on a

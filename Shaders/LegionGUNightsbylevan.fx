@@ -3965,7 +3965,9 @@ namespace LegionGUNights
 		pass PicEyePass { VertexShader = FullscreenVS; PixelShader = PicEyePS; RenderTarget = PicEyeCurTex; }
 		pass PicEyeSave { VertexShader = FullscreenVS; PixelShader = PicEyeSavePS; RenderTarget = PicEyePrevTex; }
 		pass PicApply { VertexShader = FullscreenVS; PixelShader = PicApplyPS; }
+#if !LEGIONGU_LITE
 		pass PicMotion { VertexShader = FullscreenVS; PixelShader = PicMotionPS; }
+#endif
 	}
 
 	// ---------------------------------------------------------------------------------------------------
@@ -4013,6 +4015,18 @@ namespace LegionGUNights
 	bool DofOn()
 	{
 		return PhotoOn() || PlayBlurOn() > 0.0;
+	}
+
+	// Lite: with photo mode and the play blur off the blur passes get a triangle with no area and draw nothing. A
+	// pixel shader that only discards still ran over the whole screen, 0.29 ms a frame at 3440x1440. Direct3D 9 keeps
+	// the full passes: shader model 3 reads the control strip in a vertex shader only through tex2Dlod.
+	void DofVS(uint id : SV_VertexID, out float4 pos : SV_Position, out float2 uv : TEXCOORD0)
+	{
+		FullscreenVS(id, pos, uv);
+#if LEGIONGU_LITE && __RENDERER__ >= 0xa000
+		if (!DofOn())
+			pos = float4(0.0, 0.0, 0.0, 1.0);
+#endif
 	}
 
 	// x = the focus distance in yards, eased; y = seeded. The focus is the character (CharacterYards).
@@ -4144,8 +4158,8 @@ namespace LegionGUNights
 	{
 		pass DofFocus { VertexShader = FullscreenVS; PixelShader = DofFocusPS; RenderTarget = DofFocusCurTex; }
 		pass DofFocusSave { VertexShader = FullscreenVS; PixelShader = DofFocusSavePS; RenderTarget = DofFocusPrevTex; }
-		pass DofPrep { VertexShader = FullscreenVS; PixelShader = DofPrepPS; RenderTarget = DofTex; }
-		pass DofBlurPass { VertexShader = FullscreenVS; PixelShader = DofBlurPS; RenderTarget = DofBlurTex; }
-		pass DofApply { VertexShader = FullscreenVS; PixelShader = DofApplyPS; }
+		pass DofPrep { VertexShader = DofVS; PixelShader = DofPrepPS; RenderTarget = DofTex; }
+		pass DofBlurPass { VertexShader = DofVS; PixelShader = DofBlurPS; RenderTarget = DofBlurTex; }
+		pass DofApply { VertexShader = DofVS; PixelShader = DofApplyPS; }
 	}
 }
