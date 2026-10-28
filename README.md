@@ -254,6 +254,6 @@ The build is free and provided "as is", without any warranty. You use it at your
 
 ## P.S.
 
-Создано в знак солидарности сообществу Brothers of Turtle. Честь и слава Черепашке!
+Создано в знак солидарности сообществу BROTHERS OF TURTLE: https://t.me/Brothersofturtle. Честь и слава Черепашке!
 
-Created in solidarity with the Brothers of Turtle community. Honor and glory to Turtle WoW!
+Created in solidarity with the BROTHERS OF TURTLE community: https://t.me/Brothersofturtle. Honor and glory to Turtle WoW!
