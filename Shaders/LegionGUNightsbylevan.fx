@@ -175,6 +175,7 @@
 #define LEGIONGU_CTL_RAYS_REACH 32 // ray length, 50 neutral
 #define LEGIONGU_CTL_SUN_GLOW 33 // the sun's glow in the fog, 50 neutral, 0 off, 100 double
 #define LEGIONGU_CTL_MIST_NEAR 34 // reserved: the mist at the feet, taken out in 2.0 until it is done right
+#define LEGIONGU_CTL_SOFT_GLOW 34 // the soft glow (15.11.2026), in the cell the mist at the feet left free
 #define LEGIONGU_CTL_CHAT_L 35   // the chat window in uv, for the heat haze to leave alone (beta-1.0)
 #define LEGIONGU_CTL_CHAT_T 36
 #define LEGIONGU_CTL_CHAT_R 37
@@ -183,8 +184,9 @@
 #define LEGIONGU_CTL_LIGHT_R 40  // how far a light's glow spreads, 50 as before (1.7.3)
 #define LEGIONGU_CTL_MOTION_BLUR 41 // the smear along a camera turn, 0 off (1.7.3)
 #define LEGIONGU_CTL_PLAY_BLUR 42 // the far land softly blurred in normal play, 0 off (1.7.3)
+#define LEGIONGU_CTL_GI 43       // the light bounced off nearby surfaces, 0 off (15.11.2026)
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 89    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 91    // black, white, the signature, two cells per setting, two for the checksum
 #if __RENDERER__ < 0xa000
 #define LEGIONGU_CTL_PITCH (float(BUFFER_HEIGHT) / 256.0) // pixels per cell on Direct3D 9, see LegionGUbylevan.fx
 #endif
@@ -196,7 +198,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 43; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 44; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -560,6 +562,15 @@ namespace LegionGUNights
 		ui_label = "Фоторежим";
 		ui_tooltip = "Персонаж в фокусе, фон размыт. В игре включается клавишей GU-WOW, интерфейс тогда прячется.";
 	> = false;
+
+	// The old client's Full Screen Glow (see GlowPrepPS): the bright part of the frame, blurred wide, laid back over it.
+	uniform float SoftGlow <
+		ui_type = "slider"; ui_min = 0; ui_max = 100; ui_step = 1;
+		ui_category = "Картинка";
+		ui_label = "Мягкое свечение";
+		ui_tooltip = "Светлые места слегка светятся и растекаются, модели выглядят мягче, как со старым «Полноэкранным свечением» WoW.\n"
+		             "0 выключено и ничего не стоит. Интерфейс не светится.";
+	> = 50;
 
 	// ---------------------------------------------------------------------------------------------------
 	// Settings: fog (hidden)
@@ -3589,6 +3600,68 @@ namespace LegionGUNights
 	sampler2D PicEyeCur { Texture = PicEyeCurTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 	sampler2D PicEyePrev { Texture = PicEyePrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
+	// The soft glow: the bright part of the frame at a quarter, blurred there and once more, wider, at an eighth.
+	static const float GLOW_FROM = 0.08;   // luminance where a pixel starts to glow
+	static const float GLOW_FULL = 0.6;    // and glows in full
+	static const float GLOW_MAX = 2.0;     // the glow laid over the frame at «Мягкое свечение» 100
+	static const float GLOW_STEP = 1.5;    // the blur's tap spacing in texels of its buffer
+
+	texture2D GlowATex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = RGBA16F; };
+	texture2D GlowBTex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = RGBA16F; };
+	texture2D GlowCTex { Width = BUFFER_WIDTH / 8; Height = BUFFER_HEIGHT / 8; Format = RGBA16F; };
+	texture2D GlowDTex { Width = BUFFER_WIDTH / 8; Height = BUFFER_HEIGHT / 8; Format = RGBA16F; };
+	sampler2D GlowA { Texture = GlowATex; };
+	sampler2D GlowB { Texture = GlowBTex; };
+	sampler2D GlowC { Texture = GlowCTex; };
+	sampler2D GlowD { Texture = GlowDTex; };
+
+	float GlowAmount()
+	{
+		if (!LegionGUOn(1u) || LegionGUCheckView())
+			return 0.0;
+		return LegionGUValue(LEGIONGU_CTL_SOFT_GLOW, SoftGlow) * 0.01 * GLOW_MAX;
+	}
+
+	// With the glow off its passes get a triangle with no area and draw nothing, as DofVS does.
+	void GlowVS(uint id : SV_VertexID, out float4 pos : SV_Position, out float2 uv : TEXCOORD0)
+	{
+		FullscreenVS(id, pos, uv);
+#if __RENDERER__ >= 0xa000
+		if (GlowAmount() <= 0.0)
+			pos = float4(0.0, 0.0, 0.0, 1.0);
+#endif
+	}
+
+	// A 4 x 4 box of the frame in four bilinear taps, kept by its brightness. The interface does not glow.
+	float4 GlowPrepPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		float2 o = float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+		float3 c = 0.25 * (tex2Dlod(ColorLinear, float4(uv + float2(-o.x, -o.y), 0.0, 0.0)).rgb + tex2Dlod(ColorLinear, float4(uv + float2(o.x, -o.y), 0.0, 0.0)).rgb
+		                 + tex2Dlod(ColorLinear, float4(uv + float2(-o.x, o.y), 0.0, 0.0)).rgb + tex2Dlod(ColorLinear, float4(uv + float2(o.x, o.y), 0.0, 0.0)).rgb);
+		float keep = smoothstep(GLOW_FROM, GLOW_FULL, dot(c, LUMA601)) * (1.0 - saturate(UIMaskBlur(uv) * 8.0));
+		return float4(c * keep, 1.0);
+	}
+
+	float4 GlowH4PS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		return Soft(GlowA, uv, float2(GLOW_STEP * 4.0 * BUFFER_RCP_WIDTH, 0.0));
+	}
+
+	float4 GlowV4PS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		return Soft(GlowB, uv, float2(0.0, GLOW_STEP * 4.0 * BUFFER_RCP_HEIGHT));
+	}
+
+	float4 GlowH8PS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		return Soft(GlowA, uv, float2(GLOW_STEP * 16.0 * BUFFER_RCP_WIDTH, 0.0));
+	}
+
+	float4 GlowV8PS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		return Soft(GlowC, uv, float2(0.0, GLOW_STEP * 16.0 * BUFFER_RCP_HEIGHT));
+	}
+
 	// Log luminance weighted toward the middle of the frame (the eye looks at the land ahead), and the weight;
 	// the top mip is the weighted mean.
 	float2 PicLumPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
@@ -3681,6 +3754,14 @@ namespace LegionGUNights
 			float3 amp = sqrt(saturate(min(mn, 1.0 - mx) / max(mx, 1e-4)));
 			float3 k = -amp * (SHARP_MAX * sharp);
 			c = saturate((c + (n + s + e + w) * k) / (1.0 + 4.0 * k));
+		}
+
+		// The soft glow, after the sharpening so the two do not fight: the narrow and the wide blur, screen-blended.
+		float glowK = GlowAmount();
+		if (glowK > 0.0)
+		{
+			float3 glow = 0.5 * (tex2Dlod(GlowA, float4(uv, 0.0, 0.0)).rgb + tex2Dlod(GlowD, float4(uv, 0.0, 0.0)).rgb);
+			c += SoftAdd(glow * glowK) * (1.0 - saturate(c));
 		}
 
 		// Eye adaptation: a change of brightness shows at first and fades as the eye gets used to it, so the
@@ -3964,6 +4045,11 @@ namespace LegionGUNights
 		pass PicLumPass { VertexShader = FullscreenVS; PixelShader = PicLumPS; RenderTarget = PicLumTex; }
 		pass PicEyePass { VertexShader = FullscreenVS; PixelShader = PicEyePS; RenderTarget = PicEyeCurTex; }
 		pass PicEyeSave { VertexShader = FullscreenVS; PixelShader = PicEyeSavePS; RenderTarget = PicEyePrevTex; }
+		pass GlowPrep { VertexShader = GlowVS; PixelShader = GlowPrepPS; RenderTarget = GlowATex; }
+		pass GlowH4 { VertexShader = GlowVS; PixelShader = GlowH4PS; RenderTarget = GlowBTex; }
+		pass GlowV4 { VertexShader = GlowVS; PixelShader = GlowV4PS; RenderTarget = GlowATex; }
+		pass GlowH8 { VertexShader = GlowVS; PixelShader = GlowH8PS; RenderTarget = GlowCTex; }
+		pass GlowV8 { VertexShader = GlowVS; PixelShader = GlowV8PS; RenderTarget = GlowDTex; }
 		pass PicApply { VertexShader = FullscreenVS; PixelShader = PicApplyPS; }
 #if !LEGIONGU_LITE
 		pass PicMotion { VertexShader = FullscreenVS; PixelShader = PicMotionPS; }

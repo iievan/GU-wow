@@ -1,13 +1,13 @@
 -- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
--- The settings travel to the shader as a strip of 89 cells, 4 by 4 pixels, in the top left corner of the screen.
+-- The settings travel to the shader as a strip of 91 cells, 4 by 4 pixels, in the top left corner of the screen.
 -- The effect LegionGUBridge (LegionGUbylevan.fx) reads the strip after the interface is drawn and covers it
 -- again, so it is not seen. Each colour channel is black or white, one bit. Cell 0 is black, cell 1 white, cell 2
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "2.0.3-release"
+local VERSION = "2.0.4-release"
 local CELL = 4
-local CELLS = 89
+local CELLS = 91
 
 -- Russian on a Russian client, English elsewhere.
 local RU = GetLocale() == "ruRU"
@@ -36,6 +36,10 @@ local DEFAULTS = {
 	raysOpen = 70, raysReach = 80, sunGlow = 60,
 	-- 1.7.1: the mist at the feet. Taken out in 2.0 until it is done right; the key stays so old codes read.
 	mistNear = 0,
+	-- 15.11.2026: the old client's Full Screen Glow, 0 off. It goes in the strip cell mistNear left free.
+	softGlow = 50,
+	-- 15.11.2026: the light bounced off nearby surfaces, after WoW Forever's indirect lighting, 0 off.
+	gi = 50,
 	-- 1.7.3: which objects glow at night and how far (50 is the old look), and the motion blur (0 off). These are
 	-- the player's own taste for the screen, like the dials above: a code and a ready preset leave them alone.
 	lightThreshold = 70, lightRadius = 70, motionBlur = 15,
@@ -353,7 +357,7 @@ local function UpdateZone()
 end
 
 -- A value as the shader gets it: the player's, nudged by the zone, and off for the heavy parts in low quality.
-local QUALITY_OFF = { ao = true, mist = true, sharpness = true }
+local QUALITY_OFF = { ao = true, mist = true, sharpness = true, gi = true }
 
 -- A value on screen: the preview's while one is on, the player's own otherwise.
 local function V(key)
@@ -463,10 +467,10 @@ local function Paint()
 		Code(V("grain") or 0), Code(DB.photoBlur or 35), switches, Code(haze), Code(hdr), facing,
 		Code(V("mistHigh") or 0), Code(V("rayDefinition") or 0), Code(V("mistFlow") or 0),
 		Code(V("bright") or 50), Code(V("contrast") or 50), Code(V("satur") or 50), Code(V("warmth") or 50),
-		Code(V("raysOpen") or 45), Code(V("raysReach") or 50), Code(V("sunGlow") or 50), Code(V("mistNear") or 0),
+		Code(V("raysOpen") or 45), Code(V("raysReach") or 50), Code(V("sunGlow") or 50), Code(V("softGlow") or 0),
 		chatL, chatT, chatR, chatB,
 		Code(V("lightThreshold") or 50), Code(V("lightRadius") or 50), Code(V("motionBlur") or 0),
-		Code(V("playBlur") or 0) }
+		Code(V("playBlur") or 0), Code(Effective("gi")) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v
@@ -1109,8 +1113,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("Graphic Update.. Wow! обновлён: 2.0.3 «Живой воздух».\n\nНад костром поднимается дым, в дождь у земли гуще дымка. Тёмные линии через весь экран над панелями больше не появляются. Лучи солнца не пропадают от пары облаков в голубом небе. Темнота подземелий работает и в освещённых залах, её можно выключить отдельно.\n\nСтандартные настройки обновлены под вид автора. Ваши нынешние настройки остаются, вернуть стандартные можно кнопкой «Стандартные настройки».\n\nМеню: /gu или кнопка у миникарты.",
-		"Graphic Update.. Wow! is updated: 2.0.3 “Living Air”.\n\nSmoke rises over campfires, and the ground mist gets thicker in the rain. Dark lines across the screen over the panels are gone. A few clouds in a blue sky no longer take the sun rays away. Dungeon darkness works in lit halls too and has its own switch.\n\nThe standard settings now follow the author's look. Your current settings stay; the «Standard settings» button brings back the standard ones.\n\nMenu: /gu or the minimap button."),
+	text = T("Graphic Update.. Wow! обновлён: 2.0.4 «Живой воздух».\n\nМягкое свечение: светлые места слегка светятся, модели выглядят мягче, как с полноэкранным свечением старого WoW. Ползунок на странице «Картинка».\n\nОтражённый свет: модели и земля берут цвет соседних поверхностей, у травы зеленоватый, у камня серый, как в WoW Forever. Ползунок на странице «Атмосфера».\n\nНовая страница «Системные настройки игры»: густота и дальность травы прямо из меню.\n\nМеню: /gu или кнопка у миникарты.",
+		"Graphic Update.. Wow! is updated: 2.0.4 “Living Air”.\n\nSoft glow: bright areas glow a little and models look softer, like the old WoW Full Screen Glow. A slider on the Picture page.\n\nBounced light: models and the ground take the colour of nearby surfaces, green from grass, grey from stone, as in WoW Forever. A slider on the Atmosphere page.\n\nA new «Game system settings» page: grass density and distance right from the menu.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -1427,6 +1431,9 @@ local panelNight = NewPage("LegionGUPanelNight", "Ночь", "Night",
 	"Ночь по игровым часам, свет огней и темнота подземелий.", "Night by the game clock, firelight and dungeon darkness.")
 local panelPic = NewPage("LegionGUPanelPic", "Картинка", "Picture",
 	"Резкость, цвет, яркость и плёночные эффекты.", "Sharpness, colour, brightness and the film effects.")
+local panelSys = NewPage("LegionGUPanelSys", "Системные настройки игры", "Game system settings",
+	"Настройки самой игры, не мода. Меняются сразу и сохраняются игрой, обычно и для рейдов.",
+	"The game's own settings, not the mod's. They apply at once and the game keeps them, raids usually too.")
 
 -- The GU-WOW pages are laid out about 745 by 585 points and the Blizzard options window is smaller. The pages
 -- scale themselves into the window on show (1.6.9): the window itself never changes size and no manual font
@@ -1603,6 +1610,8 @@ Slider(panelAtmo, "ao", T("Тени в щелях", "Contact shadows"), R + 6, -
 	T("Мягкие тени под камнями, травой и у стен: предметы стоят на земле, а не парят. Немного нагружает видеокарту", "Soft shadows under stones, grass and by walls: things sit on the ground. Costs a little GPU"))
 Slider(panelAtmo, "hazeStrength", T("Марево в пустынях и огненных землях", "Heat haze in deserts and fire lands"), R + 6, -206, nil, nil, 71,
 	T("Воздух дрожит от жары в пустынях и у лавы. В других местах его нет", "The air shimmers with heat in deserts and by lava. Nowhere else"))
+Slider(panelAtmo, "gi", T("Отражённый свет", "Bounced light"), R + 6, -248, nil, nil, nil,
+	T("Свет отражается от соседних поверхностей и окрашивает модели: от травы зеленоватый, от камня серый, как в WoW Forever. 0 — выключено. Самый тяжёлый эффект мода", "Light bounces off nearby surfaces and tints the models: green from grass, grey from stone, as in WoW Forever. 0 is off. The heaviest effect of the mod"))
 
 Check(panelRays, "rays", T("Лучи солнца", "Sun rays"), L, -60)
 Slider(panelRays, "raysStrength", T("Сила лучей", "Ray strength"), L + 6, -100, nil, nil, nil,
@@ -1652,6 +1661,44 @@ Slider(panelPic, "grain", T("Плёночное зерно", "Film grain"), R + 
 -- leaves it alone. 0 keeps it off.
 Slider(panelPic, "motionBlur", T("Размытие при движении", "Motion blur"), R + 6, -200, nil, nil, 71,
 	T("При быстром повороте камеры картинка слегка смазывается, как в кино. 0 — выключено. Интерфейс не размывается", "The picture smears a little on a fast camera turn, as in films. 0 is off. The interface stays sharp"))
+Slider(panelPic, "softGlow", T("Мягкое свечение", "Soft glow"), R + 6, -386, nil, nil, nil,
+	T("Светлые места слегка светятся и растекаются, модели выглядят мягче, как с «Полноэкранным свечением» старого WoW. 0 — выключено. Интерфейс не светится", "Bright areas glow and spread a little, models look softer, like the old WoW Full Screen Glow. 0 is off. The interface does not glow"))
+
+-- The game's own settings (15.11.2026): the grass. A slider here writes a CVar, not the addon's settings, and
+-- the raid copy of it too. The game may cap a value: the slider then shows what the game took.
+local function CVarSlider(parent, cvar, label, x, y, lo, hi, tip)
+	local s = Slider(parent, "sys_" .. cvar, label, x, y, lo, hi, nil, tip)
+	local text = _G[s:GetName() .. "Text"]
+	local function Show(v)
+		text:SetText(label .. ": " .. v)
+	end
+	s:SetScript("OnValueChanged", function(self, v)
+		v = math.floor(v + 0.5)
+		Show(v)
+		if refreshing or tonumber(GetCVar(cvar)) == v then
+			return
+		end
+		pcall(SetCVar, cvar, v)
+		pcall(SetCVar, "RAID" .. cvar, v)
+		local real = tonumber(GetCVar(cvar))
+		if real and math.floor(real + 0.5) ~= v then
+			Show(math.floor(real + 0.5) .. T(" (больше игра не даёт)", " (the game's cap)"))
+		end
+	end)
+	s.Refresh = function(self)
+		local v = math.floor((tonumber(GetCVar(cvar)) or lo) + 0.5)
+		self:SetValue(math.max(lo, math.min(hi, v)))
+		Show(v)
+	end
+	return s
+end
+Header(panelSys, T("Трава", "Grass"), L, -60)
+CVarSlider(panelSys, "groundEffectDensity", T("Густота травы", "Grass density"), L + 6, -100, 16, 512,
+	T("Сколько травинок на земле. Игра обычно держит до 256. Нагружает процессор, в городах и рейдах кадров станет меньше", "How many blades of grass. The game usually holds up to 256. Costs CPU, fewer frames in cities and raids"))
+CVarSlider(panelSys, "groundEffectDist", T("Дальность травы", "Grass distance"), L + 6, -142, 40, 1000,
+	T("До какого расстояния видна трава, в ярдах. Нагружает процессор", "How far the grass is drawn, in yards. Costs CPU"))
+CVarSlider(panelSys, "groundEffectFade", T("Где трава тает", "Where the grass fades"), L + 6, -184, 0, 1000,
+	T("С какого расстояния трава начинает плавно исчезать. Ближе к дальности травы — край травы незаметнее", "From where the grass starts to fade. Closer to the grass distance hides its edge better"))
 
 -- A preset carousel (1.7.1): the ready looks and, when saved, the player's own one («Мой») at the end. «<» and
 -- «>» page with a preview, «+» saves the on-screen values into the own slot, «-» deletes it. One factory serves
@@ -2390,8 +2437,8 @@ page:SetScript("OnHide", ShrinkOptions)
 page.refresh = Refresh
 guPages[1], guPages[2], guPages[3], guPages[4] = home, panel, page, pagePhoto
 guPages[5], guPages[6], guPages[7], guPages[8] = panelAtmo, panelRays, panelNight, panelPic
-guPages[9], guPages[10] = panelSupport, panelPanels
-for _, f in ipairs({ panelAtmo, panelRays, panelNight, panelPic, panelSupport, panelPanels }) do
+guPages[9], guPages[10], guPages[11] = panelSupport, panelPanels, panelSys
+for _, f in ipairs({ panelAtmo, panelRays, panelNight, panelPic, panelSupport, panelPanels, panelSys }) do
 	f:SetScript("OnShow", function()
 		GrowOptions()
 		Refresh()
@@ -2416,6 +2463,7 @@ if InterfaceOptions_AddCategory then
 	InterfaceOptions_AddCategory(panelRays)
 	InterfaceOptions_AddCategory(panelNight)
 	InterfaceOptions_AddCategory(panelPic)
+	InterfaceOptions_AddCategory(panelSys)
 	InterfaceOptions_AddCategory(page)
 	InterfaceOptions_AddCategory(panelPanels)
 	InterfaceOptions_AddCategory(pagePhoto)

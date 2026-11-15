@@ -1,12 +1,12 @@
 -- GU-WOW by levan: the in-game menu for Classic 1.12. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
--- The same strip as the main addon (AddOn/LegionGU): 89 cells of 4 by 4 pixels in the top left corner, one bit per
+-- The same strip as the main addon (AddOn/LegionGU): 91 cells of 4 by 4 pixels in the top left corner, one bit per
 -- colour channel, read and covered by LegionGUBridge. 1.12 runs Lua 5.0 and has no options window for addons, so
 -- this is a file of its own: the menu is a window opened by /guwow and the minimap button. Lua 5.0 has no # and no %,
 -- a loop variable is one for the whole loop, and the script handlers get this, event and arg1, not parameters.
 
-local VERSION = "2.0.3-release"
+local VERSION = "2.0.4-release"
 local CELL = 4
-local CELLS = 89
+local CELLS = 91
 
 local RU = GetLocale() == "ruRU"
 local function T(ru, en)
@@ -354,7 +354,7 @@ local function Paint()
 		Code(V("bright") or 50), Code(V("contrast") or 50), Code(V("satur") or 50), Code(V("warmth") or 50),
 		Code(V("raysOpen") or 45), Code(V("raysReach") or 50), Code(V("sunGlow") or 50), Code(V("mistNear") or 0),
 		chatL, chatT, chatR, chatB, Code(V("lightThreshold") or 50), Code(V("lightRadius") or 50), Code(V("motionBlur") or 0),
-		Code(V("playBlur") or 0) }
+		Code(V("playBlur") or 0), 0 }
 	local n = table.getn(VALUES)
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (n + i), v)

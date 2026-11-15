@@ -1,5 +1,21 @@
 # Graphic Update.. Wow! (в разработке GU-WOW): история версий / Version history
 
+## 2.0.4-lite «Живой воздух» / "Living Air"
+
+### Русский
+
+**Новое**
+- Мягкое свечение. Светлые места кадра слегка светятся и растекаются, модели выглядят мягче, как с «Полноэкранным свечением» старого WoW. Ползунок на странице «Картинка», 0 выключает и ничего не стоит. Интерфейс не светится.
+- Отражённый свет. Поверхности отдают свой цвет соседним: у травы модель снизу зеленоватая, у камня серая, как в WoW Forever. Ползунок на странице «Атмосфера», 0 выключает. Это самый тяжёлый эффект мода, в режиме низкого качества он выключен.
+- Страница «Системные настройки игры». На ней густота травы, её дальность и место, где она тает. Ползунки меняют настройки самой игры сразу, и для рейдов тоже.
+
+### English
+
+**New**
+- Soft glow. Bright parts of the frame glow and spread a little, models look softer, like the old WoW Full Screen Glow. A slider on the Picture page; 0 turns it off and costs nothing. The interface does not glow.
+- Bounced light. Surfaces lend their colour to nearby ones: a model gets green from the grass under it and grey from stone, as in WoW Forever. A slider on the Atmosphere page; 0 turns it off. It is the heaviest effect of the mod and is off in low quality.
+- A «Game system settings» page with grass density, distance and fade. The sliders change the game's own settings at once, raids too.
+
 ## 2.0.3-release «Живой воздух» / "Living Air"
 
 ### Русский

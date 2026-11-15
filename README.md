@@ -7,7 +7,7 @@
 
 Публичное имя мода — **Graphic Update.. Wow!**. GU-WOW — рабочее название разработки, оно остаётся в именах файлов (`GU-WOW.exe`) и в адресе репозитория.
 
-Текущая сборка: **2.0.3-release «Живой воздух»**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **2.0.3-release «Живой воздух»**, лёгкая сборка **Lite 2.0.4**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
@@ -27,6 +27,7 @@
 | Атмосфера | Погодное настроение | В пасмурную погоду и в дождь дымка гуще, цвет холоднее, контраст мягче. Работает, только когда включён туман | 1.3 |
 | Атмосфера | Тени в щелях | Мягкие тени под камнями, травой и у стен, предметы садятся на землю | 1.4 |
 | Атмосфера | Мокрая земля | В дождь и в пасмурную погоду земля темнеет, блестит и отражает небо | 1.4 |
+| Атмосфера | Отражённый свет | Поверхности отдают свой цвет соседним: у травы модель снизу зеленоватая, у камня серая, как в WoW Forever. Ползунок на странице «Атмосфера» | 2.0.4 Lite |
 | Атмосфера | Дымка в дождь | В дождь низовой туман поднимается выше и лежит гуще. Выключатель на странице «Атмосфера» | 2.0.3 |
 | Атмосфера | Марево | В пустынях и огненных землях дальняя земля дрожит от жара. Персонажи и небо не искажаются. Ползунок силы на главной странице меню, 0 выключает | 1.5.4 |
 | Атмосфера | Атмосфера по зонам | В болотах и лесах гуще низовой туман, в пустынях воздух прозрачнее, в снегах больше дымки. В выжженных землях и в городах низового тумана меньше. Ползунки игрока остаются главными | 1.5 |
@@ -42,6 +43,8 @@
 | Картинка | Плёночное зерно | Лёгкое зерно плёнки, ползунок на главной странице меню | 1.5.4 |
 | Картинка | Размытие при движении | Картинка смазывается только на быстром повороте камеры, персонаж и маунт остаются чёткими. Ползунок на странице «Картинка» | 1.7.3 |
 | Картинка | Яркость и цвет | Яркость, контрастность, сочность цвета и тепло картинки — сам WoW так не умеет. Пресеты: «Стандарт WoW», пять готовых и слот «Мой». 50 у ползунка = картинка игры | 1.7.0 |
+| Картинка | Мягкое свечение | Светлые места слегка светятся и растекаются, как «Полноэкранное свечение» старого WoW. Интерфейс не светится. Ползунок на странице «Картинка» | 2.0.4 Lite |
+| Игра | Трава | Густота, дальность и затухание травы прямо из меню, на странице «Системные настройки игры» | 2.0.4 Lite |
 | Фото | Фоторежим | Интерфейс прячется, персонаж в фокусе, фон размыт. Не работает в бою | 1.4 |
 | Фото | Сила размытия и боке | Ползунок силы размытия фона. По умолчанию размытие втрое мягче, чем в 1.5.3. Боке превращает огни на размытом фоне в мягкие кружки | 1.5.4 |
 | Фото | Размытие дали в игре | Мягкое размытие дальнего плана в обычной игре, персонаж и окна игры резкие. Ползунок на странице «Фоторежим», по умолчанию выключено | 1.7.3 |
@@ -134,7 +137,7 @@ Please note: glitches, visual artifacts, and rendering inaccuracies may occur du
 
 The mod's public name is **Graphic Update.. Wow!**. GU-WOW is the working development name; it stays in the file names (`GU-WOW.exe`) and in the repository address.
 
-Current build: **2.0.3-release "Living Air"**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **2.0.3-release "Living Air"**, the light build **Lite 2.0.4**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 
@@ -154,6 +157,7 @@ Everything is set up in the game: Interface > AddOns > Graphic Update.. Wow!, th
 | Atmosphere | Weather mood | In overcast weather and rain the haze gets thicker, the colours cooler and the contrast softer. Works only with the fog on | 1.3 |
 | Atmosphere | Contact shadows | Soft shadows under stones, grass and near walls, objects sit on the ground | 1.4 |
 | Atmosphere | Wet ground | In rain and overcast weather the ground darkens, shines and reflects the sky | 1.4 |
+| Atmosphere | Bounced light | Surfaces lend their colour to nearby ones: a model gets green from the grass under it and grey from stone, as in WoW Forever. A slider on the Atmosphere page | 2.0.4 Lite |
 | Atmosphere | Mist in the rain | In the rain the ground mist rises higher and lies thicker. A switch on the Atmosphere page | 2.0.3 |
 | Atmosphere | Heat haze | In deserts and fire lands the far ground wavers in the heat. Characters and the sky stay still. A strength slider on the main menu page, 0 turns it off | 1.5.4 |
 | Atmosphere | Atmosphere by zone | Thicker ground mist in swamps and forests, clearer air in deserts, more haze in the snow. Less ground mist in scorched lands and cities. Your sliders stay in charge | 1.5 |
@@ -169,6 +173,8 @@ Everything is set up in the game: Interface > AddOns > Graphic Update.. Wow!, th
 | Picture | Film grain | A light film grain, a slider on the main menu page | 1.5.4 |
 | Picture | Motion blur | The picture smears only on a fast camera turn; the character and the mount stay crisp. A slider on the Picture page | 1.7.3 |
 | Picture | Brightness and colour | Brightness, contrast, colour richness and picture warmth — WoW itself cannot do this. Presets: WoW standard, five ready looks and a My slot. 50 on a slider = the game's own picture | 1.7.0 |
+| Picture | Soft glow | Bright areas glow and spread a little, like the old WoW Full Screen Glow. The interface does not glow. A slider on the Picture page | 2.0.4 Lite |
+| Game | Grass | Grass density, distance and fade right from the menu, on the Game system settings page | 2.0.4 Lite |
 | Photo | Photo mode | The interface hides, your character stays in focus, the background is blurred. Not available in combat | 1.4 |
 | Photo | Blur strength and bokeh | A slider for the background blur. By default the blur is three times softer than in 1.5.3. Bokeh turns lights in the blur into soft discs | 1.5.4 |
 | Photo | Far blur in play | A soft blur of the far land in normal play; the character and the game windows stay sharp. A slider on the Photo mode page, off by default | 1.7.3 |

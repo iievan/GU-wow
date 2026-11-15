@@ -214,8 +214,9 @@
 #define LEGIONGU_CTL_LIGHT_R 40  // how far a light's glow spreads, 50 as before (1.7.3)
 #define LEGIONGU_CTL_MOTION_BLUR 41 // the smear along a camera turn, 0 off (1.7.3)
 #define LEGIONGU_CTL_PLAY_BLUR 42 // the far land softly blurred in normal play, 0 off (1.7.3)
+#define LEGIONGU_CTL_GI 43       // the light bounced off nearby surfaces, 0 off (15.11.2026)
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 89    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 91    // black, white, the signature, two cells per setting, two for the checksum
 #if __RENDERER__ < 0xa000
 // Direct3D 9 (1.12, 3.3.5): the addons lay a cell out as 3 interface units, and the screen is 768 units high
 // whatever its pixels, so a cell is BUFFER_HEIGHT / 256 pixels. The addons cannot know the pixels of a maximized
@@ -231,7 +232,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 43; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 44; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -481,6 +482,13 @@ namespace LegionGU
 		ui_label = "Тени в щелях";
 		ui_tooltip = "Мягкие тени в щелях, под камнями и травой, у стен: предметы садятся на землю. 0 без них.";
 	> = 35.0;
+
+	uniform float GIStrength <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Картинка";
+		ui_label = "Отражённый свет";
+		ui_tooltip = "Свет отражается от соседних поверхностей и окрашивает модели: от травы зеленоватый, от камня серый. 0 без него.";
+	> = 50.0;
 
 	uniform bool WeatherMood <
 		ui_category = "Атмосфера";
@@ -3187,7 +3195,7 @@ namespace LegionGU
 	static const float BRIDGE_GAP = 0.3;    // smallest step between black and white in each channel
 	static const float BRIDGE_HOLD = 2.0;   // seconds the last values stay after the strip is gone
 
-	texture2D BridgePrevTex { Width = 43; Height = 1; Format = RGBA32F; };
+	texture2D BridgePrevTex { Width = 44; Height = 1; Format = RGBA32F; };
 	sampler2D BridgePrev { Texture = BridgePrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 	float3 BridgeCell(int i)
@@ -3240,7 +3248,7 @@ namespace LegionGU
 			bool live = seen || (prev0.x > 0.5 && since <= BRIDGE_HOLD);
 			return float4(live ? 1.0 : 0.0, since, seen ? 1.0 : 0.0, 1.0);
 		}
-		if (seen && texel <= 42)
+		if (seen && texel <= 43)
 			return float4(BridgeValue(1 + 2 * texel, th) / 63.0, 0.0, 0.0, 1.0);
 		return tex2Dfetch(BridgePrev, int2(texel, 0));
 	}
@@ -3380,6 +3388,18 @@ namespace LegionGU
 	sampler2D Surf { Texture = SurfTex; };
 	sampler2D SurfBlur { Texture = SurfBlurTex; };
 
+	// The bounced light (15.11.2026, after WoW Forever's indirect lighting): the nearby surfaces a point faces
+	// lend it their colour, gathered at quarter resolution over a disk like the AO's, only wider.
+	static const float GI_RADIUS = 3.0;        // yards around a point whose surfaces light it
+	static const float GI_MAX_PX = 40.0;       // largest radius in quarter-resolution pixels
+	static const float GI_GAIN = 2.0;          // the bounce at «Отражённый свет» 100
+	static const float GI_FAR = 150.0;         // yards: farther, the bounce fades out
+
+	texture2D GiTex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = RGBA16F; };
+	texture2D GiBlurTex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = RGBA16F; };
+	sampler2D Gi { Texture = GiTex; };
+	sampler2D GiBlur { Texture = GiBlurTex; };
+
 	float SurfAO()
 	{
 		return LegionGUValue(LEGIONGU_CTL_AO, AOStrength) * 0.01;
@@ -3390,6 +3410,21 @@ namespace LegionGU
 	{
 		bool on = LegionGUPanel() ? LegionGUState(16u) && !LegionGUState(2u) : WetGround;
 		return on ? smoothstep(0.1, 0.5, tex2Dfetch(FogCur, int2(5, 0)).x) : 0.0;
+	}
+
+	float SurfGI()
+	{
+		return LegionGUOn(1u) && !LegionGUCheckView() ? LegionGUValue(LEGIONGU_CTL_GI, GIStrength) * 0.01 : 0.0;
+	}
+
+	// The bounce passes cost nothing at 0: the triangle collapses before any pixel runs.
+	void GiVS(uint id : SV_VertexID, out float4 pos : SV_Position, out float2 uv : TEXCOORD0)
+	{
+		FullscreenVS(id, pos, uv);
+#if __RENDERER__ >= 0xa000
+		if (SurfGI() <= 0.0)
+			pos = float4(0.0, 0.0, 0.0, 1.0);
+#endif
 	}
 
 	// View-space position of a depth tap in yards: x right, y up, z forward.
@@ -3492,6 +3527,78 @@ namespace LegionGU
 		return sum / max(wsum, 1e-4);
 	}
 
+	// Quarter resolution: the light the surfaces around a point send it. Each of sixteen taps on a disk GI_RADIUS
+	// yards across counts by how squarely the point faces it, so a wall lends its colour to the grass at its foot.
+	float4 GiPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		float4 depthState = tex2Dfetch(FogCur, int2(1, 0));
+		if (depthState.y < 0.5 || depthState.x <= 0.0)
+			return float4(0.0, 0.0, 0.0, 0.0);
+		// The centre of one full-resolution depth texel, as in SurfPS.
+		uv = (floor(pos.xy) * 4.0 + 1.5) * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+		float reversed = EffectiveReversed(depthState.w);
+		if (IsSky(DepthU(RawDepth(uv), reversed)))
+			return float4(0.0, 0.0, 0.0, 0.0);
+		float3 p = ViewPos(uv, reversed);
+		if (p.z >= GI_FAR)
+			return float4(0.0, 0.0, 0.0, 0.0);
+		float2 px = 4.0 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+		float3 r = ViewPos(uv + float2(px.x, 0.0), reversed) - p;
+		float3 l = p - ViewPos(uv - float2(px.x, 0.0), reversed);
+		float3 d = ViewPos(uv + float2(0.0, px.y), reversed) - p;
+		float3 t = p - ViewPos(uv - float2(0.0, px.y), reversed);
+		float3 n = normalize(cross(abs(r.z) < abs(l.z) ? r : l, abs(d.z) < abs(t.z) ? d : t));
+
+		float rpx = min(GI_RADIUS / (p.z * AO_TAN_HALF_FOV) * 0.5 * (BUFFER_HEIGHT / 4), GI_MAX_PX);
+		if (rpx < 1.0)
+			return float4(0.0, 0.0, 0.0, 0.0);
+		float turn = 6.2831853 * frac(52.9829189 * frac(dot(pos.xy, float2(0.06711056, 0.00583715))));
+		float3 sum = float3(0.0, 0.0, 0.0);
+		LEGIONGU_UNROLL
+		for (int k = 0; k < 8; ++k)
+		{
+			float a = turn + k * 0.7853982;
+			float2 dir = float2(cos(a), sin(a)) * rpx * px;
+			LEGIONGU_UNROLL
+			for (int s = 0; s < 2; ++s)
+			{
+				float2 tap = uv + dir * (s == 0 ? 0.4 : 1.0);
+				float3 v = ViewPos(tap, reversed) - p;
+				float dist = length(v);
+				float fall = saturate(1.0 - dist * dist / (GI_RADIUS * GI_RADIUS));
+				float w = saturate(dot(n, v) / max(dist, 1e-4)) * fall;
+				sum += tex2Dlod(ColorLinear, float4(tap, 0.0, 0.0)).rgb * w;
+			}
+		}
+		return float4(sum / 16.0 * (1.0 - smoothstep(GI_FAR * 0.6, GI_FAR, p.z)), 1.0);
+	}
+
+	// A 3 by 3 blur that keeps to one depth, as SurfBlurPS: the bounce of a wall does not spill onto the sky.
+	float4 GiBlurPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		float4 depthState = tex2Dfetch(FogCur, int2(1, 0));
+		if (depthState.y < 0.5)
+			return float4(0.0, 0.0, 0.0, 0.0);
+		float reversed = EffectiveReversed(depthState.w);
+		float z0 = Yards(DepthU(RawDepth(uv), reversed));
+		float2 px = 6.0 * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+		float3 sum = float3(0.0, 0.0, 0.0);
+		float wsum = 0.0;
+		LEGIONGU_UNROLL
+		for (int y = -1; y <= 1; ++y)
+		{
+			LEGIONGU_UNROLL
+			for (int x = -1; x <= 1; ++x)
+			{
+				float2 t = uv + float2(x, y) * px;
+				float w = exp(-abs(Yards(DepthU(RawDepth(t), reversed)) - z0) / (0.05 * z0 + 0.1));
+				sum += tex2Dlod(Gi, float4(t, 0.0, 0.0)).rgb * w;
+				wsum += w;
+			}
+		}
+		return float4(sum / max(wsum, 1e-4), 1.0);
+	}
+
 	float4 SurfApplyPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		float4 c = tex2Dfetch(ColorPoint, int2(pos.xy));
@@ -3499,10 +3606,16 @@ namespace LegionGU
 			return c;
 		float ao = SurfAO();
 		float wetness = SurfWet();
-		if (ao <= 0.0 && wetness <= 0.0)
+		float gi = SurfGI();
+		if (ao <= 0.0 && wetness <= 0.0 && gi <= 0.0)
 			return c;
 		float2 s = tex2Dlod(SurfBlur, float4(uv, 0.0, 0.0)).xy;
-		float3 o = c.rgb * (1.0 - ao * AO_DARK * s.x);
+		float3 o = c.rgb;
+		// The bounce lands on the surface's own colour, and a little on dark ones too, so a shaded side of a model
+		// takes the green of the grass under it.
+		if (gi > 0.0)
+			o += tex2Dlod(GiBlur, float4(uv, 0.0, 0.0)).rgb * (0.25 + o) * gi * GI_GAIN * (1.0 - saturate(o));
+		o *= 1.0 - ao * AO_DARK * s.x;
 		if (wetness > 0.0)
 		{
 			float4 depthState = tex2Dfetch(FogCur, int2(1, 0));
@@ -3532,6 +3645,8 @@ namespace LegionGU
 	{
 		pass SurfPass { VertexShader = FullscreenVS; PixelShader = SurfPS; RenderTarget = SurfTex; }
 		pass SurfBlurPass { VertexShader = FullscreenVS; PixelShader = SurfBlurPS; RenderTarget = SurfBlurTex; }
+		pass GiPass { VertexShader = GiVS; PixelShader = GiPS; RenderTarget = GiTex; }
+		pass GiBlurPass { VertexShader = GiVS; PixelShader = GiBlurPS; RenderTarget = GiBlurTex; }
 		pass SurfApply { VertexShader = FullscreenVS; PixelShader = SurfApplyPS; }
 	}
 
