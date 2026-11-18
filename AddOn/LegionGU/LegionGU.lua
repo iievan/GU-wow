@@ -1700,6 +1700,26 @@ CVarSlider(panelSys, "groundEffectDist", T("Дальность травы", "Gra
 CVarSlider(panelSys, "groundEffectFade", T("Где трава тает", "Where the grass fades"), L + 6, -184, 0, 1000,
 	T("С какого расстояния трава начинает плавно исчезать. Ближе к дальности травы — край травы незаметнее", "From where the grass starts to fade. Closer to the grass distance hides its edge better"))
 
+-- The circle under the target (18.11.2026): the game draws it itself, no addon reaches it, but the hidden CVar
+-- ObjectSelectionCircle turns it off. A switch here writes the CVar, as the grass sliders do.
+local function CVarCheck(parent, cvar, label, x, y)
+	checkCount = checkCount + 1
+	local name = "LegionGUCheck" .. checkCount
+	local c = CreateFrame("CheckButton", name, parent, "UICheckButtonTemplate")
+	c:SetPoint("TOPLEFT", x, y)
+	_G[name .. "Text"]:SetText(label)
+	c:SetScript("OnClick", function(self)
+		pcall(SetCVar, cvar, self:GetChecked() and "1" or "0")
+	end)
+	c.Refresh = function(self)
+		self:SetChecked(GetCVar(cvar) ~= "0")
+	end
+	widgets[name] = c
+	return c
+end
+Header(panelSys, T("Цель", "Target"), L, -240)
+CVarCheck(panelSys, "ObjectSelectionCircle", T("Круг под выбранной целью", "Circle under the selected target"), L + 6, -270)
+
 -- A preset carousel (1.7.1): the ready looks and, when saved, the player's own one («Мой») at the end. «<» and
 -- «>» page with a preview, «+» saves the on-screen values into the own slot, «-» deletes it. One factory serves
 -- the picture and the rays; opts: keys, presets, slot (the DB field), what (for the speech), x, y, widget.
