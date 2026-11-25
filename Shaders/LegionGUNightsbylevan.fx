@@ -1295,6 +1295,10 @@ namespace LegionGUNights
 	static const float STRIP_RUN = 4.5;
 	static const float STRIP_TALL = 2.5;
 	static const float CHAR_YD = 12.0;       // yards: nearer geometry is a character or gear, not a lamp (1.6.8)
+	static const float GLINT_YD = 30.0;      // yards up to which a colourless glint gives no glow (2.0.5)
+	static const float2 FLAME_CORE = float2(0.55, 0.9); // the pixel's own brightness where the pool lift and the halo
+	                                                    // leave it alone: the flame is lit by itself (2.0.5)
+	static const float FLAME_KNEE = 0.72;    // near a light, brightness above this rolls softly toward white (2.0.5)
 	static const float UI_SRC_FROM = 0.2;
 	static const float UI_SRC_FULL = 0.4;
 	// The UI at night: under the UI mask, what is brighter than UI_KEEP_FROM times the ambient (fully from
@@ -2407,6 +2411,10 @@ namespace LegionGUNights
 		keep *= 1.0 - 0.9 * warmL * (1.0 - smoothstep(0.18, 0.35, light.g / max(light.r, 1e-5)));
 		// A farther light glows less (see LIGHT_FAR): a torch a hundred yards off is a spark, not the lamp at the door.
 		float yards = Yards(u);
+		// Glints are not lights (2.0.5): a blade, a polished buckle or plate edge clips to white for a pixel or two and
+		// passed the white door, so knives and armour glowed by a campfire. A flame is warm in its block and a crystal
+		// coloured; a glint is colourless. Within GLINT_YD such pale light gives no glow; a lamp farther off still does.
+		keep *= 1.0 - (1.0 - warmL) * (1.0 - saturate(lsat * 3.0)) * (1.0 - smoothstep(CHAR_YD, GLINT_YD, yards));
 		keep /= 1.0 + (yards / LIGHT_FAR) * (yards / LIGHT_FAR);
 		// A surface lit all over, like the wings of a glowing mount, is not a point of light: the more of the block's taps
 		// are lights, the less it glows (see LIGHT_AREA_CUT).
@@ -2683,7 +2691,8 @@ namespace LegionGUNights
 			// it (POOL_LIFT), as firelight is in a dark night.
 			float warm = saturate((poolHue.r - poolHue.b) / max(poolHue.r, 1e-5) * 2.0);
 			float3 hue = lerp(poolHue, FIRE_COLOUR / dot(FIRE_COLOUR, LUMA601), FIRE_LEAN * warm);
-			o *= 1.0 + POOL_LIFT * poolFx;
+			// The flame itself is not lifted (2.0.5): the lift on the fire's own pixels blew the hearth into a white blob.
+			o *= 1.0 + POOL_LIFT * poolFx * (1.0 - smoothstep(FLAME_CORE.x, FLAME_CORE.y, v));
 			o = lerp(o, dot(o, LUMA601) * hue, POOL_TINT * poolFx);
 		}
 
@@ -2762,7 +2771,18 @@ namespace LegionGUNights
 			smoke *= 0.35 * keepUI * (0.75 + 0.25 * sin(ts * 1.3 + uv.y * 60.0));
 			o = lerp(o, SMOKE_COLOUR + 0.5 * smokeLit, smoke);
 		}
-		return o + SoftAdd(air) * (1.0 - saturate(o));
+		// The halo glows around the flame, not on it (2.0.5), and near a light the brightest part rolls into white over
+		// a shoulder instead of clipping: the hearth keeps its tongues of fire, not a flat blown patch.
+		air *= 1.0 - 0.7 * smoothstep(FLAME_CORE.x, FLAME_CORE.y, v);
+		float3 res = o + SoftAdd(air) * (1.0 - saturate(o));
+		float nearL = saturate(max(pool, dot(air, LUMA601) * 20.0));
+		float pk = max(max(res.r, res.g), res.b);
+		if (nearL > 0.0 && pk > FLAME_KNEE)
+		{
+			float rolled = FLAME_KNEE + (1.0 - FLAME_KNEE) * (1.0 - exp(-(pk - FLAME_KNEE) / (1.0 - FLAME_KNEE)));
+			res *= lerp(1.0, rolled / pk, nearL);
+		}
+		return res;
 	}
 
 	// "Ночь и огни": the frame at a third, the lights that count in colour and the light field L0, and six squares at

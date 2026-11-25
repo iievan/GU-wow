@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "2.0.4-release"
+local VERSION = "2.0.5-beta"
 local CELL = 4
 local CELLS = 91
 
@@ -49,6 +49,11 @@ local DEFAULTS = {
 	panelWake = true,
 	-- 1.7.6: the look of the play photo mode: plain play (false) or the photo blur and the cinema bars (true).
 	gamePhoto = false,
+	-- 2.0.5: the photo camera. camShift 50 keeps the hero in the centre, camTilt 0 keeps the game's own pitch, camFar
+	-- lets the camera go to the client's far limit; camSpeed is the key control, orbitSpeed 15 the old slow orbit.
+	camShift = 50, camTilt = 0, camFar = true, camSpeed = 50, orbitSpeed = 15, orbitLeft = false,
+	-- 2.0.5: a screenshot by itself when an achievement or a new level comes.
+	autoShot = false,
 }
 -- 1.7.3: how much of each panel shows, 100 whole, 0 gone: ui_ in plain play, photo_ in photo mode, game_ in the
 -- play photo mode (1.7.6), where only the chat stays by default.
@@ -555,8 +560,12 @@ local function ChatFrames()
 	return list
 end
 local HIDE_GROUPS = {
+	-- The Bartender4 bars too (2.0.5): with it the Blizzard bars are empty and the dial hid nothing.
 	{ "bars", T("Панели заклинаний", "Action bars"), { "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight",
-		"MultiBarRight", "MultiBarLeft" } },
+		"MultiBarRight", "MultiBarLeft", "BT4Bar1", "BT4Bar2", "BT4Bar3", "BT4Bar4", "BT4Bar5", "BT4Bar6", "BT4Bar7",
+		"BT4Bar8", "BT4Bar9", "BT4Bar10", "BT4BarPetBar", "BT4BarStanceBar", "BT4BarMicroMenu", "BT4BarBagBar",
+		"BT4BarExtraActionBar", "BT4BarZoneAbilityBar", "BT4BarVehicle", "BT4BarBlizzardArt", "BT4BarXP", "BT4BarRep",
+		"BT4BarAP", "BT4BarStatus" } },
 	{ "player", T("Портрет персонажа и питомца", "Player and pet frames"), { "PlayerFrame", "PetFrame" } },
 	{ "target", T("Портрет цели и фокуса", "Target and focus frames"), { "TargetFrame", "FocusFrame" } },
 	{ "party", T("Группа и рейд", "Party and raid"), { "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3",
@@ -873,6 +882,286 @@ uiWatch:SetScript("OnUpdate", function(self, dt)
 end)
 end
 
+-- The photo camera (2.0.5). The client lets an addon move the camera only around the hero, never free of him: the
+-- hero shifts in the frame (test_cameraOverShoulder), the camera tilts (dynamic pitch), goes farther, turns by the
+-- keys and remembers views. Every camera CVar is put back on leaving photo mode, and the keys go back at once.
+-- One do block: the file is near Lua's 200 locals, only these five live outside it.
+local CamApply, CamOn, CamOff, GridShow, grid
+do
+local CAM_CVARS = { "test_cameraOverShoulder", "test_cameraDynamicPitch", "test_cameraDynamicPitchBaseFovPad",
+	"test_cameraDynamicPitchBaseFovPadFlying", "cameraDistanceMaxZoomFactor" }
+local savedCam
+local camKeys = CreateFrame("Frame")
+local camDown = {}
+-- The test_ CVars ask «are you sure» on some clients: the camera addons unregister that question the same way.
+pcall(UIParent.UnregisterEvent, UIParent, "EXPERIMENTAL_CVAR_CONFIRMATION_NEEDED")
+local function CamSet(k, v)
+	pcall(SetCVar, k, v)
+end
+local function OrbitGo()
+	if photo and DB.orbit then
+		local s = math.max(1, DB.orbitSpeed or 15) * 0.002
+		if DB.orbitLeft then
+			MoveViewLeftStart(s)
+		else
+			MoveViewRightStart(s)
+		end
+	end
+end
+function CamApply()
+	if not photo or not savedCam then
+		return
+	end
+	CamSet("test_cameraOverShoulder", ((DB.camShift or 50) - 50) / 50 * 3)
+	local tilt = (DB.camTilt or 0) / 100
+	CamSet("test_cameraDynamicPitch", tilt > 0 and 1 or (savedCam.test_cameraDynamicPitch or 0))
+	if tilt > 0 then
+		CamSet("test_cameraDynamicPitchBaseFovPad", tilt)
+		CamSet("test_cameraDynamicPitchBaseFovPadFlying", tilt)
+	end
+	CamSet("cameraDistanceMaxZoomFactor", DB.camFar and 2.6 or (savedCam.cameraDistanceMaxZoomFactor or 1.9))
+	MoveViewLeftStop()
+	MoveViewRightStop()
+	OrbitGo()
+end
+-- The keys while photo mode is on: W and S up and down, A and D around the hero, Q and E closer and farther. The
+-- player's own movement keys do the same, so the hero stands still. Each key clicks a hidden button, down and up,
+-- so nothing new shows in the game's key list.
+local CAM_MOVES = {
+	UP = { "W", "MOVEFORWARD" }, DOWN = { "S", "MOVEBACKWARD" }, LEFT = { "A", "TURNLEFT" },
+	RIGHT = { "D", "TURNRIGHT" }, IN = { "Q", "STRAFELEFT" }, OUT = { "E", "STRAFERIGHT" },
+}
+function GUWOW_CamKey(dir, down)
+	if not photo then
+		return
+	end
+	local s = 0.05 + (DB.camSpeed or 50) / 100
+	camDown[dir] = down or nil
+	if dir == "LEFT" or dir == "RIGHT" then
+		MoveViewLeftStop()
+		MoveViewRightStop()
+		if camDown.LEFT then
+			MoveViewLeftStart(s)
+		elseif camDown.RIGHT then
+			MoveViewRightStart(s)
+		else
+			OrbitGo()
+		end
+		return
+	end
+	local name = dir == "UP" and "Up" or dir == "DOWN" and "Down" or dir == "IN" and "In" or "Out"
+	if down then
+		_G["MoveView" .. name .. "Start"](s)
+	else
+		_G["MoveView" .. name .. "Stop"]()
+	end
+end
+function CamOn()
+	savedCam = {}
+	for _, k in ipairs(CAM_CVARS) do
+		savedCam[k] = GetCVar(k)
+	end
+	for dir, pair in pairs(CAM_MOVES) do
+		local keys = { pair[1], GetBindingKey(pair[2]) }
+		for _, key in ipairs(keys) do
+			SetOverrideBindingClick(camKeys, true, key, "LegionGUCam" .. dir)
+		end
+	end
+	-- The views: 1, 2, 3 fly the camera to a remembered view, Shift with the digit remembers the one on screen.
+	for i = 1, 3 do
+		SetOverrideBindingClick(camKeys, true, tostring(i), "LegionGUView" .. i)
+		SetOverrideBindingClick(camKeys, true, "SHIFT-" .. i, "LegionGUSaveView" .. i)
+	end
+	SetOverrideBindingClick(camKeys, true, "G", "LegionGUGridKey")
+	-- The arrows frame the shot live (2.0.5): left and right shift the hero, up and down tilt the camera. Set after the
+	-- movement keys, so they win where the player walks on the arrows.
+	for _, key in ipairs({ "LEFT", "RIGHT", "UP", "DOWN" }) do
+		SetOverrideBindingClick(camKeys, true, key, "LegionGUFrame" .. key)
+	end
+	StaticPopup_Hide("EXPERIMENTAL_CVAR_WARNING")
+	CamApply()
+end
+function CamOff()
+	for _, f in ipairs({ "Left", "Right", "Up", "Down", "In", "Out" }) do
+		_G["MoveView" .. f .. "Stop"]()
+	end
+	wipe(camDown)
+	LegionGUCamHint:Hide()
+	if not InCombatLockdown() then
+		ClearOverrideBindings(camKeys)
+	end
+	if savedCam then
+		for k, v in pairs(savedCam) do
+			CamSet(k, v)
+		end
+		savedCam = nil
+	end
+end
+-- A fight ends photo mode before the lock: the keys must walk again, and only now can the addon give them back.
+-- If the lock came first, the keys go back when it ends.
+camKeys:RegisterEvent("PLAYER_REGEN_DISABLED")
+camKeys:RegisterEvent("PLAYER_REGEN_ENABLED")
+camKeys:SetScript("OnEvent", function(_, event)
+	if event == "PLAYER_REGEN_ENABLED" then
+		if not photo then
+			ClearOverrideBindings(camKeys)
+		end
+	elseif photo then
+		GUWOW_TogglePhoto()
+	end
+end)
+
+-- The game keeps five views; 1 is the first person and 5 the usual one, so the photo views are 2 to 4.
+function GUWOW_View(i, save)
+	if not photo then
+		return
+	end
+	if save then
+		SaveView(i + 1)
+		-- The view keeps its framing too: the hero's place and the tilt come back with it.
+		DB.views = DB.views or {}
+		DB.views[i] = { DB.camShift, DB.camTilt }
+		print("|cffffd200Graphic Update.. Wow!:|r " .. T("ракурс " .. i .. " запомнен.", "view " .. i .. " saved."))
+	else
+		local f = DB.views and DB.views[i]
+		if f then
+			DB.camShift, DB.camTilt = f[1], f[2]
+			CamApply()
+		end
+		SetView(i + 1)
+		After(1.2, OrbitGo)
+	end
+end
+
+-- Framing by the arrows, held: the value runs at FRAME_RATE a second and the camera follows. A line at the bottom
+-- says where the hero stands, for two seconds after the last change; it hides for the shot (see GUWOW_Screenshot).
+local FRAME_RATE = 40
+local framing = {}
+local hint = CreateFrame("Frame", "LegionGUCamHint")
+hint:SetFrameStrata("FULLSCREEN_DIALOG")
+hint:SetAllPoints(WorldFrame)
+hint:Hide()
+local hintText = hint:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+hintText:SetPoint("BOTTOM", 0, 60)
+local hintLeft = 0
+local function HintSay()
+	local sh = DB.camShift - 50
+	hintText:SetText(T("Герой: ", "Hero: ") .. (sh == 0 and T("по центру", "centre") or (sh < 0 and T("левее ", "left ") or T("правее ", "right ")) .. math.abs(sh))
+		.. "   ·   " .. T("Наклон: ", "Tilt: ") .. DB.camTilt)
+	hintLeft = 2
+	hint:Show()
+end
+hint:SetScript("OnUpdate", function(self, dt)
+	-- Photo mode left with an arrow held: its key-up never comes, the bindings are gone.
+	if not photo then
+		wipe(framing)
+	end
+	local moved = false
+	for key, sign in pairs(framing) do
+		local field = (key == "LEFT" or key == "RIGHT") and "camShift" or "camTilt"
+		local v = math.max(0, math.min(100, (DB[field] or 0) + sign * FRAME_RATE * dt))
+		if v ~= DB[field] then
+			DB[field] = v
+			moved = true
+		end
+	end
+	if moved then
+		CamApply()
+		HintSay()
+	end
+	if not next(framing) then
+		hintLeft = hintLeft - dt
+		if hintLeft <= 0 or not photo then
+			DB.camShift, DB.camTilt = math.floor(DB.camShift + 0.5), math.floor(DB.camTilt + 0.5)
+			self:Hide()
+		end
+	end
+end)
+local FRAME_SIGN = { LEFT = -1, RIGHT = 1, UP = 1, DOWN = -1 }
+local function FrameKey(key, down)
+	if not photo then
+		return
+	end
+	framing[key] = down and FRAME_SIGN[key] or nil
+	DB.camShift, DB.camTilt = DB.camShift or 50, DB.camTilt or 0
+	HintSay()
+end
+
+-- The thirds grid over photo mode (2.0.5): a help to place the hero, never on the shot (see GUWOW_Screenshot).
+grid = CreateFrame("Frame", "LegionGUGrid")
+grid:SetFrameStrata("FULLSCREEN_DIALOG")
+grid:SetAllPoints(WorldFrame)
+grid:Hide()
+for i = 1, 4 do
+	local t = grid:CreateTexture(nil, "OVERLAY")
+	if t.SetColorTexture then
+		t:SetColorTexture(1, 1, 1, 0.3)
+	else
+		t:SetTexture(1, 1, 1, 0.3)
+	end
+	if i <= 2 then
+		t:SetWidth(1)
+		t:SetPoint("TOP", grid, "TOPLEFT", 0, 0)
+		t:SetPoint("BOTTOM", grid, "BOTTOMLEFT", 0, 0)
+	else
+		t:SetHeight(1)
+		t:SetPoint("LEFT", grid, "TOPLEFT", 0, 0)
+		t:SetPoint("RIGHT", grid, "TOPRIGHT", 0, 0)
+	end
+	grid[i] = t
+end
+grid:SetScript("OnSizeChanged", function(self, w, h)
+	for i = 1, 2 do
+		self[i]:ClearAllPoints()
+		self[i]:SetPoint("TOP", self, "TOPLEFT", w * i / 3, 0)
+		self[i]:SetPoint("BOTTOM", self, "BOTTOMLEFT", w * i / 3, 0)
+		self[i + 2]:ClearAllPoints()
+		self[i + 2]:SetPoint("LEFT", self, "TOPLEFT", 0, -h * i / 3)
+		self[i + 2]:SetPoint("RIGHT", self, "TOPRIGHT", 0, -h * i / 3)
+	end
+end)
+function GridShow()
+	if photo and DB.grid then
+		grid:Show()
+		grid:GetScript("OnSizeChanged")(grid, grid:GetWidth(), grid:GetHeight())
+	else
+		grid:Hide()
+	end
+end
+function GUWOW_Grid()
+	DB.grid = not DB.grid
+	GridShow()
+end
+local function KeyButton(name, onClick, upToo)
+	local b = CreateFrame("Button", name, UIParent)
+	if upToo then
+		b:RegisterForClicks("AnyDown", "AnyUp")
+	else
+		b:RegisterForClicks("AnyDown")
+	end
+	b:SetScript("OnClick", onClick)
+end
+for dir in pairs(CAM_MOVES) do
+	KeyButton("LegionGUCam" .. dir, function(_, _, down)
+		GUWOW_CamKey(dir, down)
+	end, true)
+end
+for i = 1, 3 do
+	KeyButton("LegionGUView" .. i, function()
+		GUWOW_View(i)
+	end)
+	KeyButton("LegionGUSaveView" .. i, function()
+		GUWOW_View(i, true)
+	end)
+end
+KeyButton("LegionGUGridKey", GUWOW_Grid)
+for key in pairs(FRAME_SIGN) do
+	KeyButton("LegionGUFrame" .. key, function(_, _, down)
+		FrameKey(key, down)
+	end, true)
+end
+end
+
 local function Photo(on)
 	if on == photo then
 		return
@@ -899,13 +1188,11 @@ local function Photo(on)
 		if DB.hideNames then
 			Names(false)
 		end
-		if DB.orbit and MoveViewRightStart then
-			MoveViewRightStart(0.03)
-		end
+		CamOn()
+		GridShow()
 	else
-		if MoveViewRightStop then
-			MoveViewRightStop()
-		end
+		CamOff()
+		grid:Hide()
 		Names(true)
 		if photoPanels then
 			PhotoDim(false)
@@ -962,17 +1249,35 @@ function GUWOW_Screenshot()
 	-- The first-draw square goes too: with the strip gone nothing covers it, and it would stay on the shot.
 	strip:Hide()
 	first:Hide()
+	grid:Hide()
+	LegionGUCamHint:Hide()
 	After(0.15, function()
 		Screenshot()
 		After(0.3, function()
 			strip:Show()
 			first:Show()
+			GridShow()
 			if not wasPhoto and not photo then
 				UIParent:SetAlpha(1)
 				MinimapBack()
 			end
 		end)
 	end)
+end
+
+-- The shot in a few seconds (2.0.5): time to take a pose or an emote. The count goes in the chat, not on the screen.
+function GUWOW_TimerShot()
+	local n = 3
+	local function Tick()
+		if n == 0 then
+			GUWOW_Screenshot()
+			return
+		end
+		print("|cffffd200Graphic Update.. Wow!:|r " .. n .. "…")
+		n = n - 1
+		After(1, Tick)
+	end
+	Tick()
 end
 
 -- Esc and Enter to chat end photo mode: the Esc menu shows over the picture, chat is not typed blind. The play
@@ -1019,6 +1324,7 @@ BINDING_NAME_GUWOW_TOGGLE = T("Включить или выключить Graphi
 BINDING_NAME_GUWOW_PHOTO = T("Фоторежим (прячет интерфейс, размывает фон)", "Photo mode (hides the interface, blurs the background)")
 BINDING_NAME_GUWOW_SHOT = T("Чистый снимок экрана", "Clean screenshot")
 BINDING_NAME_GUWOW_GAME = T("Игровой фоторежим (прячет панели, игра идёт)", "Play photo mode (hides the panels, the game goes on)")
+BINDING_NAME_GUWOW_TIMER = T("Снимок через 3 секунды", "Screenshot in 3 seconds")
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Share codes: all the values in one line to paste into another player's panel.
@@ -1113,8 +1419,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("Graphic Update.. Wow! обновлён: 2.0.4 «Живой воздух».\n\nМягкое свечение: светлые места слегка светятся, модели выглядят мягче, как с полноэкранным свечением старого WoW. Ползунок на странице «Картинка».\n\nОтражённый свет: модели и земля берут цвет соседних поверхностей, у травы зеленоватый, у камня серый, как в WoW Forever. Ползунок на странице «Атмосфера».\n\nНовая страница «Системные настройки игры»: густота и дальность травы прямо из меню.\n\nМеню: /gu или кнопка у миникарты.",
-		"Graphic Update.. Wow! is updated: 2.0.4 “Living Air”.\n\nSoft glow: bright areas glow a little and models look softer, like the old WoW Full Screen Glow. A slider on the Picture page.\n\nBounced light: models and the ground take the colour of nearby surfaces, green from grass, grey from stone, as in WoW Forever. A slider on the Atmosphere page.\n\nA new «Game system settings» page: grass density and distance right from the menu.\n\nMenu: /gu or the minimap button."),
+	text = T("Graphic Update.. Wow! обновлён: 2.0.5 «Фотограф».\n\nКамера в фоторежиме: W, A, S, D водят камеру вокруг героя, Q и E приближают. Героя можно сдвинуть в кадре и наклонить камеру. Три ракурса запоминаются на Shift+1, 2, 3.\n\nСетка третей на клавише G, снимок через 3 секунды, снимок сам при достижении. Густота дождя и снега в системных настройках.\n\nПанели Bartender4 теперь тоже прячутся.\n\nМеню: /gu или кнопка у миникарты.",
+		"Graphic Update.. Wow! is updated: 2.0.5 “Photographer”.\n\nThe photo mode camera: W, A, S, D move it around the hero, Q and E zoom. Shift the hero in the frame and tilt the camera. Three views are saved on Shift+1, 2, 3.\n\nA thirds grid on G, a shot in 3 seconds, a shot by itself on an achievement. Rain and snow density in the system settings.\n\nThe Bartender4 bars hide too now.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -1719,6 +2025,10 @@ local function CVarCheck(parent, cvar, label, x, y)
 end
 Header(panelSys, T("Цель", "Target"), L, -240)
 CVarCheck(panelSys, "ObjectSelectionCircle", T("Круг под выбранной целью", "Circle under the selected target"), L + 6, -270)
+-- 2.0.5: how thick the rain and the snow fall, the game's own 0..3.
+Header(panelSys, T("Погода", "Weather"), R, -60)
+CVarSlider(panelSys, "weatherDensity", T("Густота дождя и снега", "Rain and snow density"), R + 6, -100, 0, 3,
+	T("0 — осадков не видно, 3 — самые густые. Влияет и на кадры в непогоду", "0 hides the rain and snow, 3 is the thickest. Costs frames in bad weather"))
 
 -- A preset carousel (1.7.1): the ready looks and, when saved, the player's own one («Мой») at the end. «<» and
 -- «>» page with a preview, «+» saves the on-screen values into the own slot, «-» deletes it. One factory serves
@@ -2279,7 +2589,7 @@ local sub3 = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall"
 sub3:SetPoint("TOPLEFT", title3, "BOTTOMLEFT", 0, -6)
 sub3:SetText(T("Интерфейс прячется, персонаж в фокусе, фон размыт. Выход: Esc, Enter или сама клавиша фоторежима.",
 	"The interface hides, your character stays in focus, the background is blurred. Leave with Esc, Enter or the photo key."))
-Check(pagePhoto, "orbit", T("Медленный облёт камеры", "Slow camera orbit"), 16, -70)
+Check(pagePhoto, "orbit", T("Медленный облёт камеры", "Slow camera orbit"), 16, -70, CamApply)
 Check(pagePhoto, "hideNames", T("Прятать имена над головами", "Hide names above heads"), 16, -96)
 Check(pagePhoto, "cinema", T("Кинорамка", "Cinema bars"), 16, -122)
 Check(pagePhoto, "bokeh", T("Боке огней на размытом фоне", "Bokeh of lights in the blur"), 16, -148)
@@ -2294,7 +2604,27 @@ Header(pagePhoto, T("Игровой фоторежим", "Play photo mode"), 16,
 Button(pagePhoto, T("Игровой фоторежим: вкл/выкл", "Play photo mode: on/off"), 16, -282, 220, GUWOW_ToggleGame)
 Check(pagePhoto, "gamePhoto", T("Игровой фоторежим с размытием фона и кинорамкой", "Play photo mode with the background blur and the cinema bars"), 16, -310)
 local photoPanelsNote = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-photoPanelsNote:SetPoint("TOPLEFT", 16, -410)
+-- The camera (2.0.5): its own block under the play photo mode, the dials apply at once if photo mode is on.
+Button(pagePhoto, T("Снимок через 3 с", "Shot in 3 s"), 490, -102, 150, GUWOW_TimerShot)
+Check(pagePhoto, "autoShot", T("Снимок сам при достижении и новом уровне", "A shot by itself on an achievement or a new level"), 330, -244)
+Header(pagePhoto, T("Камера в фоторежиме", "The camera in photo mode"), 16, -400)
+Slider(pagePhoto, "camShift", T("Герой в кадре: левее или правее", "The hero in the frame: left or right"), 22, -436, nil, nil, nil,
+	T("50 — герой по центру. Сдвиг оставляет место пейзажу", "50 keeps the hero in the centre. A shift leaves room for the land"), CamApply)
+Slider(pagePhoto, "camTilt", T("Наклон камеры: больше неба", "Camera tilt: more sky"), 336, -436, nil, nil, nil,
+	T("Герой опускается в кадре, над ним больше неба. 0 — как в игре", "The hero goes lower in the frame, more sky above. 0 is the game's own"), CamApply)
+Slider(pagePhoto, "camSpeed", T("Скорость камеры с клавиш", "Camera speed from the keys"), 22, -478, nil, nil, nil, nil, CamApply)
+Slider(pagePhoto, "orbitSpeed", T("Скорость облёта", "Orbit speed"), 336, -478, nil, nil, nil, nil, CamApply)
+Check(pagePhoto, "camFar", T("Камера дальше обычного", "The camera farther than usual"), 16, -512, CamApply)
+Check(pagePhoto, "orbitLeft", T("Облёт влево", "Orbit to the left"), 330, -512, CamApply)
+do
+local camNote = pagePhoto:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+camNote:SetPoint("TOPLEFT", 16, -540)
+camNote:SetWidth(700)
+camNote:SetJustifyH("LEFT")
+camNote:SetText(T("В фоторежиме: W и S — камера выше и ниже, A и D — вокруг героя, Q и E — ближе и дальше, колесо мыши тоже. Стрелки влево и вправо двигают героя в кадре, вверх и вниз — наклон, внизу экрана видно значение. Shift+1, 2, 3 — запомнить ракурс, 1, 2, 3 — вернуть. G — сетка третей, на снимок не попадает.",
+	"In photo mode: W and S move the camera up and down, A and D around the hero, Q and E closer and farther, the wheel too. The left and right arrows move the hero in the frame, up and down tilt, the value shows at the bottom. Shift+1, 2, 3 save a view, 1, 2, 3 bring it back. G is the thirds grid, never on the shot."))
+end
+photoPanelsNote:SetPoint("TOPLEFT", 16, -572)
 photoPanelsNote:SetWidth(590)
 photoPanelsNote:SetJustifyH("LEFT")
 photoPanelsNote:SetText(T("Какие панели видны в обоих фоторежимах и насколько прозрачными, задаётся на странице «Панели».",
@@ -2666,7 +2996,16 @@ events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 events:RegisterEvent("UI_SCALE_CHANGED")
 events:RegisterEvent("DISPLAY_SIZE_CHANGED")
+events:RegisterEvent("ACHIEVEMENT_EARNED")
+events:RegisterEvent("PLAYER_LEVEL_UP")
 events:SetScript("OnEvent", function(self, event, arg1)
+	-- The auto shot (2.0.5): a plain screenshot, a second later, so the achievement banner is on it.
+	if event == "ACHIEVEMENT_EARNED" or event == "PLAYER_LEVEL_UP" then
+		if DB and DB.autoShot then
+			After(1, Screenshot)
+		end
+		return
+	end
 	if event == "ADDON_LOADED" then
 		if arg1 ~= "LegionGU" then
 			return

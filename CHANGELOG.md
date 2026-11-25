@@ -1,5 +1,41 @@
 # Graphic Update.. Wow! (в разработке GU-WOW): история версий / Version history
 
+## 2.0.5-beta-lite «Фотограф» / "Photographer"
+
+### Русский
+
+**Новое**
+- Камера в фоторежиме. W и S поднимают и опускают её, A и D ведут вокруг героя, Q и E приближают. Свои клавиши движения делают то же, герой стоит на месте.
+- Герой в кадре. Стрелки влево и вправо сдвигают героя, вверх и вниз наклоняют камеру, значение видно внизу экрана. Те же значения есть ползунками на странице «Фоторежим».
+- Три ракурса. Shift+1, 2, 3 запоминают ракурс вместе с местом героя в кадре, 1, 2, 3 плавно возвращают.
+- Сетка третей на клавише G, на снимок не попадает.
+- Снимок через 3 секунды и снимок сам при достижении или новом уровне.
+- Облёт камеры: скорость и направление.
+- Густота дождя и снега на странице «Системные настройки игры».
+- Выключатель круга под выбранной целью там же.
+
+**Исправлено**
+- Огонь ночью не пересвечивается в белое пятно: пламя больше не осветляется, ореол идёт вокруг него.
+- Ножи, латы и другие блики рядом с героем больше не светятся как огни.
+- Ползунок «Панели заклинаний» прячет и панели Bartender4.
+
+### English
+
+**New**
+- The photo mode camera. W and S raise and lower it, A and D move it around the hero, Q and E zoom. Your own movement keys do the same; the hero stands still.
+- The hero in the frame. The left and right arrows shift the hero, up and down tilt the camera; the value shows at the bottom. The same values are sliders on the Photo mode page.
+- Three views. Shift+1, 2, 3 save a view with the hero's place in the frame, 1, 2, 3 bring it back smoothly.
+- A thirds grid on G, never on the shot.
+- A shot in 3 seconds and a shot by itself on an achievement or a new level.
+- The camera orbit: speed and direction.
+- Rain and snow density on the Game system settings page.
+- A switch for the circle under the selected target there too.
+
+**Fixed**
+- Fire at night no longer blows into a white patch: the flame is not brightened, the halo goes around it.
+- Knives, armour and other glints near the hero no longer glow like lights.
+- The «Action bars» dial hides the Bartender4 bars too.
+
 ## 2.0.4-lite «Живой воздух» / "Living Air"
 
 ### Русский

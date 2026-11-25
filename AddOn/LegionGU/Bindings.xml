@@ -8,6 +8,9 @@
 	<Binding name="GUWOW_GAME">
 		GUWOW_ToggleGame()
 	</Binding>
+	<Binding name="GUWOW_TIMER">
+		GUWOW_TimerShot()
+	</Binding>
 	<Binding name="GUWOW_TOGGLE">
 		GUWOW_ToggleMod()
 	</Binding>
