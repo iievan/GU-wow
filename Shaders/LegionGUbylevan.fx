@@ -215,8 +215,14 @@
 #define LEGIONGU_CTL_MOTION_BLUR 41 // the smear along a camera turn, 0 off (1.7.3)
 #define LEGIONGU_CTL_PLAY_BLUR 42 // the far land softly blurred in normal play, 0 off (1.7.3)
 #define LEGIONGU_CTL_GI 43       // the light bounced off nearby surfaces, 0 off (15.11.2026)
+#define LEGIONGU_CTL_MOON_TINT 44 // the moonlight tint, 50 the look of 27.11 (27.11.2026)
+#define LEGIONGU_CTL_STARS 45    // the stars and the moon against the darkened sky, 0 as the night curve leaves them
+#define LEGIONGU_CTL_MOON_HALO 46 // the glow round the moon in the haze, 0 off
+#define LEGIONGU_CTL_NIGHT_MIST 47 // the moonlit mist, 50 the old fixed half
+#define LEGIONGU_CTL_FLICKER 48  // the firelight flickers, 0 steady
+#define LEGIONGU_CTL_NIGHT_EYE 49 // night vision: soft dark corners and grain in the dark, 0 off
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 91    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 103   // black, white, the signature, two cells per setting, two for the checksum
 #if __RENDERER__ < 0xa000
 // Direct3D 9 (1.12, 3.3.5): the addons lay a cell out as 3 interface units, and the screen is 768 units high
 // whatever its pixels, so a cell is BUFFER_HEIGHT / 256 pixels. The addons cannot know the pixels of a maximized
@@ -232,7 +238,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 44; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 50; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -3195,7 +3201,7 @@ namespace LegionGU
 	static const float BRIDGE_GAP = 0.3;    // smallest step between black and white in each channel
 	static const float BRIDGE_HOLD = 2.0;   // seconds the last values stay after the strip is gone
 
-	texture2D BridgePrevTex { Width = 44; Height = 1; Format = RGBA32F; };
+	texture2D BridgePrevTex { Width = 50; Height = 1; Format = RGBA32F; };
 	sampler2D BridgePrev { Texture = BridgePrevTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 	float3 BridgeCell(int i)
@@ -3248,7 +3254,7 @@ namespace LegionGU
 			bool live = seen || (prev0.x > 0.5 && since <= BRIDGE_HOLD);
 			return float4(live ? 1.0 : 0.0, since, seen ? 1.0 : 0.0, 1.0);
 		}
-		if (seen && texel <= 43)
+		if (seen && texel <= 49)
 			return float4(BridgeValue(1 + 2 * texel, th) / 63.0, 0.0, 0.0, 1.0);
 		return tex2Dfetch(BridgePrev, int2(texel, 0));
 	}

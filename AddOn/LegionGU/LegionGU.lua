@@ -1,5 +1,5 @@
 -- GU-WOW by levan: the in-game panel for the GU-WOW ReShade effects. © 2026 levan, the author's licence (LICENSE-GUWOW.txt).
--- The settings travel to the shader as a strip of 91 cells, 4 by 4 pixels, in the top left corner of the screen.
+-- The settings travel to the shader as a strip of 103 cells, 4 by 4 pixels, in the top left corner of the screen.
 -- The effect LegionGUBridge (LegionGUbylevan.fx) reads the strip after the interface is drawn and covers it
 -- again, so it is not seen. Each colour channel is black or white, one bit. Cell 0 is black, cell 1 white, cell 2
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
@@ -7,7 +7,7 @@
 
 local VERSION = "2.0.5-beta"
 local CELL = 4
-local CELLS = 91
+local CELLS = 103
 
 -- Russian on a Russian client, English elsewhere.
 local RU = GetLocale() == "ruRU"
@@ -54,6 +54,8 @@ local DEFAULTS = {
 	camShift = 50, camTilt = 0, camFar = true, camSpeed = 50, orbitSpeed = 15, orbitLeft = false,
 	-- 2.0.5: a screenshot by itself when an achievement or a new level comes.
 	autoShot = false,
+	-- 27.11.2026: the night's own dials, 50 for the moon tint and the mist is the look before them.
+	moonTint = 50, nightStars = 30, moonHalo = 30, nightMist = 50, fireFlicker = 30, nightEye = 20,
 }
 -- 1.7.3: how much of each panel shows, 100 whole, 0 gone: ui_ in plain play, photo_ in photo mode, game_ in the
 -- play photo mode (1.7.6), where only the chat stays by default.
@@ -475,7 +477,9 @@ local function Paint()
 		Code(V("raysOpen") or 45), Code(V("raysReach") or 50), Code(V("sunGlow") or 50), Code(V("softGlow") or 0),
 		chatL, chatT, chatR, chatB,
 		Code(V("lightThreshold") or 50), Code(V("lightRadius") or 50), Code(V("motionBlur") or 0),
-		Code(V("playBlur") or 0), Code(Effective("gi")) }
+		Code(V("playBlur") or 0), Code(Effective("gi")),
+		Code(V("moonTint") or 50), Code(V("nightStars") or 0), Code(V("moonHalo") or 0), Code(V("nightMist") or 50),
+		Code(V("fireFlicker") or 0), Code(V("nightEye") or 0) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
 		sum = sum + v
@@ -1950,6 +1954,20 @@ Slider(panelNight, "lightThreshold", T("Что считать огнём (50 —
 	T("Больше — светятся только настоящие фонари и костры. Меньше — светятся и тусклые предметы. Если ночью светится то, что не должно, прибавьте", "Higher: only real lamps and fires glow. Lower: dim things glow too. If wrong things glow at night, raise it"))
 Slider(panelNight, "lightRadius", T("Радиус свечения (50 — как было)", "Glow radius (50 — as before)"), R + 6, -274, nil, nil, 86,
 	T("Как далеко вокруг огня разливается свет. Меньше — аккуратный ореол, больше — широкое зарево", "How far the light spreads round a flame. Lower is a tight halo, higher a wide glow"))
+-- 27.11.2026: the moon, the sky and the eye at night.
+Header(panelNight, T("Луна и небо", "Moon and sky"), L, -330)
+Slider(panelNight, "moonTint", T("Лунный оттенок (50 — как было)", "Moon tint (50 — as before)"), L + 6, -370, nil, nil, nil,
+	T("Насколько ночь холодная и лунная. 0 — цвета как днём, только темнее", "How cool and moonlit the night is. 0 keeps the day colours, only darker"))
+Slider(panelNight, "nightStars", T("Звёзды и луна", "Stars and moon"), R + 6, -370, nil, nil, nil,
+	T("Небо тёмное, а звёзды и луна светят ярче. 0 — как в затемнённой ночи", "The sky stays dark, the stars and the moon shine brighter. 0 as the darkened night leaves them"))
+Slider(panelNight, "moonHalo", T("Ореол луны", "Moon halo"), L + 6, -412, nil, nil, nil,
+	T("Мягкое светлое кольцо вокруг луны, сильнее в тумане. 0 — нет", "A soft glow round the moon, stronger in fog. 0 off"))
+Slider(panelNight, "nightMist", T("Лунная дымка (50 — как было)", "Moonlit mist (50 — as before)"), R + 6, -412, nil, nil, nil,
+	T("Серебристая дымка в ночном тумане. 0 — нет, 100 — густая", "The silver veil in the night fog. 0 none, 100 thick"))
+Slider(panelNight, "fireFlicker", T("Живое пламя", "Living flame"), L + 6, -454, nil, nil, nil,
+	T("Свет костров и факелов слегка дрожит. 0 — ровный свет", "The light of fires and torches flickers. 0 steady"))
+Slider(panelNight, "nightEye", T("Ночное зрение", "Night vision"), R + 6, -454, nil, nil, nil,
+	T("В темноте края кадра мягче и темнее, в самых тёмных местах мелкое зерно. 0 — нет", "In the dark the frame edges are softer and darker, with fine grain in the deepest dark. 0 off"))
 
 Header(panelPic, T("Картинка", "Picture"), L, -60)
 Check(panelPic, "eye", T("Привыкание глаз", "Eye adaptation"), L, -76)

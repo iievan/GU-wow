@@ -185,8 +185,14 @@
 #define LEGIONGU_CTL_MOTION_BLUR 41 // the smear along a camera turn, 0 off (1.7.3)
 #define LEGIONGU_CTL_PLAY_BLUR 42 // the far land softly blurred in normal play, 0 off (1.7.3)
 #define LEGIONGU_CTL_GI 43       // the light bounced off nearby surfaces, 0 off (15.11.2026)
+#define LEGIONGU_CTL_MOON_TINT 44 // the moonlight tint, 50 the look of 27.11 (27.11.2026)
+#define LEGIONGU_CTL_STARS 45    // the stars and the moon against the darkened sky, 0 as the night curve leaves them
+#define LEGIONGU_CTL_MOON_HALO 46 // the glow round the moon in the haze, 0 off
+#define LEGIONGU_CTL_NIGHT_MIST 47 // the moonlit mist, 50 the old fixed half
+#define LEGIONGU_CTL_FLICKER 48  // the firelight flickers, 0 steady
+#define LEGIONGU_CTL_NIGHT_EYE 49 // night vision: soft dark corners and grain in the dark, 0 off
 #define LEGIONGU_CTL_CELL 4      // pixels per cell side
-#define LEGIONGU_CTL_CELLS 91    // black, white, the signature, two cells per setting, two for the checksum
+#define LEGIONGU_CTL_CELLS 103   // black, white, the signature, two cells per setting, two for the checksum
 #if __RENDERER__ < 0xa000
 #define LEGIONGU_CTL_PITCH (float(BUFFER_HEIGHT) / 256.0) // pixels per cell on Direct3D 9, see LegionGUbylevan.fx
 #endif
@@ -198,7 +204,7 @@
 #define LEGIONGU_NEED_PANEL 1
 #endif
 
-texture2D LegionGUCtlTex { Width = 44; Height = 1; Format = RGBA32F; };
+texture2D LegionGUCtlTex { Width = 50; Height = 1; Format = RGBA32F; };
 sampler2D LegionGUCtl { Texture = LegionGUCtlTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 
 // The camera's motion this frame, shared between the effect files like the strip: xy = how far the picture
@@ -489,6 +495,50 @@ namespace LegionGUNights
 		ui_label = "Радиус свечения";
 		ui_tooltip = "50 как было. Меньше: аккуратный ореол у самого огня. Больше: широкое зарево вокруг.";
 	> = 50.0;
+
+	// The night's own dials (27.11.2026), see NightApply.
+	uniform float MoonTint <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Ночь";
+		ui_label = "Лунный оттенок";
+		ui_tooltip = "Насколько ночь холодная и лунная: 0 цвета как днём, только темнее, 100 глубокая лунная ночь.";
+	> = 50.0;
+
+	uniform float NightStars <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Ночь";
+		ui_label = "Звёзды и луна";
+		ui_tooltip = "Небо остаётся тёмным, а звёзды и луна светят ярче: 0 как в затемнённой ночи.";
+	> = 30.0;
+
+	uniform float MoonHalo <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Ночь";
+		ui_label = "Ореол луны";
+		ui_tooltip = "Мягкое светлое кольцо вокруг луны, сильнее в тумане: 0 выключено.";
+	> = 30.0;
+
+	uniform float NightMist <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Ночь";
+		ui_label = "Лунная дымка";
+		ui_tooltip = "Серебристая дымка в ночном тумане: 0 нет, 50 как было, 100 густая.";
+	> = 50.0;
+
+	uniform float FireFlicker <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Ночь";
+		ui_label = "Живое пламя";
+		ui_tooltip = "Свет костров и факелов слегка дрожит, как от настоящего огня: 0 ровный свет.";
+	> = 30.0;
+
+	uniform float NightEye <
+		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
+		ui_category = "Ночь";
+		ui_label = "Ночное зрение";
+		ui_tooltip = "В темноте края кадра чуть размыты и темнее, в самых тёмных местах мелкое зерно: 0 выключено.\n"
+		             "Освещённые места и интерфейс не трогает.";
+	> = 20.0;
 
 	uniform float Sharpness <
 		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
@@ -1276,6 +1326,21 @@ namespace LegionGUNights
 	static const float3 MOON_TINT = float3(0.84, 0.98, 1.28);   // linear, luminance about 1
 	static const float3 ROD_W = float3(0.06, 0.56, 0.38);       // rod response on linear sRGB
 	static const float3 LUMA709 = float3(0.2126, 0.7152, 0.0722);
+	// The night's own dials (27.11.2026). «Звёзды и луна»: sky pixels lit as points (NightLitSky) go back toward
+	// their own colour and STAR_GAIN past it. «Ореол луны»: a glow of MOON_HALO_COLOUR round the moon (night texel
+	// 8), MOON_HALO_R screen heights wide, MOON_HALO_FOG times more at fog dial 1. «Живое пламя»: the pools and the
+	// glow in the air swing by up to FLICKER_AMP, the phase from the light's distance, so fires flicker apart.
+	// «Ночное зрение»: past EYE_EDGE of the way to the corner the dark blurs over EYE_BLUR_PX pixels and loses
+	// EYE_DIM, and the darkest land takes grain of EYE_GRAIN.
+	static const float STAR_GAIN = 0.8;
+	static const float3 MOON_HALO_COLOUR = float3(0.07, 0.085, 0.11);
+	static const float MOON_HALO_R = 0.12;
+	static const float MOON_HALO_FOG = 1.5;
+	static const float FLICKER_AMP = 0.35;
+	static const float EYE_EDGE = 0.35;
+	static const float EYE_BLUR_PX = 3.0;
+	static const float EYE_DIM = 0.25;
+	static const float EYE_GRAIN = 0.03;
 	// The night fog: the fog colour goes NIGHT_FOG_GREY of the way toward the moonlit grey of its own luminance and
 	// takes NIGHT_FOG_DARK of the sky's darkening, so the distance dissolves into a dull grey-blue that stays lighter
 	// than the dark trees in it, and tree lines pale one behind the other. The haze at the camera takes the colour
@@ -2599,6 +2664,23 @@ namespace LegionGUNights
 
 	// The colour d a share k of the way toward moonlight (see MOON_SHIFT), mixed in linear light. The rods see red
 	// darker, so a red goes darker; nothing gets brighter than it was (a blue would by the rods alone).
+	// «Лунный оттенок»: 50 gives MOON_SHIFT, 0 none, 100 twice as much.
+	float MoonShare()
+	{
+		return MOON_SHIFT * LegionGUValue(LEGIONGU_CTL_MOON_TINT, MoonTint) * 0.02;
+	}
+
+	// «Живое пламя»: the light at yards z swings around 1, two waves out of step, its own phase by its distance.
+	float Flicker(float z)
+	{
+		float k = LegionGUValue(LEGIONGU_CTL_FLICKER, FireFlicker) * 0.01;
+		if (k <= 0.0)
+			return 1.0;
+		float ts = GUTimer * 0.001;
+		float ph = z * 2.1;
+		return 1.0 + FLICKER_AMP * k * (0.6 * sin(ts * 7.3 + ph) + 0.4 * sin(ts * 13.1 + ph * 1.7));
+	}
+
 	float3 Moonlit(float3 d, float k)
 	{
 		float3 l = pow(max(d, 0.0), 2.2);
@@ -2615,13 +2697,13 @@ namespace LegionGUNights
 		// holding and then dropping.
 		float o = min(v, max(v * exp2(log2(max(ms, 1e-4)) * (1.0 - h)), v * toe / (v + toe)));
 		float3 d = c * (o / max(v, 1e-6));
-		return sky ? d : Moonlit(d, MOON_SHIFT * s * (1.0 - h));
+		return sky ? d : Moonlit(d, MoonShare() * s * (1.0 - h));
 	}
 
 	// The night fog colour (see NIGHT_FOG_GREY).
 	float3 NightFog(float3 fogColour, float m, float s)
 	{
-		return Moonlit(fogColour, NIGHT_FOG_GREY * s) * lerp(1.0, m, NIGHT_SKY_SHARE * NIGHT_FOG_DARK);
+		return Moonlit(fogColour, NIGHT_FOG_GREY * s * MoonShare() / MOON_SHIFT) * lerp(1.0, m, NIGHT_SKY_SHARE * NIGHT_FOG_DARK);
 	}
 
 	// The night and the lights on the input colour c at uv (fog dial t), with the fog:
@@ -2650,6 +2732,19 @@ namespace LegionGUNights
 		if (chat.z > chat.x && uv.x >= chat.x && uv.x <= chat.z && uv.y >= chat.y && uv.y <= chat.w)
 			keepUI = min(keepUI, 1.0 - smoothstep(2.0 * UI_KEEP_FROM, 2.0 * UI_KEEP_FULL, v / ambient) * smoothstep(0.5, 0.75, v));
 		float s = nt.y * keepUI;
+		// «Ночное зрение»: toward the corners the dark softens a little (EYE_BLUR_PX), before the night curve.
+		float eyeK = LegionGUValue(LEGIONGU_CTL_NIGHT_EYE, NightEye) * 0.01 * saturate(3.0 * s);
+		float2 ec = (uv - 0.5) * float2(ASPECT, 1.0);
+		float eyeEdge = eyeK * smoothstep(EYE_EDGE, 1.0, length(ec) / length(float2(0.5 * ASPECT, 0.5)));
+		float eyeDark = 1.0 - smoothstep(0.0, 3.0 * ambient, v);
+		if (eyeEdge * eyeDark > 0.0)
+		{
+			float2 ep = EYE_BLUR_PX * eyeEdge * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
+			float3 eb = 0.25 * (tex2Dlod(ColorLinear, float4(uv + float2(ep.x, ep.y), 0.0, 0.0)).rgb + tex2Dlod(ColorLinear, float4(uv + float2(-ep.x, ep.y), 0.0, 0.0)).rgb
+			                 + tex2Dlod(ColorLinear, float4(uv + float2(ep.x, -ep.y), 0.0, 0.0)).rgb + tex2Dlod(ColorLinear, float4(uv - ep, 0.0, 0.0)).rgb);
+			c = lerp(c, eb, eyeDark * keepUI);
+			v = max(max(c.r, c.g), c.b);
+		}
 		float m = lerp(1.0, nt.w, keepUI);
 		float u = DepthU(RawDepth(uv), EffectiveReversed(depthState.w));
 		bool sky = IsSky(u);
@@ -2673,6 +2768,7 @@ namespace LegionGUNights
 		// darkening that and tinting it blue made a fire give cold light and leave the model dark.
 		float pool = 0.0;
 		float3 poolHue = float3(1.0, 1.0, 1.0);
+		float poolFl = 1.0;
 		if (nt.z > 0.0 && !sky)
 		{
 			float4 Lp = tex2Dlod(LitS, float4(uv, 0.0, 0.0));
@@ -2682,6 +2778,7 @@ namespace LegionGUNights
 				float dzp = (z - Lp.a / lp) / POOL_YD;
 				pool = smoothstep(POOL_FROM, POOL_FULL, lp) * exp2(-dzp * dzp) * keepUI;
 				poolHue = Lp.rgb / lp;
+				poolFl = Flicker(Lp.a / lp);
 			}
 		}
 		float mp = lerp(m, 1.0, POOL_KEEP * pool);
@@ -2692,13 +2789,19 @@ namespace LegionGUNights
 		float farSky = sky ? 0.0 : smoothstep(NIGHT_FAR_FROM, NIGHT_FAR_SKY, z);
 		if (farSky > 0.0)
 			o = lerp(o, NightCurve(c, v, NightLitSky(v, skyLum), mp, true, 0.0, n7.w * outside), farSky);
+		// «Звёзды и луна»: the points of light in the sky go back to their own colour and past it, the sky between stays dark.
+		if (sky)
+		{
+			float ks = LegionGUValue(LEGIONGU_CTL_STARS, NightStars) * 0.01 * saturate(3.0 * s);
+			o = lerp(o, min(c * (1.0 + STAR_GAIN * ks), 1.0), h * ks);
+		}
 		// A pool takes the colour of its light, softly (POOL_TINT): the game's moonlit night is blue, and the firelight
 		// on the ground and on the character read cold next to a campfire.
 		// Only as much as the night (or a dark cave) darkens here: in a lit tavern the game's own torches and candles need
 		// nothing, and the tint of a room full of lights drowned it in red.
 		// The pool follows «Свет огней»: its lift was a constant, and the firelight on the ground and on the
 		// character stayed dim at night whatever the slider said.
-		float poolFx = pool * saturate(s * 3.0) * (0.4 + 1.2 * LegionGUValue(LEGIONGU_CTL_GLOW, LightGlow) * 0.01);
+		float poolFx = pool * saturate(s * 3.0) * (0.4 + 1.2 * LegionGUValue(LEGIONGU_CTL_GLOW, LightGlow) * 0.01) * poolFl;
 		if (poolFx > 0.0)
 		{
 			// Fire reads orange: a warm light (red over blue) leans its tint toward FIRE_COLOUR, since the flame itself is
@@ -2724,6 +2827,9 @@ namespace LegionGUNights
 			o += c * lit * (LIFT_MAX / (LIFT_MAX + dot(lit, LUMA601)));
 			float zl = A.a / max(dot(A.rgb, LUMA601), 1e-8);
 			air = A.rgb * (keepUI * (sky ? 1.0 : smoothstep(zl - max(GLOW_OCC_K * zl, GLOW_OCC_NEAR), zl, z)));
+			float fl = Flicker(zl);
+			o += c * lit * (LIFT_MAX / (LIFT_MAX + dot(lit, LUMA601))) * (fl - 1.0);
+			air *= fl;
 			}
 		}
 
@@ -2737,8 +2843,18 @@ namespace LegionGUNights
 			o = FogBlend(o, a, fogColour, key, SunInFog(uv));
 		}
 
+		// «Ореол луны» (see MOON_HALO_COLOUR): over the sky and the far land, not on what stands near.
+		float kh = LegionGUValue(LEGIONGU_CTL_MOON_HALO, MoonHalo) * 0.01 * saturate(2.0 * n7.z) * keepUI * outside;
+		if (kh > 0.0)
+		{
+			float4 nm = tex2Dfetch(FogCur, int2(8, 0));
+			float2 dh = (uv - nm.xy) * float2(ASPECT, 1.0);
+			float halo = nm.z * exp(-dot(dh, dh) / (2.0 * MOON_HALO_R * MOON_HALO_R)) * (1.0 + MOON_HALO_FOG * FogDial());
+			o += MOON_HALO_COLOUR * (kh * halo * (sky ? 1.0 : smoothstep(30.0, NIGHT_FAR_FROM, z)));
+		}
+
 		// the moonlit mist over LegionGUFog's fog (see MIST_COLOUR)
-		float km = MIST_NIGHT_SHARE * saturate(2.0 * n7.z) * keepUI * outside * (1.0 - GAME_FOG_GIVE * tex2Dfetch(FogCur, int2(9, 0)).y);
+		float km = MIST_NIGHT_SHARE * LegionGUValue(LEGIONGU_CTL_NIGHT_MIST, NightMist) * 0.02 * saturate(2.0 * n7.z) * keepUI * outside * (1.0 - GAME_FOG_GIVE * tex2Dfetch(FogCur, int2(9, 0)).y);
 		if (km > 0.0)
 		{
 			float tf = FogDial();
@@ -2796,6 +2912,16 @@ namespace LegionGUNights
 		{
 			float rolled = FLAME_KNEE + (1.0 - FLAME_KNEE) * (1.0 - exp(-(pk - FLAME_KNEE) / (1.0 - FLAME_KNEE)));
 			res *= lerp(1.0, rolled / pk, nearL);
+		}
+		// «Ночное зрение»: the dark corners lose a little light, the darkest land takes a fine grain.
+		if (eyeK > 0.0)
+		{
+			float rv = max(max(res.r, res.g), res.b);
+			float dk = (1.0 - smoothstep(0.0, 3.0 * ambient, rv)) * keepUI;
+			res *= 1.0 - EYE_DIM * eyeEdge * dk;
+			float2 gp = uv * float2(BUFFER_WIDTH, BUFFER_HEIGHT) + float(LegionGUFrame % 64u) * float2(17.0, 31.0);
+			float g = frac(sin(dot(gp, float2(12.9898, 78.233))) * 43758.5453) - 0.5;
+			res = max(res + g * EYE_GRAIN * eyeK * dk, 0.0);
 		}
 		return res;
 	}
@@ -4027,6 +4153,7 @@ namespace LegionGUNights
 	{
 		float4 c4 = tex2Dfetch(ColorPoint, int2(pos.xy));
 		float k = LegionGUValue(LEGIONGU_CTL_MOTION_BLUR, MotionBlur) * 0.01;
+		k *= k;  // on the square like the lens blur (27.11): the low end was already a heavy smear
 		if (k <= 0.0 || !LegionGUOn(1u) || LegionGUInStrip(pos.xy) || LegionGUCheckView() || LegionGUState(8u))
 			return c4;
 		float4 depthState = tex2Dfetch(FogCur, int2(1, 0));
@@ -4099,8 +4226,9 @@ namespace LegionGUNights
 
 	static const float DOF_MAX_PX = 12.0;      // largest blur radius in half-resolution pixels at «Размытие» 100
 	static const float BOKEH_GAIN = 8.0;       // bright taps weigh up to this much more with bokeh on: lights open into discs
-	static const float DOF_SPAN = 1.2;         // this share of the focus distance behind the focus is fully blurred
-	static const float DOF_NEAR = 3.0;         // in front of the focus the blur grows this much faster
+	static const float DOF_SPAN = 3.0;         // this share of the focus distance behind the focus is fully blurred (1.2 to 27.11: all past twice the focus was a smear)
+	static const float DOF_NEAR = 1.5;         // in front of the focus the blur grows this much faster (3.0 to 27.11)
+	static const float DOF_SWAP_PX = 1.5;      // the half-resolution blur fades in up to this radius in half-resolution pixels
 	static const float DOF_FOCUS_TIME = 0.3;   // seconds for the focus to follow the character
 
 	texture2D DofTex { Width = BUFFER_WIDTH / 2; Height = BUFFER_HEIGHT / 2; Format = RGBA16F; };
@@ -4169,10 +4297,10 @@ namespace LegionGUNights
 	// The largest blur radius in half-resolution pixels: the photo mode's own dial, or the normal play one.
 	float DofMaxPx()
 	{
-		float share = PLAY_MAX * PlayBlurOn();
-		if (PhotoOn())
-			share = LegionGUValue(LEGIONGU_CTL_PHOTO_BLUR, PhotoBlur) * 0.01;
-		return DOF_MAX_PX * share;
+		// The dials work on the square (27.11): linear, the first steps already blurred hard and only 1 of 100 was of
+		// use; squared, 30 gives a tenth of the radius and the top keeps the old strength.
+		float k = PhotoOn() ? LegionGUValue(LEGIONGU_CTL_PHOTO_BLUR, PhotoBlur) * 0.01 : PlayBlurOn();
+		return DOF_MAX_PX * k * k * (PhotoOn() ? 1.0 : PLAY_MAX);
 	}
 
 	// Half resolution: rgb = the colour, a = the blur radius 0..1 of DofMaxPx. With the dial at 0 there is no blur at
@@ -4242,7 +4370,7 @@ namespace LegionGUNights
 		if (!DofOn() || (!photoUI && LegionGUInStrip(pos.xy)))
 			return c;
 		float4 b = tex2Dlod(DofBlur, float4(uv, 0.0, 0.0));
-		float share = smoothstep(0.05, 0.3, b.a);
+		float share = smoothstep(0.05, 0.3, b.a) * saturate(b.a * DofMaxPx() / DOF_SWAP_PX);
 		if (photoUI)
 		{
 			float3 dc = abs(c.rgb - b.rgb);
@@ -4255,7 +4383,7 @@ namespace LegionGUNights
 			float z = DofYards(uv, tex2Dfetch(FogCur, int2(1, 0)));
 			float f = tex2Dfetch(DofFocusCur, int2(0, 0)).x;
 			float coc = saturate((z - f * PLAY_FROM) / (f * PLAY_SPAN));
-			return float4(lerp(c.rgb, b.rgb, smoothstep(0.05, 0.3, coc) * (1.0 - saturate(UIMaskBlur(uv) * 8.0))), c.a);
+			return float4(lerp(c.rgb, b.rgb, smoothstep(0.05, 0.3, coc) * saturate(coc * DofMaxPx() / DOF_SWAP_PX) * (1.0 - saturate(UIMaskBlur(uv) * 8.0))), c.a);
 		}
 		// The cinema frame (the addon's option): black bars to 2.39 : 1 on a narrower screen, with a soft inner
 		// edge of a few pixels instead of a hard cut (1.6.8).
