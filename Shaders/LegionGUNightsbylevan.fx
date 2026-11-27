@@ -1465,10 +1465,12 @@ namespace LegionGUNights
 	static const float MIST_NIGHT_SHARE = 0.5;   // the moonlit mist at half: at full it laid a milky veil over the night
 	static const float MIST_MOON_R = 0.35;
 	// The moon finder (see FogStatePS texel 8): the moon is at least MOON_CONTRAST times the sky's luminance, its
-	// peak between MOON_MIN.x and .y fades in, and it covers at most MOON_CELLS cells of 64 x 32.
+	// peak between MOON_MIN.x and .y fades in, and it covers MOON_CELLS.x to .y cells of 64 x 32 (a star is one cell,
+	// a glowing horizon is many). A cell counts with at least MOON_SKY_TAPS of its 16 taps on the sky.
 	static const float MOON_CONTRAST = 3.0;
 	static const float2 MOON_MIN = float2(0.12, 0.25);
-	static const float MOON_CELLS = 24.0;
+	static const float2 MOON_CELLS = float2(2.0, 96.0);
+	static const float MOON_SKY_TAPS = 8.0;
 	// The indoor share easing at a door (see FogCurTex texel 9): in fast, out slow, like eyes at a doorway.
 	static const float INSIDE_IN = 0.6;
 	static const float INSIDE_OUT = 2.2;
@@ -2003,13 +2005,15 @@ namespace LegionGUNights
 	// The moon finder: each cell keeps its brightest sky tap of 4 x 4 (a tap every 13 pixels across at 3440 wide, so
 	// the moon is always hit), xy = where, z = its luminance. The night grid alone was too coarse: the centroid of its
 	// sky taps landed on the glow of the horizon or on a fixed point above the player, and the halo and the moonlit
-	// mist stood there instead of on the moon (28.11).
+	// mist stood there instead of on the moon (28.11). The mean of the cell's sky taps, not the brightest one: one
+	// tap on a star made a «moon» of a single cell, and the halo jumped from star to star as the camera turned (28.11).
 	float4 MoonCellPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	{
 		float4 depthPrev = tex2Dfetch(FogPrev, int2(1, 0));
-		float4 best = float4(0.0, 0.0, 0.0, 0.0);
 		if (depthPrev.y < 0.5)
-			return best;
+			return float4(0.0, 0.0, 0.0, 0.0);
+		float3 sum = float3(0.0, 0.0, 0.0);
+		float k = 0.0;
 		[unroll]
 		for (int j = 0; j < 4; ++j)
 		{
@@ -2019,12 +2023,11 @@ namespace LegionGUNights
 				float2 g = (floor(pos.xy) * 4.0 + float2(i, j) + 0.5) / float2(256.0, 128.0);
 				if (!IsSky(DepthU(RawDepth(g), EffectiveReversed(depthPrev.w))) || LegionGUUIAt(g) > 0.5)
 					continue;
-				float l = dot(tex2Dlod(ColorPoint, float4(g, 0.0, 0.0)).rgb, LUMA601);
-				if (l > best.z)
-					best = float4(g, l, 1.0);
+				sum += float3(g, dot(tex2Dlod(ColorPoint, float4(g, 0.0, 0.0)).rgb, LUMA601));
+				k += 1.0;
 			}
 		}
-		return best;
+		return k >= MOON_SKY_TAPS ? float4(sum / k, 1.0) : float4(0.0, 0.0, 0.0, 0.0);
 	}
 
 	void NightGridPS(float4 pos : SV_Position, float2 uv : TEXCOORD0, out float4 a : SV_Target0, out float4 b : SV_Target1)
@@ -2103,7 +2106,7 @@ namespace LegionGUNights
 					}
 				}
 			}
-			float seen = n > 0.0 && n <= MOON_CELLS ? smoothstep(MOON_CONTRAST, 2.0 * MOON_CONTRAST, pk.z / max(skyL, 1e-3)) * smoothstep(MOON_MIN.x, MOON_MIN.y, pk.z) : 0.0;
+			float seen = n >= MOON_CELLS.x && n <= MOON_CELLS.y ? smoothstep(MOON_CONTRAST, 2.0 * MOON_CONTRAST, pk.z / max(skyL, 1e-3)) * smoothstep(MOON_MIN.x, MOON_MIN.y, pk.z) : 0.0;
 			float4 prev8 = tex2Dfetch(FogPrev, int2(8, 0));
 			float2 at = seen > 0.0 ? mw.xy / mw.z : prev8.xy + LegionGUMotionRawUV();
 			float z = prev8.w > 0.5 ? lerp(prev8.z, seen, Rate(dt, 0.3)) : seen;
