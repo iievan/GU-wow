@@ -1967,7 +1967,7 @@ Slider(panelNight, "nightMist", T("Лунная дымка (50 — как был
 Slider(panelNight, "fireFlicker", T("Живое пламя", "Living flame"), L + 6, -454, nil, nil, nil,
 	T("Свет костров и факелов слегка дрожит. 0 — ровный свет", "The light of fires and torches flickers. 0 steady"))
 Slider(panelNight, "nightEye", T("Ночное зрение", "Night vision"), R + 6, -454, nil, nil, nil,
-	T("В темноте края кадра мягче и темнее. 0 — нет", "In the dark the frame edges are softer and darker. 0 off"))
+	T("Ночью края кадра темнее и бесцветнее, как видит глаз в темноте. 0 — нет", "At night the frame edges are darker and paler, as the eye sees in the dark. 0 off"))
 
 Header(panelPic, T("Картинка", "Picture"), L, -60)
 Check(panelPic, "eye", T("Привыкание глаз", "Eye adaptation"), L, -76)

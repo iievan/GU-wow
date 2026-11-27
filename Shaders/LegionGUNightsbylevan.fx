@@ -536,8 +536,7 @@ namespace LegionGUNights
 		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
 		ui_category = "Ночь";
 		ui_label = "Ночное зрение";
-		ui_tooltip = "В темноте края кадра чуть размыты и темнее: 0 выключено.\n"
-		             "Освещённые места и интерфейс не трогает.";
+		ui_tooltip = "Ночью края кадра темнее и бесцветнее, как видит глаз в темноте: 0 выключено.";
 	> = 20.0;
 
 	uniform float Sharpness <
@@ -1323,6 +1322,7 @@ namespace LegionGUNights
 	// gamma space: green grass turned teal-grey and red cloth purple. Now reds darken and fade as at real night
 	// (Purkinje), greens and blues keep their hue, and greys take only a light cool cast.
 	static const float MOON_SHIFT = 0.45;
+	static const float MOON_FULL = 0.85;
 	static const float3 MOON_TINT = float3(0.84, 0.98, 1.28);   // linear, luminance about 1
 	static const float3 ROD_W = float3(0.06, 0.56, 0.38);       // rod response on linear sRGB
 	static const float3 LUMA709 = float3(0.2126, 0.7152, 0.0722);
@@ -1330,15 +1330,15 @@ namespace LegionGUNights
 	// their own colour and STAR_GAIN past it. «Ореол луны»: a glow of MOON_HALO_COLOUR round the moon (night texel
 	// 8), MOON_HALO_R screen heights wide, MOON_HALO_FOG times more at fog dial 1. «Живое пламя»: the pools and the
 	// glow in the air swing by up to FLICKER_AMP, the phase from the light's distance, so fires flicker apart.
-	// «Ночное зрение»: past EYE_EDGE of the way to the corner the dark blurs over EYE_BLUR_PX pixels and loses
-	// EYE_DIM.
-	static const float STAR_GAIN = 0.8;
-	static const float3 MOON_HALO_COLOUR = float3(0.07, 0.085, 0.11);
+	// «Ночное зрение»: past EYE_EDGE of the way to the corner the frame loses up to EYE_DIM of its light and EYE_GREY
+	// of its colour, as the eye sees at night outside the centre.
+	static const float STAR_GAIN = 2.0;
+	static const float3 MOON_HALO_COLOUR = float3(0.20, 0.24, 0.30);
 	static const float MOON_HALO_R = 0.12;
 	static const float MOON_HALO_FOG = 1.5;
 	static const float FLICKER_AMP = 0.35;
 	static const float EYE_EDGE = 0.35;
-	static const float EYE_BLUR_PX = 3.0;
+	static const float EYE_GREY = 0.6;
 	static const float EYE_DIM = 0.25;
 	// The night fog: the fog colour goes NIGHT_FOG_GREY of the way toward the moonlit grey of its own luminance and
 	// takes NIGHT_FOG_DARK of the sky's darkening, so the distance dissolves into a dull grey-blue that stays lighter
@@ -2663,10 +2663,19 @@ namespace LegionGUNights
 
 	// The colour d a share k of the way toward moonlight (see MOON_SHIFT), mixed in linear light. The rods see red
 	// darker, so a red goes darker; nothing gets brighter than it was (a blue would by the rods alone).
-	// «Лунный оттенок»: 50 gives MOON_SHIFT, 0 none, 100 twice as much.
-	float MoonShare()
+	// How much it is night here, 0..1, whatever «Темнота ночи» says: the darkening strength s over the slider. The
+	// night's own dials go by it (27.11): by s itself, at «Темнота ночи» 20 they showed a fifth of their strength.
+	float NightFull(float s)
 	{
-		return MOON_SHIFT * LegionGUValue(LEGIONGU_CTL_MOON_TINT, MoonTint) * 0.02;
+		return saturate(s / max(LegionGUValue(LEGIONGU_CTL_NIGHT, NightDarkness) * 0.01, 0.05));
+	}
+
+	// «Лунный оттенок» as the share toward moonlight at strength s: 0 none, 50 MOON_SHIFT times s (the look of 27.11),
+	// 100 MOON_FULL of the way wherever it is night.
+	float MoonK(float s)
+	{
+		float t = LegionGUValue(LEGIONGU_CTL_MOON_TINT, MoonTint) * 0.02;
+		return t <= 1.0 ? MOON_SHIFT * s * t : lerp(MOON_SHIFT * s, MOON_FULL * NightFull(s), t - 1.0);
 	}
 
 	// «Живое пламя»: the light at yards z swings around 1, two waves out of step, its own phase by its distance.
@@ -2698,13 +2707,13 @@ namespace LegionGUNights
 		// holding and then dropping.
 		float o = min(v, max(v * exp2(log2(max(ms, 1e-4)) * (1.0 - h)), v * toe / (v + toe)));
 		float3 d = c * (o / max(v, 1e-6));
-		return sky ? d : Moonlit(d, MoonShare() * s * (1.0 - h));
+		return sky ? d : Moonlit(d, MoonK(s) * (1.0 - h));
 	}
 
 	// The night fog colour (see NIGHT_FOG_GREY).
 	float3 NightFog(float3 fogColour, float m, float s)
 	{
-		return Moonlit(fogColour, NIGHT_FOG_GREY * s * MoonShare() / MOON_SHIFT) * lerp(1.0, m, NIGHT_SKY_SHARE * NIGHT_FOG_DARK);
+		return Moonlit(fogColour, NIGHT_FOG_GREY * MoonK(s) / MOON_SHIFT) * lerp(1.0, m, NIGHT_SKY_SHARE * NIGHT_FOG_DARK);
 	}
 
 	// The night and the lights on the input colour c at uv (fog dial t), with the fog:
@@ -2733,19 +2742,11 @@ namespace LegionGUNights
 		if (chat.z > chat.x && uv.x >= chat.x && uv.x <= chat.z && uv.y >= chat.y && uv.y <= chat.w)
 			keepUI = min(keepUI, 1.0 - smoothstep(2.0 * UI_KEEP_FROM, 2.0 * UI_KEEP_FULL, v / ambient) * smoothstep(0.5, 0.75, v));
 		float s = nt.y * keepUI;
-		// «Ночное зрение»: toward the corners the dark softens a little (EYE_BLUR_PX), before the night curve.
-		float eyeK = LegionGUValue(LEGIONGU_CTL_NIGHT_EYE, NightEye) * 0.01 * saturate(3.0 * s);
+		// «Ночное зрение» (see EYE_EDGE): by the place on screen only. The first version (27.11) blurred and dimmed by each
+		// pixel's own brightness, and every dark texture shimmered as a ripple over the night.
+		float eyeK = LegionGUValue(LEGIONGU_CTL_NIGHT_EYE, NightEye) * 0.01 * NightFull(s) * keepUI;
 		float2 ec = (uv - 0.5) * float2(ASPECT, 1.0);
 		float eyeEdge = eyeK * smoothstep(EYE_EDGE, 1.0, length(ec) / length(float2(0.5 * ASPECT, 0.5)));
-		float eyeDark = 1.0 - smoothstep(0.0, 3.0 * ambient, v);
-		if (eyeEdge * eyeDark > 0.0)
-		{
-			float2 ep = EYE_BLUR_PX * eyeEdge * float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT);
-			float3 eb = 0.25 * (tex2Dlod(ColorLinear, float4(uv + float2(ep.x, ep.y), 0.0, 0.0)).rgb + tex2Dlod(ColorLinear, float4(uv + float2(-ep.x, ep.y), 0.0, 0.0)).rgb
-			                 + tex2Dlod(ColorLinear, float4(uv + float2(ep.x, -ep.y), 0.0, 0.0)).rgb + tex2Dlod(ColorLinear, float4(uv - ep, 0.0, 0.0)).rgb);
-			c = lerp(c, eb, eyeDark * keepUI);
-			v = max(max(c.r, c.g), c.b);
-		}
 		float m = lerp(1.0, nt.w, keepUI);
 		float u = DepthU(RawDepth(uv), EffectiveReversed(depthState.w));
 		bool sky = IsSky(u);
@@ -2793,7 +2794,7 @@ namespace LegionGUNights
 		// «Звёзды и луна»: the points of light in the sky go back to their own colour and past it, the sky between stays dark.
 		if (sky)
 		{
-			float ks = LegionGUValue(LEGIONGU_CTL_STARS, NightStars) * 0.01 * saturate(3.0 * s);
+			float ks = LegionGUValue(LEGIONGU_CTL_STARS, NightStars) * 0.01 * NightFull(s);
 			o = lerp(o, min(c * (1.0 + STAR_GAIN * ks), 1.0), h * ks);
 		}
 		// A pool takes the colour of its light, softly (POOL_TINT): the game's moonlit night is blue, and the firelight
@@ -2845,13 +2846,13 @@ namespace LegionGUNights
 		}
 
 		// «Ореол луны» (see MOON_HALO_COLOUR): over the sky and the far land, not on what stands near.
-		float kh = LegionGUValue(LEGIONGU_CTL_MOON_HALO, MoonHalo) * 0.01 * saturate(2.0 * n7.z) * keepUI * outside;
+		float kh = LegionGUValue(LEGIONGU_CTL_MOON_HALO, MoonHalo) * 0.01 * NightFull(s) * keepUI * outside;
 		if (kh > 0.0)
 		{
 			float4 nm = tex2Dfetch(FogCur, int2(8, 0));
 			float2 dh = (uv - nm.xy) * float2(ASPECT, 1.0);
 			float halo = nm.z * exp(-dot(dh, dh) / (2.0 * MOON_HALO_R * MOON_HALO_R)) * (1.0 + MOON_HALO_FOG * FogDial());
-			o += MOON_HALO_COLOUR * (kh * halo * (sky ? 1.0 : smoothstep(30.0, NIGHT_FAR_FROM, z)));
+			o += MOON_HALO_COLOUR * (1.0 - saturate(o)) * (kh * halo * (sky ? 1.0 : smoothstep(30.0, NIGHT_FAR_FROM, z)));
 		}
 
 		// the moonlit mist over LegionGUFog's fog (see MIST_COLOUR)
@@ -2914,14 +2915,9 @@ namespace LegionGUNights
 			float rolled = FLAME_KNEE + (1.0 - FLAME_KNEE) * (1.0 - exp(-(pk - FLAME_KNEE) / (1.0 - FLAME_KNEE)));
 			res *= lerp(1.0, rolled / pk, nearL);
 		}
-		// «Ночное зрение»: the dark corners lose a little light. The grain over the dark (27.11) went out the same day:
-		// new every frame, it read as a ripple over the whole night.
-		if (eyeK > 0.0)
-		{
-			float rv = max(max(res.r, res.g), res.b);
-			float dk = (1.0 - smoothstep(0.0, 3.0 * ambient, rv)) * keepUI;
-			res *= 1.0 - EYE_DIM * eyeEdge * dk;
-		}
+		// «Ночное зрение»: the corners darker and paler.
+		if (eyeEdge > 0.0)
+			res = lerp(res, dot(res, LUMA601), EYE_GREY * eyeEdge) * (1.0 - EYE_DIM * eyeEdge);
 		return res;
 	}
 
