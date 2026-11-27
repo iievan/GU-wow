@@ -55,7 +55,7 @@ local DEFAULTS = {
 	-- 2.0.5: a screenshot by itself when an achievement or a new level comes.
 	autoShot = false,
 	-- 27.11.2026: the night's own dials, 50 for the moon tint and the mist is the look before them.
-	moonTint = 50, nightStars = 30, moonHalo = 30, nightMist = 50, fireFlicker = 30, nightEye = 20,
+	moonTint = 50, nightStars = 30, moonRays = 50, nightMist = 50, fireFlicker = 30, nightEye = 20,
 }
 -- 1.7.3: how much of each panel shows, 100 whole, 0 gone: ui_ in plain play, photo_ in photo mode, game_ in the
 -- play photo mode (1.7.6), where only the chat stays by default.
@@ -478,7 +478,7 @@ local function Paint()
 		chatL, chatT, chatR, chatB,
 		Code(V("lightThreshold") or 50), Code(V("lightRadius") or 50), Code(V("motionBlur") or 0),
 		Code(V("playBlur") or 0), Code(Effective("gi")),
-		Code(V("moonTint") or 50), Code(V("nightStars") or 0), Code(V("moonHalo") or 0), Code(V("nightMist") or 50),
+		Code(V("moonTint") or 50), Code(V("nightStars") or 0), Code(V("moonRays") or 50), Code(V("nightMist") or 50),
 		Code(V("fireFlicker") or 0), Code(V("nightEye") or 0) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
@@ -1935,6 +1935,9 @@ Slider(panelRays, "raysReach", T("Длина лучей (50 — как было)
 	T("Как далеко от солнца тянутся лучи. Меньше — короткие, больше — через весь экран", "How far the shafts reach from the sun. Lower is short, higher crosses the screen"))
 Slider(panelRays, "sunGlow", T("Свечение солнца в тумане (50 — как было)", "Sun glow in the fog (50 — as before)"), R + 6, -142, nil, nil, 76,
 	T("Светлое пятно вокруг солнца, когда оно в тумане", "The bright patch round the sun when it is in the fog"))
+-- 28.11.2026: the moon gives the same rays at night, with every dial above; this one is its strength.
+Slider(panelRays, "moonRays", T("Лучи луны (50 — как у солнца)", "Moon rays (50 — as the sun's)"), R + 6, -184, nil, nil, nil,
+	T("Ночью луна даёт такие же лучи, как солнце днём. 0 — без лучей, 100 — вдвое ярче солнечных", "At night the moon gives the same rays as the sun by day. 0 none, 100 twice the sun's"))
 
 Header(panelNight, T("Ночь", "Night"), L, -60)
 Check(panelNight, "night", T("Ночь и огни", "Night and lights"), L, -76)
@@ -1960,13 +1963,11 @@ Slider(panelNight, "moonTint", T("Лунный оттенок (50 — как б�
 	T("Насколько ночь холодная и лунная. 0 — цвета как днём, только темнее", "How cool and moonlit the night is. 0 keeps the day colours, only darker"))
 Slider(panelNight, "nightStars", T("Звёзды и луна", "Stars and moon"), R + 6, -370, nil, nil, nil,
 	T("Небо тёмное, а звёзды и луна светят ярче. 0 — как в затемнённой ночи", "The sky stays dark, the stars and the moon shine brighter. 0 as the darkened night leaves them"))
-Slider(panelNight, "moonHalo", T("Ореол луны", "Moon halo"), L + 6, -412, nil, nil, nil,
-	T("Мягкое светлое кольцо вокруг луны, сильнее в тумане. 0 — нет", "A soft glow round the moon, stronger in fog. 0 off"))
-Slider(panelNight, "nightMist", T("Лунная дымка (50 — как было)", "Moonlit mist (50 — as before)"), R + 6, -412, nil, nil, nil,
+Slider(panelNight, "nightMist", T("Лунная дымка (50 — как было)", "Moonlit mist (50 — as before)"), L + 6, -412, nil, nil, nil,
 	T("Серебристая дымка в ночном тумане. 0 — нет, 100 — густая", "The silver veil in the night fog. 0 none, 100 thick"))
-Slider(panelNight, "fireFlicker", T("Живое пламя", "Living flame"), L + 6, -454, nil, nil, nil,
+Slider(panelNight, "fireFlicker", T("Живое пламя", "Living flame"), R + 6, -412, nil, nil, nil,
 	T("Свет костров и факелов слегка дрожит. 0 — ровный свет", "The light of fires and torches flickers. 0 steady"))
-Slider(panelNight, "nightEye", T("Ночное зрение", "Night vision"), R + 6, -454, nil, nil, nil,
+Slider(panelNight, "nightEye", T("Ночное зрение", "Night vision"), L + 6, -454, nil, nil, nil,
 	T("Ночью края кадра темнее и бесцветнее, как видит глаз в темноте. 0 — нет", "At night the frame edges are darker and paler, as the eye sees in the dark. 0 off"))
 
 Header(panelPic, T("Картинка", "Picture"), L, -60)

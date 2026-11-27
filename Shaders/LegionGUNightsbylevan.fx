@@ -187,7 +187,7 @@
 #define LEGIONGU_CTL_GI 43       // the light bounced off nearby surfaces, 0 off (15.11.2026)
 #define LEGIONGU_CTL_MOON_TINT 44 // the moonlight tint, 50 the look of 27.11 (27.11.2026)
 #define LEGIONGU_CTL_STARS 45    // the stars and the moon against the darkened sky, 0 as the night curve leaves them
-#define LEGIONGU_CTL_MOON_HALO 46 // the glow round the moon in the haze, 0 off
+#define LEGIONGU_CTL_MOON_RAYS 46 // the moon's rays at night, read by LegionGURays (28.11.2026, was the moon halo)
 #define LEGIONGU_CTL_NIGHT_MIST 47 // the moonlit mist, 50 the old fixed half
 #define LEGIONGU_CTL_FLICKER 48  // the firelight flickers, 0 steady
 #define LEGIONGU_CTL_NIGHT_EYE 49 // night vision: soft dark corners and grain in the dark, 0 off
@@ -509,13 +509,6 @@ namespace LegionGUNights
 		ui_category = "Ночь";
 		ui_label = "Звёзды и луна";
 		ui_tooltip = "Небо остаётся тёмным, а звёзды и луна светят ярче: 0 как в затемнённой ночи.";
-	> = 30.0;
-
-	uniform float MoonHalo <
-		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
-		ui_category = "Ночь";
-		ui_label = "Ореол луны";
-		ui_tooltip = "Мягкое светлое кольцо вокруг луны, сильнее в тумане: 0 выключено.";
 	> = 30.0;
 
 	uniform float NightMist <
@@ -1327,15 +1320,12 @@ namespace LegionGUNights
 	static const float3 ROD_W = float3(0.06, 0.56, 0.38);       // rod response on linear sRGB
 	static const float3 LUMA709 = float3(0.2126, 0.7152, 0.0722);
 	// The night's own dials (27.11.2026). «Звёзды и луна»: sky pixels lit as points (NightLitSky) go back toward
-	// their own colour and STAR_GAIN past it. «Ореол луны»: a glow of MOON_HALO_COLOUR round the moon (night texel
-	// 8), MOON_HALO_R screen heights wide, MOON_HALO_FOG times more at fog dial 1. «Живое пламя»: the pools and the
+	// their own colour and STAR_GAIN past it. «Живое пламя»: the pools and the
 	// glow in the air swing by up to FLICKER_AMP, the phase from the light's distance, so fires flicker apart.
 	// «Ночное зрение»: past EYE_EDGE of the way to the corner the frame loses up to EYE_DIM of its light and EYE_GREY
-	// of its colour, as the eye sees at night outside the centre.
+	// of its colour, as the eye sees at night outside the centre. The moon halo is gone (28.11): the moon's rays
+	// in LegionGURays took its place.
 	static const float STAR_GAIN = 2.0;
-	static const float3 MOON_HALO_COLOUR = float3(0.20, 0.24, 0.30);
-	static const float MOON_HALO_R = 0.12;
-	static const float MOON_HALO_FOG = 1.5;
 	static const float FLICKER_AMP = 0.35;
 	static const float EYE_EDGE = 0.35;
 	static const float EYE_GREY = 0.6;
@@ -2903,16 +2893,6 @@ namespace LegionGUNights
 			float kv = max(max(key.r, key.g), key.b);
 			key.rgb = NightCurve(key.rgb, kv, NightLit(kv, ambient), m, false, s, n7.w * outside);
 			o = FogBlend(o, a, fogColour, key, SunInFog(uv));
-		}
-
-		// «Ореол луны» (see MOON_HALO_COLOUR): over the sky and the far land, not on what stands near.
-		float kh = LegionGUValue(LEGIONGU_CTL_MOON_HALO, MoonHalo) * 0.01 * NightFull(s) * keepUI * outside;
-		if (kh > 0.0)
-		{
-			float4 nm = tex2Dfetch(FogCur, int2(8, 0));
-			float2 dh = (uv - nm.xy) * float2(ASPECT, 1.0);
-			float halo = nm.z * exp(-dot(dh, dh) / (2.0 * MOON_HALO_R * MOON_HALO_R)) * (1.0 + MOON_HALO_FOG * FogDial());
-			o += MOON_HALO_COLOUR * (1.0 - saturate(o)) * (kh * halo * (sky ? 1.0 : smoothstep(30.0, NIGHT_FAR_FROM, z)));
 		}
 
 		// the moonlit mist over LegionGUFog's fog (see MIST_COLOUR)
