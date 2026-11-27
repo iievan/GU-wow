@@ -2357,7 +2357,7 @@ namespace LegionGUNights
 	// and its glow blinked. Here a found light stays and eases in and out (see LightSteadyPS): the
 	// block and last frame's, faded. Short enough that a turning camera leaves no visible trail.
 	static const float LIGHT_HOLD_NEAR = 0.04;  // seconds for a light near the player to rise and fade: a shot's flash is gone at once
-	static const float LIGHT_HOLD_FAR = 0.25;   // seconds for a far light: a small far light is found and lost as it slides
+	static const float LIGHT_HOLD_FAR = 0.1;    // seconds for a far light (0.25 to 27.11: the glow hung in the air after a move): a small far light is found and lost as it slides
 	                                            // across the taps, and must rise and fade softly instead of flickering
 	static const float2 LIGHT_HOLD_YD = float2(30.0, 120.0); // yards over which the time goes from near to far
 
@@ -2380,7 +2380,9 @@ namespace LegionGUNights
 		// drops, and it is exactly then that the trails showed.
 		float4 mo = tex2Dfetch(LegionGUMotionS, int2(0, 0));
 		float moAge = float((FrameCount % 8388608u + 8388608u - uint(mo.w + 0.5) % 8388608u) % 8388608u);
-		float turning = moAge <= 2.0 ? saturate(length(mo.xy) * 50.0) : 1.0;
+		// Full from a fifth of a percent of the screen a frame (27.11): at 50 times the shift a slow turn kept most of
+		// the hold, and the glow hung in the air behind the lamps.
+		float turning = moAge <= 2.0 ? saturate(length(mo.xy) * 500.0) : 1.0;
 		tau *= 1.0 - turning;
 		return lerp(prev, now, Rate(FrameSeconds(), ln > lp ? 0.5 * tau : tau));
 	}
