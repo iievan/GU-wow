@@ -1268,8 +1268,14 @@ namespace LegionGUNights
 	static const float DEEP_GLOW = 0.25;        // the lights glow this share more at «Глубина ночи» 100
 	static const float NIGHT_FLOOR = 0.012;
 	static const float NIGHT_SKY_SHARE = 0.6;
-	static const float MOON_SHIFT = 0.6;
-	static const float3 MOON_TINT = float3(0.86, 1.01, 1.30);
+	// The moonlight (27.11): the darkened land goes MOON_SHIFT of the way, in linear light, toward its rod (scotopic)
+	// luminance ROD_W times MOON_TINT. Before, it went 0.6 of the way toward its gamma luma times a strong blue in
+	// gamma space: green grass turned teal-grey and red cloth purple. Now reds darken and fade as at real night
+	// (Purkinje), greens and blues keep their hue, and greys take only a light cool cast.
+	static const float MOON_SHIFT = 0.45;
+	static const float3 MOON_TINT = float3(0.84, 0.98, 1.28);   // linear, luminance about 1
+	static const float3 ROD_W = float3(0.06, 0.56, 0.38);       // rod response on linear sRGB
+	static const float3 LUMA709 = float3(0.2126, 0.7152, 0.0722);
 	// The night fog: the fog colour goes NIGHT_FOG_GREY of the way toward the moonlit grey of its own luminance and
 	// takes NIGHT_FOG_DARK of the sky's darkening, so the distance dissolves into a dull grey-blue that stays lighter
 	// than the dark trees in it, and tree lines pale one behind the other. The haze at the camera takes the colour
@@ -2591,6 +2597,16 @@ namespace LegionGUNights
 		return x * x * x / (1.0 + x * x * x);
 	}
 
+	// The colour d a share k of the way toward moonlight (see MOON_SHIFT), mixed in linear light. The rods see red
+	// darker, so a red goes darker; nothing gets brighter than it was (a blue would by the rods alone).
+	float3 Moonlit(float3 d, float k)
+	{
+		float3 l = pow(max(d, 0.0), 2.2);
+		float3 r = dot(l, ROD_W) * MOON_TINT;
+		r *= min(1.0, dot(l, LUMA709) / max(dot(r, LUMA709), 1e-8));
+		return pow(lerp(l, r, saturate(k)), 1.0 / 2.2);
+	}
+
 	float3 NightCurve(float3 c, float v, float h, float m, bool sky, float s, float deep)
 	{
 		float ms = sky ? lerp(1.0, m, lerp(NIGHT_SKY_SHARE, 1.0, deep)) : m;
@@ -2599,14 +2615,13 @@ namespace LegionGUNights
 		// holding and then dropping.
 		float o = min(v, max(v * exp2(log2(max(ms, 1e-4)) * (1.0 - h)), v * toe / (v + toe)));
 		float3 d = c * (o / max(v, 1e-6));
-		return sky ? d : lerp(d, dot(d, LUMA601) * MOON_TINT, MOON_SHIFT * s * (1.0 - h));
+		return sky ? d : Moonlit(d, MOON_SHIFT * s * (1.0 - h));
 	}
 
 	// The night fog colour (see NIGHT_FOG_GREY).
 	float3 NightFog(float3 fogColour, float m, float s)
 	{
-		float l = dot(fogColour, LUMA601);
-		return lerp(fogColour, l * MOON_TINT, NIGHT_FOG_GREY * s) * lerp(1.0, m, NIGHT_SKY_SHARE * NIGHT_FOG_DARK);
+		return Moonlit(fogColour, NIGHT_FOG_GREY * s) * lerp(1.0, m, NIGHT_SKY_SHARE * NIGHT_FOG_DARK);
 	}
 
 	// The night and the lights on the input colour c at uv (fog dial t), with the fog:
