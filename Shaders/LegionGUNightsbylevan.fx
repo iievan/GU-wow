@@ -1464,6 +1464,11 @@ namespace LegionGUNights
 	static const float MIST_MOON = 0.8;
 	static const float MIST_NIGHT_SHARE = 0.5;   // the moonlit mist at half: at full it laid a milky veil over the night
 	static const float MIST_MOON_R = 0.35;
+	// The moon finder (see FogStatePS texel 8): the moon is at least MOON_CONTRAST times the sky's luminance, its
+	// peak between MOON_MIN.x and .y fades in, and it covers at most MOON_CELLS cells of 64 x 32.
+	static const float MOON_CONTRAST = 3.0;
+	static const float2 MOON_MIN = float2(0.12, 0.25);
+	static const float MOON_CELLS = 24.0;
 	// The indoor share easing at a door (see FogCurTex texel 9): in fast, out slow, like eyes at a doorway.
 	static const float INSIDE_IN = 0.6;
 	static const float INSIDE_OUT = 2.2;
@@ -1559,6 +1564,9 @@ namespace LegionGUNights
 	texture2D NightGridBTex { Width = 32; Height = 16; Format = RGBA16F; MipLevels = 6; };
 	sampler2D NightGridA { Texture = NightGridATex; };
 	sampler2D NightGridB { Texture = NightGridBTex; };
+	// The moon finder (28.11, see MoonCellPS): 64 x 32 cells over the whole screen, 4 x 4 taps each.
+	texture2D MoonCellTex { Width = 64; Height = 32; Format = RGBA16F; };
+	sampler2D MoonCell { Texture = MoonCellTex; MinFilter = POINT; MagFilter = POINT; MipFilter = POINT; };
 	sampler2D L0 { Texture = L0Tex; AddressU = BORDER; AddressV = BORDER; };
 	sampler2D L1 { Texture = L1Tex; AddressU = BORDER; AddressV = BORDER; };
 	sampler2D L2 { Texture = L2Tex; AddressU = BORDER; AddressV = BORDER; };
@@ -1992,6 +2000,33 @@ namespace LegionGUNights
 	// parallel, and their means in the last mip level, which ReShade builds after the pass. A: x = log2 luminance on
 	// the sky, y = 1 on the sky, z = log2 luminance on land, w = 1 on land. B: rgb = log2 colour on the sky, a = the
 	// light of last frame's widest field there, before any strength (see LIGHT_TOTAL_REF). Without depth (last frame's depth state) all zeros.
+	// The moon finder: each cell keeps its brightest sky tap of 4 x 4 (a tap every 13 pixels across at 3440 wide, so
+	// the moon is always hit), xy = where, z = its luminance. The night grid alone was too coarse: the centroid of its
+	// sky taps landed on the glow of the horizon or on a fixed point above the player, and the halo and the moonlit
+	// mist stood there instead of on the moon (28.11).
+	float4 MoonCellPS(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+	{
+		float4 depthPrev = tex2Dfetch(FogPrev, int2(1, 0));
+		float4 best = float4(0.0, 0.0, 0.0, 0.0);
+		if (depthPrev.y < 0.5)
+			return best;
+		[unroll]
+		for (int j = 0; j < 4; ++j)
+		{
+			[unroll]
+			for (int i = 0; i < 4; ++i)
+			{
+				float2 g = (floor(pos.xy) * 4.0 + float2(i, j) + 0.5) / float2(256.0, 128.0);
+				if (!IsSky(DepthU(RawDepth(g), EffectiveReversed(depthPrev.w))) || LegionGUUIAt(g) > 0.5)
+					continue;
+				float l = dot(tex2Dlod(ColorPoint, float4(g, 0.0, 0.0)).rgb, LUMA601);
+				if (l > best.z)
+					best = float4(g, l, 1.0);
+			}
+		}
+		return best;
+	}
+
 	void NightGridPS(float4 pos : SV_Position, float2 uv : TEXCOORD0, out float4 a : SV_Target0, out float4 b : SV_Target1)
 	{
 		a = float4(0.0, 0.0, 0.0, 0.0);
@@ -2033,26 +2068,46 @@ namespace LegionGUNights
 			return float4(skyL, cold, ga.y, lights);
 		if (texel == 8)
 		{
-			// the moon side: the centroid of the night grid's sky taps weighted steeply by their luminance
-			float3 mw = float3(0.0, 0.0, 0.0);
-			float peak = 0.0;
+			// The moon (see MoonCellPS): the brightest sky cell, if it is MOON_CONTRAST times the sky and small (at most
+			// MOON_CELLS cells at half its brightness: a glowing horizon is wide), and the centroid of those cells.
+			// Found, the place is taken as it is; lost, it rides with the camera and the strength fades, so nothing
+			// glows where no moon is.
+			float3 pk = float3(0.0, 0.0, 0.0);
 			[loop]
-			for (int j = 0; j < 16; ++j)
+			for (int j = 0; j < 32; ++j)
 			{
 				[loop]
-				for (int i = 0; i < 32; ++i)
+				for (int i = 0; i < 64; ++i)
 				{
-					float4 q = tex2Dfetch(NightGridA, int2(i, j));
-					float w = q.y > 0.5 ? exp2(4.0 * q.x) : 0.0;
-					mw += float3(0.10 + 0.80 * (i + 0.5) / 32.0, 0.05 + 0.70 * (j + 0.5) / 16.0, 1.0) * w;
-					peak = max(peak, q.y > 0.5 ? q.x : -20.0);
+					float4 q = tex2Dfetch(MoonCell, int2(i, j));
+					if (q.z > pk.z)
+						pk = q.xyz;
 				}
 			}
+			float3 mw = float3(0.0, 0.0, 0.0);
+			float n = 0.0;
+			if (pk.z > 0.0)
+			{
+				[loop]
+				for (int j = 0; j < 32; ++j)
+				{
+					[loop]
+					for (int i = 0; i < 64; ++i)
+					{
+						float4 q = tex2Dfetch(MoonCell, int2(i, j));
+						if (q.z > 0.5 * pk.z)
+						{
+							mw += float3(q.xy * q.z, q.z);
+							n += 1.0;
+						}
+					}
+				}
+			}
+			float seen = n > 0.0 && n <= MOON_CELLS ? smoothstep(MOON_CONTRAST, 2.0 * MOON_CONTRAST, pk.z / max(skyL, 1e-3)) * smoothstep(MOON_MIN.x, MOON_MIN.y, pk.z) : 0.0;
 			float4 prev8 = tex2Dfetch(FogPrev, int2(8, 0));
-			float4 moon = float4(mw.xy / max(mw.z, 1e-12), smoothstep(-3.5, -2.0, peak), 1.0);
-			if (mw.z <= 0.0)
-				moon = float4(prev8.xy, 0.0, 1.0);
-			return prev8.w > 0.5 ? lerp(prev8, moon, Rate(dt, 0.5)) : moon;
+			float2 at = seen > 0.0 ? mw.xy / mw.z : prev8.xy + LegionGUMotionRawUV();
+			float z = prev8.w > 0.5 ? lerp(prev8.z, seen, Rate(dt, 0.3)) : seen;
+			return float4(at, z, 1.0);
 		}
 		bool seedNow = !seeded && landOk;
 
@@ -3716,6 +3771,7 @@ namespace LegionGUNights
 	>
 	{
 		pass NightGrid { VertexShader = FullscreenVS; PixelShader = NightGridPS; RenderTarget0 = NightGridATex; RenderTarget1 = NightGridBTex; }
+		pass MoonCells { VertexShader = FullscreenVS; PixelShader = MoonCellPS; RenderTarget = MoonCellTex; }
 		pass NightState { VertexShader = FullscreenVS; PixelShader = FogStatePS; RenderTarget = FogCurTex; }
 		pass NightSave { VertexShader = FullscreenVS; PixelShader = FogSavePS; RenderTarget = FogPrevTex; }
 		pass LightFind { VertexShader = FullscreenVS; PixelShader = LightFindPS; RenderTarget = LightRawTex; }
