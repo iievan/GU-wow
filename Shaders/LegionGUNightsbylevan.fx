@@ -187,7 +187,7 @@
 #define LEGIONGU_CTL_GI 43       // the light bounced off nearby surfaces, 0 off (15.11.2026)
 #define LEGIONGU_CTL_MOON_TINT 44 // the moonlight tint, 50 the look of 27.11 (27.11.2026)
 #define LEGIONGU_CTL_STARS 45    // the stars and the moon against the darkened sky, 0 as the night curve leaves them
-#define LEGIONGU_CTL_MOON_RAYS 46 // the moon's rays at night, read by LegionGURays (28.11.2026, was the moon halo)
+#define LEGIONGU_CTL_FREE_46 46  // free: the moon halo and then the moon rays lived here, both removed (28.11.2026)
 #define LEGIONGU_CTL_NIGHT_MIST 47 // the moonlit mist, 50 the old fixed half
 #define LEGIONGU_CTL_FLICKER 48  // the firelight flickers, 0 steady
 #define LEGIONGU_CTL_NIGHT_EYE 49 // night vision: soft dark corners and grain in the dark, 0 off
@@ -1323,8 +1323,8 @@ namespace LegionGUNights
 	// their own colour and STAR_GAIN past it. «Живое пламя»: the pools and the
 	// glow in the air swing by up to FLICKER_AMP, the phase from the light's distance, so fires flicker apart.
 	// «Ночное зрение»: past EYE_EDGE of the way to the corner the frame loses up to EYE_DIM of its light and EYE_GREY
-	// of its colour, as the eye sees at night outside the centre. The moon halo is gone (28.11): the moon's rays
-	// in LegionGURays took its place.
+	// of its colour, as the eye sees at night outside the centre. The moon halo is gone (28.11): it never stood
+	// steadily on the moon.
 	static const float STAR_GAIN = 2.0;
 	static const float FLICKER_AMP = 0.35;
 	static const float EYE_EDGE = 0.35;

@@ -7,7 +7,7 @@
 
 Публичное имя мода — **Graphic Update.. Wow!**. GU-WOW — рабочее название разработки, оно остаётся в именах файлов (`GU-WOW.exe`) и в адресе репозитория.
 
-Текущая сборка: **2.0.3-release «Живой воздух»**, лёгкая сборка **Lite 2.0.4**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Текущая сборка: **2.0.3-release «Живой воздух»**, лёгкая сборка **Lite 2.0.6 beta**. Скачать: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## Поддержка систем
 
@@ -137,7 +137,7 @@ Please note: glitches, visual artifacts, and rendering inaccuracies may occur du
 
 The mod's public name is **Graphic Update.. Wow!**. GU-WOW is the working development name; it stays in the file names (`GU-WOW.exe`) and in the repository address.
 
-Current build: **2.0.3-release "Living Air"**, the light build **Lite 2.0.4**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
+Current build: **2.0.3-release "Living Air"**, the light build **Lite 2.0.6 beta**. Download: [Releases](https://github.com/iievan/GU-wow/releases/latest).
 
 ## System Support
 

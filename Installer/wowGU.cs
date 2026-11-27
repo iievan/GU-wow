@@ -23,9 +23,9 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("GU-WOW: fog, sun rays, night and picture for World of Warcraft. Installer and support helper.")]
 [assembly: AssemblyCompany("levan")]
 [assembly: AssemblyCopyright("© 2026 levan")]
-[assembly: AssemblyVersion("2.0.5")]
-[assembly: AssemblyFileVersion("2.0.5")]
-[assembly: AssemblyInformationalVersion("2.0.5-beta")]
+[assembly: AssemblyVersion("2.0.6")]
+[assembly: AssemblyFileVersion("2.0.6")]
+[assembly: AssemblyInformationalVersion("2.0.6-beta")]
 
 class ShotForm : Form
 {
@@ -35,7 +35,7 @@ class ShotForm : Form
 
 static class WowGU
 {
-	const string Version = "2.0.5-beta";
+	const string Version = "2.0.6-beta";
 	// GU-WOW-Lite.exe is the same installer built with /define:LITE: it switches LEGIONGU_LITE on in the preset,
 	// the full one switches it off, so either can be installed over the other.
 #if LITE

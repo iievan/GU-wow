@@ -1,5 +1,27 @@
 # Graphic Update.. Wow! (в разработке GU-WOW): история версий / Version history
 
+## 2.0.6-beta-lite «Лунная ночь» / "Moonlit Night"
+
+### Русский
+
+**Новое**
+- Ночь в лунном свете считается в линейном свете, как видит глаз в темноте. Красные цвета больше не уходят в фиолетовый.
+- Пять ползунков на странице «Ночь»: лунный оттенок, звёзды и луна, лунная дымка, живое пламя, ночное зрение. У оттенка и дымки 50 значит как было.
+- Размытие мягче. Ползунки размытия работают по квадрату, низкие значения больше не смазывают картинку, даль за фокусом размывается плавнее.
+
+**Исправлено**
+- Свечение огней не висит в воздухе позади движущейся камеры.
+
+### English
+
+**New**
+- The moonlit night is computed in linear light, the way the eye sees in the dark. Reds no longer turn purple.
+- Five sliders on the Night page: moon tint, stars and moon, moonlit mist, living flame, night vision. For the tint and the mist 50 is as before.
+- Softer blur. The blur sliders work on the square, low values no longer smear the picture, the land behind the focus blurs more gently.
+
+**Fixed**
+- The lights' glow no longer hangs in the air behind a moving camera.
+
 ## 2.0.5-beta-lite «Фотограф» / "Photographer"
 
 ### Русский

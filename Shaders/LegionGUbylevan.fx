@@ -217,7 +217,7 @@
 #define LEGIONGU_CTL_GI 43       // the light bounced off nearby surfaces, 0 off (15.11.2026)
 #define LEGIONGU_CTL_MOON_TINT 44 // the moonlight tint, 50 the look of 27.11 (27.11.2026)
 #define LEGIONGU_CTL_STARS 45    // the stars and the moon against the darkened sky, 0 as the night curve leaves them
-#define LEGIONGU_CTL_MOON_RAYS 46 // the moon's rays at night, 50 as strong as the sun's (28.11.2026, was the moon halo)
+#define LEGIONGU_CTL_FREE_46 46  // free: the moon halo and then the moon rays lived here, both removed (28.11.2026)
 #define LEGIONGU_CTL_NIGHT_MIST 47 // the moonlit mist, 50 the old fixed half
 #define LEGIONGU_CTL_FLICKER 48  // the firelight flickers, 0 steady
 #define LEGIONGU_CTL_NIGHT_EYE 49 // night vision: soft dark corners and grain in the dark, 0 off
@@ -454,13 +454,6 @@ namespace LegionGU
 		ui_label = "Сила лучей";
 		ui_tooltip = "Яркость солнечных лучей: 0 без лучей.";
 	> = 100.0;
-
-	uniform float MoonRays <
-		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
-		ui_category = "Атмосфера";
-		ui_label = "Лучи луны";
-		ui_tooltip = "Ночью луна даёт лучи, как солнце днём: 50 такие же по силе, 0 без лучей.";
-	> = 50.0;
 
 	uniform float MistAmount <
 		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
@@ -3124,7 +3117,8 @@ namespace LegionGU
 	// the canopy estimate is 0, so only the open strength is left. With "rays only with depth" the rays go out a second after the depth stopped differing (a
 	// cleared buffer on a loading screen, no depth in a cinematic, like the original's placement 0), and they
 	// fade back in with depth. The canopy estimate leaves RAYS_OPEN_GAIN of the strength in the open.
-	static const float3 MOON_COLOUR = float3(0.75, 0.85, 1.0);  // moonbeams take this cold colour
+	static const float MOON_RAYS = 0.3;                        // moonbeams at this share of «Сила лучей»
+	static const float3 MOON_COLOUR = float3(0.75, 0.85, 1.0);  // and this cold colour
 	// The colour of the light by the game clock (1.6.8): deep gold at sunrise and sunset, the plain warm white
 	// of RaysColour at noon. The blend runs over about two hours on each side of 6:30 and 19:30.
 	static const float3 DAWN_COLOUR = float3(1.0, 0.72, 0.42);
@@ -3143,11 +3137,11 @@ namespace LegionGU
 			return c;
 		// No rays at night by the game's clock: the finder takes the moon or the glow at the horizon for the sun, and the
 		// frame dazzled whenever the camera turned to the horizon.
-		// At night the moon (a clipped white disk, like the sun to the finder) gives cold rays with every dial of the
-		// sun's, times «Лучи луны»: 50 as strong as the sun, 0 none, 100 twice (28.11.2026; until then a fixed 0.3).
-		// The glow at the horizon has no clipped channel and gives none.
+		// At night the moon (a clipped white disk, like the sun to the finder) gives soft cold rays at MOON_RAYS of the
+		// strength; the glow at the horizon has no clipped channel and gives none. Stronger moonbeams with their own
+		// dial were tried on 28.11.2026 and rejected by the owner.
 		float nightNow = LegionGUNight();
-		float gain = LegionGUValue(LEGIONGU_CTL_RAYS, RaysStrength) * 0.01 * RaysMaxExposure * lerp(1.0, LegionGUValue(LEGIONGU_CTL_MOON_RAYS, MoonRays) * 0.02, nightNow);
+		float gain = LegionGUValue(LEGIONGU_CTL_RAYS, RaysStrength) * 0.01 * RaysMaxExposure * lerp(1.0, MOON_RAYS, nightNow);
 		float4 depthState = tex2Dfetch(RaysCur, int2(2, 0));
 		float depthLive = depthState.x * depthState.y;
 		if (SunMode == 0)

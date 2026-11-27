@@ -5,7 +5,7 @@
 -- magenta (the signature); each value 0..63 takes two cells, high bits first; the last two are the checksum.
 -- Besides the settings the strip carries what only the game knows: the time of day, indoors, flying, photo mode.
 
-local VERSION = "2.0.5-beta"
+local VERSION = "2.0.6-beta"
 local CELL = 4
 local CELLS = 103
 
@@ -55,7 +55,7 @@ local DEFAULTS = {
 	-- 2.0.5: a screenshot by itself when an achievement or a new level comes.
 	autoShot = false,
 	-- 27.11.2026: the night's own dials, 50 for the moon tint and the mist is the look before them.
-	moonTint = 50, nightStars = 30, moonRays = 50, nightMist = 50, fireFlicker = 30, nightEye = 20,
+	moonTint = 50, nightStars = 30, nightMist = 50, fireFlicker = 30, nightEye = 20,
 }
 -- 1.7.3: how much of each panel shows, 100 whole, 0 gone: ui_ in plain play, photo_ in photo mode, game_ in the
 -- play photo mode (1.7.6), where only the chat stays by default.
@@ -478,7 +478,7 @@ local function Paint()
 		chatL, chatT, chatR, chatB,
 		Code(V("lightThreshold") or 50), Code(V("lightRadius") or 50), Code(V("motionBlur") or 0),
 		Code(V("playBlur") or 0), Code(Effective("gi")),
-		Code(V("moonTint") or 50), Code(V("nightStars") or 0), Code(V("moonRays") or 50), Code(V("nightMist") or 50),
+		Code(V("moonTint") or 50), Code(V("nightStars") or 0), Code(0), Code(V("nightMist") or 50),
 		Code(V("fireFlicker") or 0), Code(V("nightEye") or 0) }
 	for i, v in ipairs(extra) do
 		Cell(3 + 2 * (#VALUES + i), v)
@@ -1423,8 +1423,8 @@ end
 -- Yes or no before a change that replaces or deletes something. The action runs only on «Accept».
 -- What is new, once after an update.
 StaticPopupDialogs["GUWOW_NEWS"] = {
-	text = T("Graphic Update.. Wow! обновлён: 2.0.5 «Фотограф».\n\nКамера в фоторежиме: W, A, S, D водят камеру вокруг героя, Q и E приближают. Героя можно сдвинуть в кадре и наклонить камеру. Три ракурса запоминаются на Shift+1, 2, 3.\n\nСетка третей на клавише G, снимок через 3 секунды, снимок сам при достижении. Густота дождя и снега в системных настройках.\n\nПанели Bartender4 теперь тоже прячутся.\n\nМеню: /gu или кнопка у миникарты.",
-		"Graphic Update.. Wow! is updated: 2.0.5 “Photographer”.\n\nThe photo mode camera: W, A, S, D move it around the hero, Q and E zoom. Shift the hero in the frame and tilt the camera. Three views are saved on Shift+1, 2, 3.\n\nA thirds grid on G, a shot in 3 seconds, a shot by itself on an achievement. Rain and snow density in the system settings.\n\nThe Bartender4 bars hide too now.\n\nMenu: /gu or the minimap button."),
+	text = T("Graphic Update.. Wow! обновлён: 2.0.6 «Лунная ночь».\n\nНочь в лунном свете: красные цвета больше не уходят в фиолетовый.\n\nНа странице «Ночь» пять новых ползунков: лунный оттенок, звёзды и луна, лунная дымка, живое пламя, ночное зрение.\n\nРазмытие мягче, свечение огней не отстаёт от камеры.\n\nМеню: /gu или кнопка у миникарты.",
+		"Graphic Update.. Wow! is updated: 2.0.6 “Moonlit Night”.\n\nThe night in moonlight: reds no longer turn purple.\n\nFive new sliders on the Night page: moon tint, stars and moon, moonlit mist, living flame, night vision.\n\nSofter blur, and the lights' glow keeps up with the camera.\n\nMenu: /gu or the minimap button."),
 	button1 = OKAY or "OK",
 	timeout = 0,
 	whileDead = 1,
@@ -1935,9 +1935,6 @@ Slider(panelRays, "raysReach", T("Длина лучей (50 — как было)
 	T("Как далеко от солнца тянутся лучи. Меньше — короткие, больше — через весь экран", "How far the shafts reach from the sun. Lower is short, higher crosses the screen"))
 Slider(panelRays, "sunGlow", T("Свечение солнца в тумане (50 — как было)", "Sun glow in the fog (50 — as before)"), R + 6, -142, nil, nil, 76,
 	T("Светлое пятно вокруг солнца, когда оно в тумане", "The bright patch round the sun when it is in the fog"))
--- 28.11.2026: the moon gives the same rays at night, with every dial above; this one is its strength.
-Slider(panelRays, "moonRays", T("Лучи луны (50 — как у солнца)", "Moon rays (50 — as the sun's)"), R + 6, -184, nil, nil, nil,
-	T("Ночью луна даёт такие же лучи, как солнце днём. 0 — без лучей, 100 — вдвое ярче солнечных", "At night the moon gives the same rays as the sun by day. 0 none, 100 twice the sun's"))
 
 Header(panelNight, T("Ночь", "Night"), L, -60)
 Check(panelNight, "night", T("Ночь и огни", "Night and lights"), L, -76)
