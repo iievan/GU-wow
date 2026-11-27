@@ -536,7 +536,7 @@ namespace LegionGUNights
 		ui_type = "slider"; ui_min = 0.0; ui_max = 100.0; ui_step = 1.0;
 		ui_category = "Ночь";
 		ui_label = "Ночное зрение";
-		ui_tooltip = "В темноте края кадра чуть размыты и темнее, в самых тёмных местах мелкое зерно: 0 выключено.\n"
+		ui_tooltip = "В темноте края кадра чуть размыты и темнее: 0 выключено.\n"
 		             "Освещённые места и интерфейс не трогает.";
 	> = 20.0;
 
@@ -1331,7 +1331,7 @@ namespace LegionGUNights
 	// 8), MOON_HALO_R screen heights wide, MOON_HALO_FOG times more at fog dial 1. «Живое пламя»: the pools and the
 	// glow in the air swing by up to FLICKER_AMP, the phase from the light's distance, so fires flicker apart.
 	// «Ночное зрение»: past EYE_EDGE of the way to the corner the dark blurs over EYE_BLUR_PX pixels and loses
-	// EYE_DIM, and the darkest land takes grain of EYE_GRAIN.
+	// EYE_DIM.
 	static const float STAR_GAIN = 0.8;
 	static const float3 MOON_HALO_COLOUR = float3(0.07, 0.085, 0.11);
 	static const float MOON_HALO_R = 0.12;
@@ -1340,7 +1340,6 @@ namespace LegionGUNights
 	static const float EYE_EDGE = 0.35;
 	static const float EYE_BLUR_PX = 3.0;
 	static const float EYE_DIM = 0.25;
-	static const float EYE_GRAIN = 0.03;
 	// The night fog: the fog colour goes NIGHT_FOG_GREY of the way toward the moonlit grey of its own luminance and
 	// takes NIGHT_FOG_DARK of the sky's darkening, so the distance dissolves into a dull grey-blue that stays lighter
 	// than the dark trees in it, and tree lines pale one behind the other. The haze at the camera takes the colour
@@ -2677,7 +2676,9 @@ namespace LegionGUNights
 		if (k <= 0.0)
 			return 1.0;
 		float ts = GUTimer * 0.001;
-		float ph = z * 2.1;
+		// The phase turns once per 50 yards of the light's depth (27.11): once per 3 yards, the depth that varies
+		// across one glow drew moving bands, a ripple over the night.
+		float ph = z * 0.125;
 		return 1.0 + FLICKER_AMP * k * (0.6 * sin(ts * 7.3 + ph) + 0.4 * sin(ts * 13.1 + ph * 1.7));
 	}
 
@@ -2913,15 +2914,13 @@ namespace LegionGUNights
 			float rolled = FLAME_KNEE + (1.0 - FLAME_KNEE) * (1.0 - exp(-(pk - FLAME_KNEE) / (1.0 - FLAME_KNEE)));
 			res *= lerp(1.0, rolled / pk, nearL);
 		}
-		// «Ночное зрение»: the dark corners lose a little light, the darkest land takes a fine grain.
+		// «Ночное зрение»: the dark corners lose a little light. The grain over the dark (27.11) went out the same day:
+		// new every frame, it read as a ripple over the whole night.
 		if (eyeK > 0.0)
 		{
 			float rv = max(max(res.r, res.g), res.b);
 			float dk = (1.0 - smoothstep(0.0, 3.0 * ambient, rv)) * keepUI;
 			res *= 1.0 - EYE_DIM * eyeEdge * dk;
-			float2 gp = uv * float2(BUFFER_WIDTH, BUFFER_HEIGHT) + float(LegionGUFrame % 64u) * float2(17.0, 31.0);
-			float g = frac(sin(dot(gp, float2(12.9898, 78.233))) * 43758.5453) - 0.5;
-			res = max(res + g * EYE_GRAIN * eyeK * dk, 0.0);
 		}
 		return res;
 	}
