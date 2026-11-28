@@ -11,6 +11,7 @@
 
 **Исправлено**
 - Свечение огней не висит в воздухе позади движущейся камеры.
+- Ночь, «Картинка» и «Фоторежим» снова загружаются. В первой сборке 2.0.6 beta они не включались совсем.
 
 ### English
 
@@ -21,6 +22,7 @@
 
 **Fixed**
 - The lights' glow no longer hangs in the air behind a moving camera.
+- The night, the Picture and the Photo mode load again. In the first 2.0.6 beta build they did not start at all.
 
 ## 2.0.5-beta-lite «Фотограф» / "Photographer"
 
