@@ -2010,11 +2010,12 @@ namespace LegionGUNights
 			[unroll]
 			for (int i = 0; i < 4; ++i)
 			{
+				// A weight, not continue: ReShade turns a continue in an unrolled loop into a loop D3DCompile cannot
+				// unroll, and the whole night file failed to load (28.11).
 				float2 g = (floor(pos.xy) * 4.0 + float2(i, j) + 0.5) / float2(256.0, 128.0);
-				if (!IsSky(DepthU(RawDepth(g), EffectiveReversed(depthPrev.w))) || LegionGUUIAt(g) > 0.5)
-					continue;
-				sum += float3(g, dot(tex2Dlod(ColorPoint, float4(g, 0.0, 0.0)).rgb, LUMA601));
-				k += 1.0;
+				float w = IsSky(DepthU(RawDepth(g), EffectiveReversed(depthPrev.w))) && LegionGUUIAt(g) <= 0.5 ? 1.0 : 0.0;
+				sum += w * float3(g, dot(tex2Dlod(ColorPoint, float4(g, 0.0, 0.0)).rgb, LUMA601));
+				k += w;
 			}
 		}
 		return k >= MOON_SKY_TAPS ? float4(sum / k, 1.0) : float4(0.0, 0.0, 0.0, 0.0);
